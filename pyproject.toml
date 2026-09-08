@@ -1,0 +1,19 @@
+[project]
+name = "text2sql-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Bonkaa", email = "kinnguynhu@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.5.5",
+]
+
+[project.scripts]
+text2sql-agent = "text2sql_agent:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"

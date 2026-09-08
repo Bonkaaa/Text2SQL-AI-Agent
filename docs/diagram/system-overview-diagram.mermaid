@@ -1,0 +1,73 @@
+graph TB
+    subgraph ClientLayer ["1. Tầng Trình duyệt & Người dùng (Client)"]
+        UserAnalyst["Analyst (Hỏi số liệu, duyệt query)"]
+        UserAdmin["Admin (Quản trị schema, kiểm soát log)"]
+    end
+
+    subgraph FrontendLayer ["2. Tầng Giao diện (Next.js + Recharts)"]
+        ChatUI["Chat Interface (Hỏi đáp tiếng Việt, Streaming)"]
+        HITLModal["HITL Approval Modal (Xem trước SQL & Cost)"]
+        DataViz["Data Visualization (Recharts + Data Table)"]
+        AuthUI["Auth Guard (Supabase Auth Login)"]
+    end
+
+    subgraph BackendLayer ["3. Tầng Dịch vụ Cổng (FastAPI Gateway)"]
+        APIRouter["API Router (/ask, /approve, /history)"]
+        AuthMiddleware["RBAC & Auth Middleware"]
+        SessionMgr["Session Checkpointer (LangGraph Memory)"]
+        AuditService["Audit Log Service"]
+    end
+
+    subgraph AgentLayer ["4. Tầng AI Agent (DeepAgents + LangGraph)"]
+        Supervisor["Deep Agent Supervisor (Planner & Todo)"]
+        Clarifier["Clarification Loop (Xử lý mơ hồ)"]
+        Retriever["Schema & Value Retriever"]
+        SQLGen["SQL Generator (Error-aware Prompting)"]
+        ControlPipeline["LangGraph Control Subgraph (AST + Cost + RBAC)"]
+        Synthesizer["Response Synthesizer (Chart & Insights)"]
+    end
+
+    subgraph StorageLayer ["5. Tầng Dữ liệu & Warehouse (TPC-H Benchmark)"]
+        WarehouseDuckDB[("DuckDB: data/tpch.duckdb (Local TPC-H)")]
+        WarehouseBigQuery[("BigQuery: TPC-H Sandbox (Cloud Warehouse)")]
+        VectorStore[("Vector DB: Qdrant / pgvector")]
+        AuditDB[("PostgreSQL / SQLite (Audit & Sessions)")]
+    end
+
+    subgraph ExternalServices ["6. Dịch vụ AI & Đám mây"]
+        LLMTier1["LLM Tier 1: Claude 3.5 Sonnet / GPT-4o"]
+        LLMTier2["LLM Tier 2: Claude 3.5 Haiku / GPT-4o-mini"]
+    end
+
+    %% Client -> Frontend
+    UserAnalyst --> ChatUI
+    UserAnalyst --> HITLModal
+    UserAdmin --> DataViz
+    UserAdmin --> AuthUI
+
+    %% Frontend -> Backend
+    ChatUI -->|HTTP SSE Streaming| APIRouter
+    HITLModal -->|POST /approve| APIRouter
+    AuthUI --> AuthMiddleware
+
+    %% Backend internal
+    APIRouter --> AuthMiddleware
+    APIRouter --> SessionMgr
+    APIRouter --> Supervisor
+
+    %% Agent internal
+    Supervisor --> Clarifier
+    Supervisor --> Retriever
+    Supervisor --> SQLGen
+    Supervisor --> ControlPipeline
+    Supervisor --> Synthesizer
+
+    %% Agent -> Data & External
+    Retriever --> VectorStore
+    Retriever --> LLMTier2
+    SQLGen --> LLMTier1
+    ControlPipeline --> WarehouseDuckDB
+    ControlPipeline --> WarehouseBigQuery
+    ControlPipeline --> AuditService
+    AuditService --> AuditDB
+    Synthesizer --> LLMTier2
