@@ -160,6 +160,7 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     return {"status": "healthy"}
@@ -265,10 +266,12 @@ from rich.console import Console
 app = typer.Typer()
 console = Console()
 
+
 @app.command()
 def hello(name: str = typer.Option(..., "--name", "-n", help="Your name")):
     """Greet someone"""
     console.print(f"[bold green]Hello {name}![/bold green]")
+
 
 def main():
     app()

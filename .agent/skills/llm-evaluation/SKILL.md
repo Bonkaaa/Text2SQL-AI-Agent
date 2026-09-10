@@ -78,28 +78,27 @@ Use stronger LLMs to evaluate weaker model outputs.
 from llm_eval import EvaluationSuite, Metric
 
 # Define evaluation suite
-suite = EvaluationSuite([
-    Metric.accuracy(),
-    Metric.bleu(),
-    Metric.bertscore(),
-    Metric.custom(name="groundedness", fn=check_groundedness)
-])
+suite = EvaluationSuite(
+    [
+        Metric.accuracy(),
+        Metric.bleu(),
+        Metric.bertscore(),
+        Metric.custom(name="groundedness", fn=check_groundedness),
+    ]
+)
 
 # Prepare test cases
 test_cases = [
     {
         "input": "What is the capital of France?",
         "expected": "Paris",
-        "context": "France is a country in Europe. Paris is its capital."
+        "context": "France is a country in Europe. Paris is its capital.",
     },
     # ... more test cases
 ]
 
 # Run evaluation
-results = suite.evaluate(
-    model=your_model,
-    test_cases=test_cases
-)
+results = suite.evaluate(model=your_model, test_cases=test_cases)
 
 print(f"Overall Accuracy: {results.metrics['accuracy']}")
 print(f"BLEU Score: {results.metrics['bleu']}")
@@ -111,20 +110,19 @@ print(f"BLEU Score: {results.metrics['bleu']}")
 ```python
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
+
 def calculate_bleu(reference, hypothesis):
     """Calculate BLEU score between reference and hypothesis."""
     smoothie = SmoothingFunction().method4
 
     return sentence_bleu(
-        [reference.split()],
-        hypothesis.split(),
-        smoothing_function=smoothie
+        [reference.split()], hypothesis.split(), smoothing_function=smoothie
     )
+
 
 # Usage
 bleu = calculate_bleu(
-    reference="The cat sat on the mat",
-    hypothesis="A cat is sitting on the mat"
+    reference="The cat sat on the mat", hypothesis="A cat is sitting on the mat"
 )
 ```
 
@@ -132,15 +130,16 @@ bleu = calculate_bleu(
 ```python
 from rouge_score import rouge_scorer
 
+
 def calculate_rouge(reference, hypothesis):
     """Calculate ROUGE scores."""
-    scorer = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+    scorer = rouge_scorer.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
     scores = scorer.score(reference, hypothesis)
 
     return {
-        'rouge1': scores['rouge1'].fmeasure,
-        'rouge2': scores['rouge2'].fmeasure,
-        'rougeL': scores['rougeL'].fmeasure
+        "rouge1": scores["rouge1"].fmeasure,
+        "rouge2": scores["rouge2"].fmeasure,
+        "rougeL": scores["rougeL"].fmeasure,
     }
 ```
 
@@ -148,19 +147,17 @@ def calculate_rouge(reference, hypothesis):
 ```python
 from bert_score import score
 
+
 def calculate_bertscore(references, hypotheses):
     """Calculate BERTScore using pre-trained BERT."""
     P, R, F1 = score(
-        hypotheses,
-        references,
-        lang='en',
-        model_type='microsoft/deberta-xlarge-mnli'
+        hypotheses, references, lang="en", model_type="microsoft/deberta-xlarge-mnli"
     )
 
     return {
-        'precision': P.mean().item(),
-        'recall': R.mean().item(),
-        'f1': F1.mean().item()
+        "precision": P.mean().item(),
+        "recall": R.mean().item(),
+        "f1": F1.mean().item(),
     }
 ```
 
@@ -176,14 +173,16 @@ def calculate_groundedness(response, context):
     result = nli(f"{context} [SEP] {response}")[0]
 
     # Return confidence that response is entailed by context
-    return result['score'] if result['label'] == 'ENTAILMENT' else 0.0
+    return result["score"] if result["label"] == "ENTAILMENT" else 0.0
+
 
 def calculate_toxicity(text):
     """Measure toxicity in generated text."""
     from detoxify import Detoxify
 
-    results = Detoxify('original').predict(text)
+    results = Detoxify("original").predict(text)
     return max(results.values())  # Return highest toxicity score
+
 
 def calculate_factuality(claim, knowledge_base):
     """Verify factual claims against knowledge base."""
@@ -216,9 +215,7 @@ Provide ratings in JSON format:
 """
 
     result = openai.ChatCompletion.create(
-        model="gpt-5",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+        model="gpt-5", messages=[{"role": "user", "content": prompt}], temperature=0
     )
 
     return json.loads(result.choices[0].message.content)
@@ -247,9 +244,7 @@ Answer with JSON:
 """
 
     result = openai.ChatCompletion.create(
-        model="gpt-5",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+        model="gpt-5", messages=[{"role": "user", "content": prompt}], temperature=0
     )
 
     return json.loads(result.choices[0].message.content)
@@ -275,30 +270,31 @@ class AnnotationTask:
             "ratings": {
                 "accuracy": {
                     "scale": "1-5",
-                    "description": "Is the response factually correct?"
+                    "description": "Is the response factually correct?",
                 },
                 "relevance": {
                     "scale": "1-5",
-                    "description": "Does it answer the question?"
+                    "description": "Does it answer the question?",
                 },
                 "coherence": {
                     "scale": "1-5",
-                    "description": "Is it logically consistent?"
-                }
+                    "description": "Is it logically consistent?",
+                },
             },
             "issues": {
                 "factual_error": False,
                 "hallucination": False,
                 "off_topic": False,
-                "unsafe_content": False
+                "unsafe_content": False,
             },
-            "feedback": ""
+            "feedback": "",
         }
 ```
 
 ### Inter-Rater Agreement
 ```python
 from sklearn.metrics import cohen_kappa_score
+
 
 def calculate_agreement(rater1_scores, rater2_scores):
     """Calculate inter-rater agreement."""
@@ -310,13 +306,10 @@ def calculate_agreement(rater1_scores, rater2_scores):
         kappa < 0.4: "Fair",
         kappa < 0.6: "Moderate",
         kappa < 0.8: "Substantial",
-        kappa <= 1.0: "Almost Perfect"
+        kappa <= 1.0: "Almost Perfect",
     }
 
-    return {
-        "kappa": kappa,
-        "interpretation": interpretation[True]
-    }
+    return {"kappa": kappa, "interpretation": interpretation[True]}
 ```
 
 ## A/B Testing
@@ -325,6 +318,7 @@ def calculate_agreement(rater1_scores, rater2_scores):
 ```python
 from scipy import stats
 import numpy as np
+
 
 class ABTest:
     def __init__(self, variant_a_name="A", variant_b_name="B"):
@@ -347,19 +341,20 @@ class ABTest:
         t_stat, p_value = stats.ttest_ind(a_scores, b_scores)
 
         # Effect size (Cohen's d)
-        pooled_std = np.sqrt((np.std(a_scores)**2 + np.std(b_scores)**2) / 2)
+        pooled_std = np.sqrt((np.std(a_scores) ** 2 + np.std(b_scores) ** 2) / 2)
         cohens_d = (np.mean(b_scores) - np.mean(a_scores)) / pooled_std
 
         return {
             "variant_a_mean": np.mean(a_scores),
             "variant_b_mean": np.mean(b_scores),
             "difference": np.mean(b_scores) - np.mean(a_scores),
-            "relative_improvement": (np.mean(b_scores) - np.mean(a_scores)) / np.mean(a_scores),
+            "relative_improvement": (np.mean(b_scores) - np.mean(a_scores))
+            / np.mean(a_scores),
             "p_value": p_value,
             "statistically_significant": p_value < alpha,
             "cohens_d": cohens_d,
             "effect_size": self.interpret_cohens_d(cohens_d),
-            "winner": "B" if np.mean(b_scores) > np.mean(a_scores) else "A"
+            "winner": "B" if np.mean(b_scores) > np.mean(a_scores) else "A",
         }
 
     @staticmethod
@@ -401,17 +396,16 @@ class RegressionDetector:
 
             # Flag if significant decrease
             if relative_change < -self.threshold:
-                regressions.append({
-                    "metric": metric,
-                    "baseline": baseline_score,
-                    "current": new_score,
-                    "change": relative_change
-                })
+                regressions.append(
+                    {
+                        "metric": metric,
+                        "baseline": baseline_score,
+                        "current": new_score,
+                        "change": relative_change,
+                    }
+                )
 
-        return {
-            "has_regression": len(regressions) > 0,
-            "regressions": regressions
-        }
+        return {"has_regression": len(regressions) > 0, "regressions": regressions}
 ```
 
 ## Benchmarking
@@ -435,7 +429,7 @@ class BenchmarkRunner:
                 score = metric.calculate(
                     prediction=prediction,
                     reference=example["reference"],
-                    context=example.get("context")
+                    context=example.get("context"),
                 )
                 results[metric.name].append(score)
 
@@ -445,7 +439,7 @@ class BenchmarkRunner:
                 "mean": np.mean(scores),
                 "std": np.std(scores),
                 "min": min(scores),
-                "max": max(scores)
+                "max": max(scores),
             }
             for metric, scores in results.items()
         }

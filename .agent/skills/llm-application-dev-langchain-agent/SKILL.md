@@ -45,6 +45,7 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import create_react_agent
 from langchain_anthropic import ChatAnthropic
 
+
 class AgentState(TypedDict):
     messages: Annotated[list, "conversation history"]
     context: Annotated[dict, "retrieved context"]
@@ -87,15 +88,11 @@ from langchain_pinecone import PineconeVectorStore
 embeddings = VoyageAIEmbeddings(model="voyage-3-large")
 
 # Vector store with hybrid search
-vectorstore = PineconeVectorStore(
-    index=index,
-    embedding=embeddings
-)
+vectorstore = PineconeVectorStore(index=index, embedding=embeddings)
 
 # Retriever with reranking
 base_retriever = vectorstore.as_retriever(
-    search_type="hybrid",
-    search_kwargs={"k": 20, "alpha": 0.5}
+    search_type="hybrid", search_kwargs={"k": 20, "alpha": 0.5}
 )
 ```
 
@@ -110,8 +107,10 @@ base_retriever = vectorstore.as_retriever(
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+
 class ToolInput(BaseModel):
     query: str = Field(description="Query to process")
+
 
 async def tool_function(query: str) -> str:
     # Implement with error handling
@@ -121,12 +120,13 @@ async def tool_function(query: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+
 tool = StructuredTool.from_function(
     func=tool_function,
     name="tool_name",
     description="What this tool does",
     args_schema=ToolInput,
-    coroutine=tool_function
+    coroutine=tool_function,
 )
 ```
 
@@ -137,12 +137,12 @@ tool = StructuredTool.from_function(
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
+
 @app.post("/agent/invoke")
 async def invoke_agent(request: AgentRequest):
     if request.stream:
         return StreamingResponse(
-            stream_response(request),
-            media_type="text/event-stream"
+            stream_response(request), media_type="text/event-stream"
         )
     return await agent.ainvoke({"messages": [...]})
 ```
@@ -168,14 +168,10 @@ from langsmith.evaluation import evaluate
 # Run evaluation suite
 eval_config = RunEvalConfig(
     evaluators=["qa", "context_qa", "cot_qa"],
-    eval_llm=ChatAnthropic(model="claude-sonnet-4-5")
+    eval_llm=ChatAnthropic(model="claude-sonnet-4-5"),
 )
 
-results = await evaluate(
-    agent_function,
-    data=dataset_name,
-    evaluators=eval_config
-)
+results = await evaluate(agent_function, data=dataset_name, evaluators=eval_config)
 ```
 
 ## Key Patterns
@@ -196,7 +192,7 @@ agent = builder.compile(checkpointer=checkpointer)
 async def process_request(message: str, session_id: str):
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": session_id}}
+        config={"configurable": {"thread_id": session_id}},
     )
     return result["messages"][-1].content
 ```
@@ -204,6 +200,7 @@ async def process_request(message: str, session_id: str):
 ### Error Handling Pattern
 ```python
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def call_with_retry():

@@ -152,7 +152,9 @@ app = FastAPI(title="AI Agent API", version="0.1.0")
 class ChatRequest(BaseModel):
     """Schema cho request gửi đến Agent."""
 
-    message: str = Field(..., min_length=1, max_length=10000, description="Câu hỏi của người dùng")
+    message: str = Field(
+        ..., min_length=1, max_length=10000, description="Câu hỏi của người dùng"
+    )
     session_id: str | None = Field(None, description="ID phiên hội thoại")
     stream: bool = Field(True, description="Bật/tắt streaming response")
 
@@ -215,14 +217,22 @@ async def chat(request: ChatRequest):
             session_id=request.session_id or str(uuid4()),
         )
     except LLMRateLimitError:
-        raise HTTPException(status_code=429, detail="Agent đang quá tải. Vui lòng thử lại sau vài giây.")
+        raise HTTPException(
+            status_code=429, detail="Agent đang quá tải. Vui lòng thử lại sau vài giây."
+        )
     except LLMAuthError:
         if settings.app_env == "development":
-            raise HTTPException(status_code=500, detail="API key không hợp lệ. Kiểm tra lại .env file.")
-        raise HTTPException(status_code=500, detail="Lỗi cấu hình hệ thống. Vui lòng liên hệ admin.")
+            raise HTTPException(
+                status_code=500, detail="API key không hợp lệ. Kiểm tra lại .env file."
+            )
+        raise HTTPException(
+            status_code=500, detail="Lỗi cấu hình hệ thống. Vui lòng liên hệ admin."
+        )
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.")
+        raise HTTPException(
+            status_code=500, detail="Đã xảy ra lỗi không mong muốn. Vui lòng thử lại."
+        )
 ```
 
 Error handling phải phân biệt giữa môi trường development và production. Trong development, bạn muốn hiển thị thông tin chi tiết để debug. Trong production, bạn chỉ hiển thị thông báo thân thiện, không tiết lộ chi tiết kỹ thuật (đề phòng lộ thông tin nhạy cảm).
@@ -291,7 +301,9 @@ def router_node(state: AgentState) -> AgentState:
     """Phân loại câu hỏi và quyết định luồng xử lý."""
     question = state["question"]
     # Gọi LLM để phân loại
-    classification = llm.invoke(f"Phân loại câu hỏi sau: '{question}'\nTrả lời một trong: simple, search, database")
+    classification = llm.invoke(
+        f"Phân loại câu hỏi sau: '{question}'\nTrả lời một trong: simple, search, database"
+    )
     needs_search = "search" in classification.lower()
     return {"needs_search": needs_search}
 
@@ -305,7 +317,9 @@ def search_node(state: AgentState) -> AgentState:
 def generate_node(state: AgentState) -> AgentState:
     """Tạo câu trả lời dựa trên context đã thu thập."""
     context_str = "\n".join(state["context"]) if state["context"] else ""
-    answer = llm.invoke(f"Dựa trên context sau:\n{context_str}\n\nTrả lời câu hỏi: {state['question']}")
+    answer = llm.invoke(
+        f"Dựa trên context sau:\n{context_str}\n\nTrả lời câu hỏi: {state['question']}"
+    )
     return {"answer": answer}
 
 
@@ -398,7 +412,9 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 vectorstore = Chroma(
-    collection_name="documents", embedding_function=OpenAIEmbeddings(), persist_directory="./data/chroma"
+    collection_name="documents",
+    embedding_function=OpenAIEmbeddings(),
+    persist_directory="./data/chroma",
 )
 
 # Tìm kiếm tài liệu liên quan
