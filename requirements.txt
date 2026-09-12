@@ -1,0 +1,27 @@
+# Core Database & Parsing
+duckdb>=1.2.0
+sqlglot>=25.0.0
+
+# Settings & Validation
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.0
+
+# LangChain & LangGraph Ecosystem
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# LLM Providers (OpenAI, Gemini, DeepSeek, Mistral)
+langchain-openai>=0.2.0
+langchain-google-genai>=2.0.0
+langchain-deepseek>=0.1.0
+langchain-mistralai>=0.2.0
+
+# Search & Utilities
+rapidfuzz>=3.0.0
+
+# Testing & Quality
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+ruff>=0.8.0

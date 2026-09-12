@@ -29,16 +29,19 @@ class Settings(BaseSettings):
     api_prefix: str = Field(default="/api/v1", description="Prefix đường dẫn API")
 
     # --- LLM Providers & Tiering Strategy ---
-    llm_provider: Literal["openai", "gemini", "anthropic"] = Field(
+    llm_provider: Literal["openai", "gemini", "deepseek", "mistral"] = Field(
         default="openai", description="Nhà cung cấp LLM mặc định"
     )
     openai_api_key: str | None = Field(default=None, description="Khóa API OpenAI")
     gemini_api_key: str | None = Field(
         default=None, description="Khóa API Google Gemini"
     )
-    anthropic_api_key: str | None = Field(
-        default=None, description="Khóa API Anthropic"
+    deepseek_api_key: str | None = Field(default=None, description="Khóa API DeepSeek")
+    deepseek_base_url: str = Field(
+        default="https://api.deepseek.com/v1",
+        description="Base URL của DeepSeek API",
     )
+    mistral_api_key: str | None = Field(default=None, description="Khóa API Mistral AI")
 
     # Tier 1 Model: Dành cho tác vụ suy luận & sinh SQL phức tạp
     tier1_model: str = Field(

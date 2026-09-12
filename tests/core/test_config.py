@@ -55,3 +55,14 @@ def test_get_settings_singleton(monkeypatch):
     settings_2 = get_settings()
 
     assert settings_1 is settings_2
+
+
+def test_llm_providers_validation():
+    """Kiểm tra cấu hình 4 nhà cung cấp LLM hợp lệ (openai, gemini, deepseek, mistral)."""
+    for provider in ["openai", "gemini", "deepseek", "mistral"]:
+        s = Settings(_env_file=None, llm_provider=provider)
+        assert s.llm_provider == provider
+
+    # Provider không nằm trong danh sách phải ném ValidationError
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, llm_provider="anthropic")

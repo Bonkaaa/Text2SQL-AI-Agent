@@ -23,6 +23,113 @@ class ClarificationResult(BaseModel):
     )
 
 
+class SchemaContextResult(BaseModel):
+    """Kết quả trích xuất ngữ cảnh lược đồ từ Schema & Value Retriever Subagent."""
+
+    selected_tables: list[str] = Field(
+        default_factory=list,
+        description="Danh sách các bảng TPC-H liên quan được chọn lọc",
+    )
+    join_conditions: list[str] = Field(
+        default_factory=list,
+        description="Các điều kiện JOIN chuẩn giữa các bảng được chọn",
+    )
+    categorical_filters: dict[str, str] = Field(
+        default_factory=dict,
+        description="Từ điển các giá trị phân loại danh mục ánh xạ từ câu hỏi (ví dụ: {'c_mktsegment': 'BUILDING'})",
+    )
+    metric_formulas: list[str] = Field(
+        default_factory=list,
+        description="Danh sách các công thức tính toán chỉ số nghiệp vụ chuẩn (dbt semantic metrics)",
+    )
+    context_markdown: str = Field(
+        description="Chuỗi Markdown cô đọng chứa DDL, JOIN, và Categorical context đưa vào prompt cho SQL Generator"
+    )
+
+
+class SQLGenerationResult(BaseModel):
+    """Kết quả sinh câu lệnh SQL từ SQL Generator Subagent."""
+
+    sql: str = Field(
+        description="Câu lệnh SELECT SQL thuần túy, tuyệt đối không bọc markdown ```sql ```"
+    )
+    dialect: Literal["duckdb", "bigquery"] = Field(
+        default="duckdb",
+        description="Dialect của câu lệnh SQL (mặc định: duckdb)",
+    )
+    explanation: str = Field(
+        description="Tóm tắt ngắn gọn logic truy vấn và các bước tính toán"
+    )
+    assumptions: list[str] = Field(
+        default_factory=list,
+        description="Các giả định ngầm định được áp dụng (nếu có)",
+    )
+
+
+class DiagnosticResult(BaseModel):
+    """Kết quả chẩn đoán lỗi có cấu trúc từ Error Diagnostic Agent."""
+
+    error_category: Literal[
+        "AST_VIOLATION",
+        "RBAC_VIOLATION",
+        "COST_EXCEEDED",
+        "DB_RUNTIME_ERROR",
+        "TIMEOUT",
+        "HITL_REJECTED",
+        "UNKNOWN_ERROR",
+    ] = Field(description="Phân loại lỗi kỹ thuật chính")
+    root_cause: str = Field(description="Nguyên nhân cốt lõi gây ra lỗi truy vấn SQL")
+    offending_entity: str | None = Field(
+        default=None,
+        description="Tên cột, bảng, hoặc từ khóa cấm vi phạm (ví dụ: 'c_phone')",
+    )
+    suggested_fix: str = Field(
+        description="Hướng dẫn sửa kỹ thuật cụ thể cho SQL Generator"
+    )
+    actionable_feedback: str = Field(
+        description="Đoạn văn bản tóm tắt 2-3 câu nạp trực tiếp vào prompt retry của SQL Generator"
+    )
+
+
+class SelfCorrectionResult(BaseModel):
+    """Kết quả thực thi vòng lặp tự sửa lỗi Bounded Self-Correction."""
+
+    success: bool = Field(
+        description="True nếu truy vấn SQL hợp lệ và thực thi thành công"
+    )
+    sql: str = Field(
+        description="Câu lệnh SQL cuối cùng (thành công hoặc lần thử cuối)"
+    )
+    data: list[dict[str, Any]] | None = Field(
+        default=None, description="Dữ liệu kết quả truy vấn"
+    )
+    columns: list[str] | None = Field(
+        default=None, description="Danh sách các cột kết quả"
+    )
+    retry_count: int = Field(default=0, description="Số lần đã thử lại sửa lỗi")
+    explanation: str | None = Field(
+        default=None, description="Giải thích logic truy vấn"
+    )
+    error_message: str | None = Field(
+        default=None, description="Thông báo lỗi nếu thất bại"
+    )
+    error_type: str | None = Field(
+        default=None, description="Mã phân loại lỗi kỹ thuật"
+    )
+    actionable_feedback: str | None = Field(
+        default=None, description="Chỉ dẫn sửa lỗi từ lần thất bại cuối"
+    )
+    diagnostic_result: DiagnosticResult | None = Field(
+        default=None, description="Kết quả chẩn đoán lỗi chi tiết"
+    )
+    execution_time_ms: float = Field(default=0.0, description="Thời gian thực thi (ms)")
+    bytes_scanned: int = Field(default=0, description="Dung lượng dữ liệu quét (bytes)")
+    history: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Lịch sử các lần thử và phản hồi lỗi",
+    )
+
+
 class RechartsConfig(BaseModel):
     """Cấu hình render biểu đồ Recharts trả về cho Frontend UI."""
 
@@ -52,11 +159,18 @@ class ControlPipelineOutput(TypedDict):
 
     is_valid: bool
     status: Literal[
-        "SUCCESS", "BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "DB_ERROR", "TIMEOUT"
+        "SUCCESS",
+        "BLOCKED_AST",
+        "BLOCKED_RBAC",
+        "BLOCKED_COST",
+        "BLOCKED_HITL",
+        "DB_ERROR",
+        "TIMEOUT",
     ]
     error_type: str | None
     error_message: str | None
     actionable_feedback: str | None
+    diagnostic_result: DiagnosticResult | None
     data: list[dict[str, Any]] | None
     columns: list[str] | None
     bytes_scanned: int
@@ -70,6 +184,14 @@ class ControlState(TypedDict, total=False):
     user_context: UserContext
     session_id: str
     schema_context: str | None
+
+    # Trạng thái xử lý và phân loại lỗi
+    status: Literal[
+        "SUCCESS", "BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "DB_ERROR", "TIMEOUT"
+    ]
+    error_type: str | None
+    error_message: str | None
+    execution_time_ms: float
 
     # Kết quả kiểm duyệt AST
     ast_valid: bool
@@ -89,10 +211,10 @@ class ControlState(TypedDict, total=False):
 
     # Chẩn đoán lỗi thông minh (Error Diagnostic Agent)
     actionable_feedback: str | None
+    diagnostic_result: DiagnosticResult | None
 
     # Kết quả thực thi
     execution_result: ControlPipelineOutput | None
-
 
 
 class AgentState(TypedDict, total=False):
@@ -114,6 +236,7 @@ class AgentState(TypedDict, total=False):
     draft_sql: str | None
     retry_count: int
     error_context: str | None
+    diagnostic_result: DiagnosticResult | None
 
     # Khâu Thực thi và Kiểm soát (Control Pipeline)
     query_result: ControlPipelineOutput | None

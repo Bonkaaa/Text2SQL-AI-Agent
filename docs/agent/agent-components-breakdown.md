@@ -152,7 +152,7 @@
   - `routers.py`: Chứa các hàm conditional edge điều hướng luồng (`route_after_ast`, `route_after_rbac`, `route_after_cost`, `route_after_hitl`, `route_after_execute`).
   - `diagnostic.py`: Chứa node Agentic `error_diagnostic_node` (`ERROR_DIAGNOSTIC_AGENT`) sử dụng LLM Tier 2 để chẩn đoán nguyên nhân lỗi sâu và tạo Actionable Feedback.
   - `builder.py`: Khởi tạo `StateGraph(ControlState)`, lắp ghép node + edge, compile thành Runnable Graph.
-  - `__init__.py`: Re-export `create_control_pipeline_graph`, `run_control_pipeline`, và các kiểu dữ liệu liên quan.
+  - `__init__.py`: Re-export `build_control_pipeline_graph`, `run_control_pipeline`, và các kiểu dữ liệu liên quan (`ControlPipelineInput`, `ControlPipelineOutput`, `ControlState`).
 - **Nhiệm vụ**: Xây dựng đồ thị con (Subgraph) kết nối tuần tự các chốt chặn an toàn tất định, kết hợp với Agent chẩn đoán lỗi thông minh:
   `AST_CHECK` -> `RBAC_CHECK` -> `COST_GUARD` -> `HITL_APPROVAL` (nếu cần) -> `EXECUTE` -> `AUDIT_LOG`
   - Nếu gặp lỗi ở bất kỳ khâu nào -> chuyển sang `ERR_NODE` -> chuyển tiếp qua `ERROR_DIAGNOSTIC_AGENT` (tạo chỉ dẫn sửa lỗi Actionable Feedback) -> kết thúc Subgraph để gửi trả về cho `SQL Generator` tự sửa.
@@ -164,14 +164,14 @@
   - Node `execute_node`: Thực thi trên database qua Component 1.3 (`execute_query`). Nếu lỗi DB runtime hoặc timeout -> chuyển `err_node`.
   - Node `audit_node`: Luôn được gọi (kể cả thành công hay thất bại) qua Component 1.4 (`log_audit_event`).
   - Node `err_node`: Đóng gói payload mã lỗi chuẩn hóa (`error_type`, `error_message`, `status`).
-  - Node `diagnostic_node` (`ERROR_DIAGNOSTIC_AGENT`): Gọi LLM Tier 2 với system prompt chẩn đoán SQL để so khớp câu query lỗi với schema, tạo ra chỉ dẫn sửa lỗi ngắn gọn (Actionable Feedback).
-- **Dependencies**: `langgraph>=0.2`, `langchain-core`.
+  - Node `diagnostic_node` (`ERROR_DIAGNOSTIC_AGENT`): Gọi LLM Tier 2 với `with_structured_output(DiagnosticResult)` (hoặc Rule-based Fallback) để phân loại lỗi chuẩn hóa (`error_category`), bóc tách thực thể vi phạm (`offending_entity`), giải pháp (`suggested_fix`) và tạo chỉ dẫn sửa lỗi có cấu trúc (`DiagnosticResult`) kèm chuỗi văn bản tóm tắt (`actionable_feedback`).
+- **Dependencies**: `langgraph>=0.2`, `langchain-core`, Pydantic v2.
 - **Unit Test**: `tests/test_control_pipeline.py`:
   - Test luồng query hợp lệ -> chạy trơn tru đến execute và trả về data.
   - Test câu query chèn lệnh cấm -> bị chặn ngay tại `ast_check_node`, chuyển qua chẩn đoán lỗi.
   - Test câu query vi phạm cột RBAC -> bị chặn tại `rbac_check_node`.
   - Test câu query bị timeout -> bị ngắt an toàn và chẩn đoán timeout.
-  - Test node `error_diagnostic_node` sinh ra Actionable Feedback chuẩn.
+  - Test node `error_diagnostic_node` sinh ra `DiagnosticResult` và `actionable_feedback` chuẩn (cả luồng có LLM và fallback không có LLM).
 
 ---
 
@@ -203,17 +203,21 @@
 - **Dependencies**: `rapidfuzz` hoặc thư viện vector search nhẹ.
 - **Unit Test**: `tests/test_categorical_search.py` (test tìm kiếm "châu á" -> `r_name = 'ASIA'`, "ngành máy móc" -> `c_mktsegment = 'MACHINERY'`).
 
-#### Component 2.3: Subagent: Schema & Value Retriever
+#### Component 2.3: Subagent: Schema & Value Retriever (Dictionary-based SubAgent)
 - **File**: `src/agents/schema_retriever.py`
-- **Nhiệm vụ**: Kết hợp Semantic Schema (2.1) và Categorical Values (2.2) để chọn lọc ra đúng các bảng, cột và giá trị cần thiết cho câu hỏi của người dùng, đóng gói thành context tối giản.
-- **Nội dung code**:
-  - Hàm `retrieve_schema_context(question: str) -> str`:
-    - Phân tích câu hỏi -> tìm top relevant tables.
-    - Tìm các categorical values khớp trong câu hỏi.
-    - Trích xuất DDL của các bảng liên quan kèm foreign keys để join.
-    - Trả về chuỗi Markdown tóm tắt ngữ cảnh schema.
-- **Dependencies**: `langchain-core` / OpenAI client.
-- **Unit Test**: `tests/test_schema_retriever.py`.
+- **Nhiệm vụ**: Đóng gói thành **DeepAgents SubAgent dictionary** (`name="schema-retriever"`), kết hợp Semantic Schema (2.1) và Categorical Values (2.2) để chọn lọc ra đúng các bảng, cột và giá trị phân loại cần thiết cho câu hỏi người dùng, cách ly hoàn toàn context thô khỏi Supervisor.
+- **Cấu hình SubAgent**:
+  - `mode: "isolated"`: Context Quarantine — mọi bước gọi tool tra cứu DDL và fuzzy matching chạy riêng biệt, không làm phình context của Supervisor.
+  - `model`: Tier 2 (`gpt-4o-mini` / `claude-3-5-haiku` / `gemini-2.5-flash`).
+  - `tools`: `[search_tables_and_columns, search_categorical_values]`.
+  - `response_format`: `SchemaContextResult` (Pydantic Model):
+    - `selected_tables: list[str]` (ví dụ `["orders", "customer", "lineitem"]`).
+    - `join_conditions: list[str]` (ví dụ `["orders.o_custkey = customer.c_custkey"]`).
+    - `categorical_filters: dict[str, str]` (ví dụ `{"c_mktsegment": "BUILDING"}`).
+    - `metric_formulas: list[str]` (ví dụ `["SUM(l_extendedprice * (1 - l_discount))"]`).
+    - `context_markdown: str` (chuỗi markdown tối giản ghi vào Virtual Filesystem `session://{thread_id}/schema_context.md`).
+- **Dependencies**: `deepagents`, `langchain-core`, Pydantic v2.
+- **Unit Test**: `tests/test_schema_retriever.py` (test khởi tạo SubAgent dict, mock tool execution, validate `SchemaContextResult`).
 
 ---
 
@@ -231,15 +235,20 @@
   - Error-Feedback Prompt Template: Cấu trúc prompt đưa lỗi kỹ thuật từ Phase 1 (AST lỗi, cột cấm RBAC, syntax error từ DB) vào để LLM sửa chữa.
 - **Unit Test**: Kiểm tra format prompt với các biến đầu vào.
 
-#### Component 3.2: Subagent: SQL Generator
+#### Component 3.2: Subagent: SQL Generator (Dictionary-based SubAgent)
 - **File**: `src/agents/sql_generator.py`
-- **Nhiệm vụ**: Nhận câu hỏi, schema context và lịch sử lỗi (nếu có) để gọi LLM sinh câu lệnh SQL.
-- **Nội dung code**:
-  - Hàm `generate_sql(question: str, schema_context: str, error_context: Optional[str] = None, user_role: str = "Analyst") -> str`:
-    - Gọi LLM (Tier 1: GPT-4o / Claude 3.5 Sonnet).
-    - Làm sạch chuỗi SQL trả về (cắt bỏ markdown ```sql ```).
-- **Dependencies**: `langchain-openai` hoặc `google-genai` / `anthropic`.
-- **Unit Test**: `tests/test_sql_generator.py` (mock LLM output, kiểm tra output trả về là câu SQL sạch).
+- **Nhiệm vụ**: Đóng gói thành **DeepAgents SubAgent dictionary** (`name="sql-generator"`), nhận câu hỏi, schema context và lịch sử lỗi (nếu có) để gọi LLM sinh câu lệnh SQL chuẩn xác.
+- **Cấu hình SubAgent**:
+  - `mode: "isolated"`: Chỉ tập trung suy luận SQL từ prompt và context được giao.
+  - `model`: Tier 1 (`gpt-4o` / `claude-3-5-sonnet`) để tối đa hóa Execution Accuracy (EX).
+  - `tools`: `[]` (Không cấp tool, tránh phân tâm).
+  - `response_format`: `SQLGenerationResult` (Pydantic Model):
+    - `sql: str` (SQL SELECT thuần túy, tuyệt đối không bọc markdown ```sql ```).
+    - `dialect: str = "duckdb"`
+    - `explanation: str` (Tóm tắt logic truy vấn).
+    - `assumptions: list[str]` (Các giả định ngầm định nếu có).
+- **Dependencies**: `deepagents`, `langchain-core`, Pydantic v2.
+- **Unit Test**: `tests/test_sql_generator.py` (mock LLM structured output, kiểm tra output `SQLGenerationResult.sql` sạch và hợp lệ).
 
 #### Component 3.3: Bounded Self-Correction Loop (Vòng Lặp Sửa Lỗi Tự Động <= 3 Lần)
 - **File**: Tích hợp trong luồng điều phối chính (`src/agents/supervisor.py` & `src/agents/control_pipeline.py`)
@@ -248,8 +257,8 @@
   - Kiểm tra điều kiện `retry_count < 3`:
     - Nếu Control Pipeline trả về `is_valid == False`:
       - Tăng `retry_count += 1`.
-      - Nạp `error_message` vào `error_context`.
-      - Kích hoạt lại `generate_sql`.
+      - Nạp `actionable_feedback` từ `ERROR_DIAGNOSTIC_AGENT` vào `error_context`.
+      - Kích hoạt lại `sql-generator` qua `task()`.
     - Nếu `retry_count >= 3`:
       - Dừng luồng, trả về thông báo thất bại nhã nhặn kèm hướng dẫn người dùng đặt lại câu hỏi.
       - Log audit thất bại.
@@ -269,27 +278,39 @@
     - Nếu câu hỏi đã rõ ràng (ví dụ: *"Top 5 khách hàng mua nhiều nhất năm 1995 tại Châu Á"*): Trả về `needs_clarification = False`.
 - **Unit Test**: `tests/test_clarification.py` (kiểm tra với bộ câu hỏi mơ hồ mẫu và câu hỏi rõ ràng mẫu).
 
-#### Component 4.2: Subagent: Response Synthesizer & Đề Xuất Biểu Đồ
+#### Component 4.2: Subagent: Response Synthesizer & Đề Xuất Biểu Đồ (Dictionary-based SubAgent)
 - **File**: `src/agents/synthesizer.py`
-- **Nhiệm vụ**: Đọc dữ liệu bảng trả về từ database để sinh lời giải thích kinh doanh và cấu hình biểu đồ (Recharts schema).
-- **Nội dung code**:
-  - Hàm `synthesize_response(question: str, data: list[dict], columns: list[str]) -> SynthesizedOutput`:
-    - Phân tích kiểu dữ liệu: Nếu có cột ngày tháng + cột số lượng/tiền -> đề xuất `line` hoặc `area`. Nếu có cột phân loại (< 8 categories) -> đề xuất `bar` hoặc `pie`.
-    - Sinh JSON cấu hình Recharts frontend: `{ chart_type: "bar", x_axis: "nation_name", y_axis: "total_revenue", title: "..." }`.
-    - Viết tóm tắt insight kinh doanh bằng tiếng Việt (2-3 câu nêu bật con số cao nhất, xu hướng).
+- **Nhiệm vụ**: Đóng gói thành **DeepAgents SubAgent dictionary** (`name="response-synthesizer"`), đọc dữ liệu bảng trả về từ database để sinh lời giải thích kinh doanh và cấu hình biểu đồ Recharts chuẩn JSON.
+- **Cấu hình SubAgent**:
+  - `mode: "isolated"`: Chỉ nhận dữ liệu bảng và câu hỏi gốc, cách ly hoàn toàn với context debug SQL.
+  - `model`: Tier 2 (`gpt-4o-mini` / `claude-3-5-haiku`).
+  - `tools`: `[]`.
+  - `response_format`: `SynthesizerResult` (Pydantic Model):
+    - `chart_type: Literal["bar", "line", "pie", "area", "table"]`.
+    - `recharts_config: dict` (x_key, y_keys, series_labels, title).
+    - `business_insight: str` (2-3 câu diễn giải số liệu nổi bật bằng tiếng Việt).
+    - `summary_metrics: dict[str, Any]` (giá trị tổng hợp như min, max, sum).
 - **Unit Test**: `tests/test_synthesizer.py`.
 
 #### Component 4.3: Deep Agent Supervisor (LangGraph State Graph Điều Phối Chính)
 - **File**: `src/agents/supervisor.py`
-- **Nhiệm vụ**: Graph mẹ (Master Graph) điều phối toàn bộ vòng đời của một yêu cầu.
+- **Nhiệm vụ**: Khởi tạo Deep Agent Supervisor qua `create_deep_agent` đăng ký danh sách subagents:
+  ```python
+  subagents = [
+      schema_retriever_subagent,
+      sql_generator_subagent,
+      response_synthesizer_subagent,
+      control_pipeline_subagent,  # CompiledSubAgent bọc StateGraph Phase 1
+  ]
+  ```
 - **Nội dung code**:
-  - Kết nối các node:
-    `USER_INPUT` -> `CLARIFICATION_CHECK` 
+  - Supervisor duy trì Todo List (`write_todos`) và điều phối tuần tự:
+    `USER_INPUT` -> `CLARIFICATION_CHECK`
       - (Mơ hồ) -> `ASK_USER` -> END
-      - (Rõ ràng) -> `SCHEMA_RETRIEVAL` -> `SQL_GENERATION` -> `CONTROL_PIPELINE_SUBGRAPH`
-        - (Lỗi & retry < 3) -> `SQL_GENERATION`
+      - (Rõ ràng) -> `task(schema-retriever)` -> `task(sql-generator)` -> `task(control-pipeline)`
+        - (Lỗi & retry < 3) -> Nạp Actionable Feedback -> gọi lại `task(sql-generator)`
         - (Lỗi & retry >= 3) -> `HANDLE_FAILURE` -> END
-        - (Thành công) -> `RESPONSE_SYNTHESIS` -> END
+        - (Thành công) -> `task(response-synthesizer)` -> END
   - Quản lý bộ nhớ phiên (Memory Checkpointer với `MemorySaver` hoặc `SqliteSaver`).
 - **Unit Test**: `tests/test_supervisor.py` (chạy end-to-end giả lập từ câu hỏi đến kết quả).
 
@@ -324,26 +345,26 @@
 
 ## 3. Ma Trận Phụ Thuộc & Thứ Tự Thực Hiện Chi Tiết
 
-| Thứ tự | Component | Tệp tin chính | Phụ thuộc trước | Kết quả kiểm thử (DoD) |
-|---|---|---|---|---|
-| **#1** | **Config & Env** | `src/config.py` | Không | Unit test đọc đúng biến môi trường `.env` |
-| **#2** | **TPC-H Seeder** | `src/utils/tpch_seeder.py` | #1 | 8 bảng TPC-H có dữ liệu trong DuckDB |
-| **#3** | **State & RBAC Models** | `src/models/state.py`, `rbac.py` | #1 | Serialize/Deserialize schema thành công |
-| **#4** | **AST Sanitizer** | `src/utils/ast_sanitizer.py` | Không | 100% test chặn DDL/DML, thêm LIMIT pass |
-| **#5** | **RBAC Enforcer** | `src/utils/rbac_enforcer.py` | #3, #4 | Chặn đúng cột PII theo role Analyst |
-| **#6** | **DB Connector & Cost** | `src/utils/db_connector.py` | #1, #2 | Chạy query, đo execution_time, bắt timeout |
-| **#7** | **Audit Logger** | `src/utils/audit_logger.py` | #1 | Ghi log JSON có cấu trúc |
-| **#8** | **Control Subgraph** | `src/agents/control_pipeline.py` | #3, #4, #5, #6, #7 | Subgraph LangGraph pass các test case kiểm duyệt |
-| **#9** | **Schema & Metrics Dict** | `src/utils/schema_context.py` | #2 | Cung cấp DDL và công thức metric |
-| **#10**| **Categorical Search** | `src/utils/categorical_search.py` | #2 | Map đúng từ khóa tiếng Việt sang giá trị cột TPC-H |
-| **#11**| **Schema Retriever** | `src/agents/schema_retriever.py` | #9, #10 | Trả về schema_context.md thu nhỏ chính xác |
-| **#12**| **SQL Generator** | `src/agents/sql_generator.py` | #1, #9 | Sinh SQL chuẩn cú pháp DuckDB |
-| **#13**| **Self-Correction** | Tích hợp Generator + Control | #8, #12 | Tự sửa lỗi sau khi bị AST hoặc DB báo lỗi (<= 3 lần) |
-| **#14**| **Clarification Node**| `src/agents/clarification.py` | #1 | Nhận diện câu hỏi mơ hồ và hỏi lại gợi ý option |
-| **#15**| **Response Synthesizer**| `src/agents/synthesizer.py` | #1 | Sinh Recharts JSON config + Insight tiếng Việt |
-| **#16**| **Supervisor Graph** | `src/agents/supervisor.py` | #8, #11, #12, #13, #14, #15 | Graph chính chạy thông suốt end-to-end |
-| **#17**| **FastAPI Gateway** | `src/api/main.py`, `routes/` | #16 | Endpoint `/ask`, `/approve` hoạt động qua Postman/Curl |
-| **#18**| **Evals Benchmark** | `evals/benchmark_runner.py` | #16 | Chạy 50 câu hỏi mẫu, xuất chỉ số VSR, EX |
+| Thứ tự  | Component                 | Tệp tin chính                     | Phụ thuộc trước             | Kết quả kiểm thử (DoD)                                 |
+| ---------| ---------------------------| -----------------------------------| -----------------------------| --------------------------------------------------------|
+| **#1**  | **Config & Env**          | `src/config.py`                   | Không                       | Unit test đọc đúng biến môi trường `.env`              |
+| **#2**  | **TPC-H Seeder**          | `src/utils/tpch_seeder.py`        | #1                          | 8 bảng TPC-H có dữ liệu trong DuckDB                   |
+| **#3**  | **State & RBAC Models**   | `src/models/state.py`, `rbac.py`  | #1                          | Serialize/Deserialize schema thành công                |
+| **#4**  | **AST Sanitizer**         | `src/utils/ast_sanitizer.py`      | Không                       | 100% test chặn DDL/DML, thêm LIMIT pass                |
+| **#5**  | **RBAC Enforcer**         | `src/utils/rbac_enforcer.py`      | #3, #4                      | Chặn đúng cột PII theo role Analyst                    |
+| **#6**  | **DB Connector & Cost**   | `src/utils/db_connector.py`       | #1, #2                      | Chạy query, đo execution_time, bắt timeout             |
+| **#7**  | **Audit Logger**          | `src/utils/audit_logger.py`       | #1                          | Ghi log JSON có cấu trúc                               |
+| **#8**  | **Control Subgraph**      | `src/agents/control_pipeline.py`  | #3, #4, #5, #6, #7          | Subgraph LangGraph pass các test case kiểm duyệt       |
+| **#9**  | **Schema & Metrics Dict** | `src/utils/schema_context.py`     | #2                          | Cung cấp DDL và công thức metric                       |
+| **#10** | **Categorical Search**    | `src/utils/categorical_search.py` | #2                          | Map đúng từ khóa tiếng Việt sang giá trị cột TPC-H     |
+| **#11** | **Schema Retriever**      | `src/agents/schema_retriever.py`  | #9, #10                     | Trả về schema_context.md thu nhỏ chính xác             |
+| **#12** | **SQL Generator**         | `src/agents/sql_generator.py`     | #1, #9                      | Sinh SQL chuẩn cú pháp DuckDB                          |
+| **#13** | **Self-Correction**       | Tích hợp Generator + Control      | #8, #12                     | Tự sửa lỗi sau khi bị AST hoặc DB báo lỗi (<= 3 lần)   |
+| **#14** | **Clarification Node**    | `src/agents/clarification.py`     | #1                          | Nhận diện câu hỏi mơ hồ và hỏi lại gợi ý option        |
+| **#15** | **Response Synthesizer**  | `src/agents/synthesizer.py`       | #1                          | Sinh Recharts JSON config + Insight tiếng Việt         |
+| **#16** | **Supervisor Graph**      | `src/agents/supervisor.py`        | #8, #11, #12, #13, #14, #15 | Graph chính chạy thông suốt end-to-end                 |
+| **#17** | **FastAPI Gateway**       | `src/api/main.py`, `routes/`      | #16                         | Endpoint `/ask`, `/approve` hoạt động qua Postman/Curl |
+| **#18** | **Evals Benchmark**       | `evals/benchmark_runner.py`       | #16                         | Chạy 50 câu hỏi mẫu, xuất chỉ số VSR, EX               |
 
 ---
 

@@ -14,6 +14,7 @@ AuditStatus = Literal[
     "BLOCKED_AST",
     "BLOCKED_RBAC",
     "BLOCKED_COST",
+    "BLOCKED_HITL",
     "DB_ERROR",
     "TIMEOUT",
 ]

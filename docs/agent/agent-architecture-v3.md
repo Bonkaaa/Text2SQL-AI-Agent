@@ -106,19 +106,34 @@ flowchart TD
   - Nếu thiếu điều kiện lọc mang tính bắt buộc: Dừng luồng truy vấn, tạo câu hỏi làm rõ gợi ý kèm các option (ví dụ: *"Bạn muốn xem doanh thu theo: A. Năm 1995, B. Năm 1996, hay C. Toàn bộ các năm?"*).
   - Lịch sử đối thoại được lưu trong LangGraph State để nối tiếp ngữ cảnh khi người dùng phản hồi.
 
-### 4.3. Subagent: Schema & Value Retriever (Nâng cấp)
-Không dừng lại ở việc tra cứu DDL bảng thông thường, subagent này giải quyết bài toán **Schema Linking** thực tế:
-1. **Vector DDL Indexing**: Tìm kiếm Top-k bảng và cột liên quan ngữ nghĩa trong 8 bảng TPC-H (dùng Qdrant / pgvector).
-2. **Categorical Value Search**: Tra cứu giá trị thực tế trong database. Ví dụ: Người dùng hỏi xe hoặc thép, subagent sẽ tra ra trong DB cột `p_type` lưu mã `'ECONOMY ANODIZED STEEL'`, hoặc phân khúc `c_mktsegment = 'AUTOMOBILE'`.
-3. **Semantic Metrics Layer (dbt Integration)**: Cung cấp công thức tính chỉ số chuẩn doanh nghiệp (ví dụ: `Discounted Net Revenue = l_extendedprice * (1 - l_discount)`), tránh việc LLM tự chế công thức tính toán.
-4. **Output**: Tổng hợp ngắn gọn vào file `session://{thread_id}/schema_context.md`.
+### 4.3. Subagent: Schema & Value Retriever (Dictionary-based SubAgent)
+Khai báo theo chuẩn **DeepAgents SubAgent dictionary** (`name="schema-retriever"`):
+- **Ngữ cảnh (`mode: "isolated"`)**: Áp dụng triệt để nguyên lý **Context Quarantine**. Subagent tự do gọi tool tra cứu, toàn bộ dữ liệu thô trung gian được giữ kín trong subagent, không làm phình context của Supervisor.
+- **Mô hình (`model`)**: **Tier 2 Model** (`gpt-4o-mini` / `gemini-2.5-flash` / `claude-3-5-haiku`) tối ưu chi phí và phản hồi nhanh (<1s).
+- **Công cụ (`tools`)**: `[search_tables_and_columns, search_categorical_values]`.
+  1. **Vector DDL Indexing**: Tìm kiếm Top-k bảng và cột liên quan ngữ nghĩa trong 8 bảng TPC-H.
+  2. **Categorical Value Search**: Tra cứu giá trị thực tế trong database. Ví dụ: Người dùng hỏi xe hoặc thép, subagent sẽ tra ra trong DB cột `p_type` lưu mã `'ECONOMY ANODIZED STEEL'`, hoặc phân khúc `c_mktsegment = 'AUTOMOBILE'`.
+  3. **Semantic Metrics Layer (dbt Integration)**: Cung cấp công thức tính chỉ số chuẩn doanh nghiệp (ví dụ: `Discounted Net Revenue = l_extendedprice * (1 - l_discount)`), tránh việc LLM tự chế công thức tính toán.
+- **Đầu ra có cấu trúc (`response_format: SchemaContextResult`)**: Sử dụng Pydantic Model để trả về dữ liệu chuẩn mực:
+  - `selected_tables: list[str]`
+  - `join_conditions: list[str]`
+  - `categorical_filters: dict[str, str]` (ví dụ `{"c_mktsegment": "AUTOMOBILE"}`)
+  - `metric_formulas: list[str]`
+  - `context_markdown: str` (ghi kèm vào `session://{thread_id}/schema_context.md`)
 
-### 4.4. Subagent: SQL Generator
-- Đọc `schema_context.md`, câu hỏi nghiệp vụ và vai trò người dùng (`Analyst` hoặc `Admin`).
-- Sinh câu lệnh SQL tương thích với dialect của warehouse (BigQuery Standard SQL hoặc DuckDB SQL).
+### 4.4. Subagent: SQL Generator (Dictionary-based SubAgent)
+Khai báo theo chuẩn **DeepAgents SubAgent dictionary** (`name="sql-generator"`):
+- **Ngữ cảnh (`mode: "isolated"`)**: Chỉ nhận User Question + Schema Context + Error Feedback (nếu có). Tập trung 100% tài nguyên suy luận vào việc viết SQL, không bị phân tâm bởi lịch sử hội thoại trước đó.
+- **Mô hình (`model`)**: **Tier 1 Model** (`gpt-4o` / `claude-3-5-sonnet`) đảm bảo tư duy logic JOIN nhiều bảng TPC-H, gom nhóm GROUP BY, và ép kiểu ngày tháng chính xác.
+- **Công cụ (`tools: []`)**: Không cấp tools để ép agent chỉ tập trung reasoning và sinh SQL thuần dựa trên context đã cung cấp.
+- **Đầu ra có cấu trúc (`response_format: SQLGenerationResult`)**:
+  - `sql: str` (Câu lệnh SELECT SQL thuần túy, tuyệt đối không bọc markdown ```sql ```)
+  - `dialect: str = "duckdb"` (hoặc `"bigquery"`)
+  - `explanation: str` (Giải thích ngắn gọn logic query)
+  - *Ý nghĩa then chốt*: Loại bỏ hoàn toàn lỗi vặt Markdown formatting, giúp AST Validator ở Control Pipeline parse được cú pháp SQL ngay lập tức mà không cần regex bóc tách.
 - **Error-Aware Prompting**: Khi được kích hoạt từ luồng `RETRY_CHECK`, prompt sẽ được nạp bổ sung:
   - Câu SQL vừa sinh lỗi.
-  - **Actionable Diagnostic Feedback** từ `ERROR_DIAGNOSTIC_AGENT` (chỉ rõ cột sai, bảng cần join, cấu trúc cần sửa).
+  - **DiagnosticResult có cấu trúc** từ `ERROR_DIAGNOSTIC_AGENT` (`error_category`, `root_cause`, `offending_entity`, `suggested_fix`, và chuỗi tóm tắt `actionable_feedback`).
   - Chỉ dẫn cụ thể để không lặp lại lỗi cũ.
 
 ### 4.5. LangGraph Deterministic Control Pipeline (CompiledSubAgent)
@@ -151,28 +166,41 @@ Nằm tại lối ra của luồng lỗi (`err_node`) trong Control Pipeline Sub
 - **Hiệu quả của v3.0**: Nhờ có `ERROR_DIAGNOSTIC_AGENT`, SQL Generator nhận được hướng dẫn sửa lỗi có cấu trúc và có tính hành động cao, giúp giảm thiểu số vòng lặp sửa lỗi mù quáng (blind trial-and-error), nâng tỷ lệ sửa lỗi thành công ở lần thứ 2 lên đáng kể.
 - Nếu vượt quá 3 lần: Pipeline dừng lại, trả thông báo lỗi thân thiện cho người dùng giải thích vì sao không thể thực hiện câu hỏi này, đồng thời lưu vết vào Audit log.
 
-### 4.8. Subagent: Response Synthesizer
-- Tiếp nhận kết quả dạng bảng từ bước thực thi.
-- Tự động phân tích kiểu dữ liệu (data types và data shape) để đề xuất loại chart phù hợp:
-  - Dữ liệu chuỗi thời gian (Date/Month $\rightarrow$ Metrics) $\rightarrow$ Line / Area Chart.
-  - Phân bố danh mục ($\le 7$ categories) $\rightarrow$ Bar / Pie Chart.
-  - Dữ liệu đa chiều $\rightarrow$ Grouped Bar Chart hoặc Table.
-- Sinh cấu hình schema JSON cho Recharts frontend.
-- Diễn giải insight kinh doanh bằng tiếng Việt ngắn gọn, nêu rõ con số nổi bật, xu hướng tăng/giảm thay vì chỉ đọc lại bảng số liệu.
+### 4.8. Subagent: Response Synthesizer (Dictionary-based SubAgent)
+Khai báo theo chuẩn **DeepAgents SubAgent dictionary** (`name="response-synthesizer"`):
+- **Ngữ cảnh (`mode: "isolated"`)**: Chỉ nhận User Question và bảng dữ liệu kết quả (`data_records: list[dict]`). Cách ly hoàn toàn với quá trình debug SQL phức tạp trước đó.
+- **Mô hình (`model`)**: **Tier 2 Model** (`gpt-4o-mini` / `claude-3-5-haiku`) tối ưu hóa tốc độ và chi phí.
+- **Công cụ (`tools: []`)**: Thuần LLM analysis & schema generation.
+- **Đầu ra có cấu trúc (`response_format: SynthesizerResult`)**:
+  - `chart_type: Literal["bar", "line", "pie", "area", "table"]`
+  - `recharts_config: dict` (x_key, y_keys, series names, legend, title)
+  - `business_insight: str` (2-3 câu diễn giải số liệu nổi bật bằng tiếng Việt)
+  - *Ý nghĩa then chốt*: Frontend Next.js nhận trực tiếp JSON payload để render ngay component Recharts và bảng dữ liệu mà không cần tầng trung gian parse lại.
+
+### 4.9. Bảng Đặc Tả Cấu Hình Subagents (DeepAgents Specification Matrix)
+
+| Thuộc tính | `schema-retriever` | `sql-generator` | `response-synthesizer` | `control-pipeline` |
+|---|---|---|---|---|
+| **Phân loại cấu hình** | `SubAgent` (Dict-based) | `SubAgent` (Dict-based) | `SubAgent` (Dict-based) | `CompiledSubAgent` (LangGraph) |
+| **Context Mode** | `mode: "isolated"` | `mode: "isolated"` | `mode: "isolated"` | `mode: "isolated"` |
+| **Model Tier** | Tier 2 (`gpt-4o-mini`) | Tier 1 (`gpt-4o`) | Tier 2 (`gpt-4o-mini`) | Code thuần + Tier 2 (Node DIAG) |
+| **Tools đính kèm** | `search_tables`, `search_values` | Không (`[]`) | Không (`[]`) | AST, RBAC, Cost, DB Executor, Audit |
+| **Đầu ra (Format)**| `response_format=SchemaContextResult` | `response_format=SQLGenerationResult` | `response_format=SynthesizerResult` | `ControlState` (Data / Diagnostic) |
+| **Cơ chế gọi** | Supervisor gọi qua `task()` | Supervisor gọi qua `task()` | Supervisor gọi qua `task()` | Supervisor điều phối sau bước SQL |
 
 ---
 
 ## 5. Danh mục Tools & Components phát triển
 
-| Tên Tool / Node | Thành phần sử dụng | Mô tả chức năng | Xử lý lỗi / Fallback |
-|---|---|---|---|
-| `retrieve_schema_and_values` | Schema Retriever | Tra cứu vector DDL + bảng giá trị phân loại + dbt semantic metrics | Trả về thông báo nếu không tìm thấy bảng phù hợp |
-| `validate_sql_ast` | LangGraph AST Node | Parse SQL qua `sqlglot`, kiểm tra mệnh đề SELECT, kiểm tra SQL Injection | Trả về vị trí lỗi cú pháp hoặc danh sách lệnh bị cấm |
-| `enforce_rbac_policy` | LangGraph RBAC Node | Đối chiếu các entity được SELECT với quyền của User Role | Trả về danh sách cột/bảng vi phạm quyền |
-| `estimate_query_cost` | LangGraph Cost Node | Chạy dry-run lấy bytes scanned (BigQuery) hoặc cost plan (DuckDB) | Nếu driver không hỗ trợ dry-run, fallback về ước tính kích thước bảng |
-| `execute_warehouse_query` | LangGraph Execute Node | Chạy truy vấn trên database với timeout và limit | Bắt lỗi database exception, format lỗi gửi về node ERR |
-| `persist_audit_log` | LangGraph Audit Node | Ghi vết truy vấn vào bảng audit log | Lưu log bất đồng bộ, không làm crash luồng chính nếu log thất bại (Fail-Safe) |
-| **`diagnose_query_error`** | **Error Diagnostic Node** | **LLM phân tích nguyên nhân lỗi kỹ thuật và tạo Actionable Feedback** | **Nếu LLM timeout/lỗi, fallback dùng trực tiếp thông báo lỗi kỹ thuật raw** |
+| Tên Tool / Node              | Thành phần sử dụng        | Mô tả chức năng                                                          | Xử lý lỗi / Fallback                                                          |
+| ------------------------------| ---------------------------| --------------------------------------------------------------------------| -------------------------------------------------------------------------------|
+| `retrieve_schema_and_values` | Schema Retriever          | Tra cứu vector DDL + bảng giá trị phân loại + dbt semantic metrics       | Trả về thông báo nếu không tìm thấy bảng phù hợp                              |
+| `validate_sql_ast`           | LangGraph AST Node        | Parse SQL qua `sqlglot`, kiểm tra mệnh đề SELECT, kiểm tra SQL Injection | Trả về vị trí lỗi cú pháp hoặc danh sách lệnh bị cấm                          |
+| `enforce_rbac_policy`        | LangGraph RBAC Node       | Đối chiếu các entity được SELECT với quyền của User Role                 | Trả về danh sách cột/bảng vi phạm quyền                                       |
+| `estimate_query_cost`        | LangGraph Cost Node       | Chạy dry-run lấy bytes scanned (BigQuery) hoặc cost plan (DuckDB)        | Nếu driver không hỗ trợ dry-run, fallback về ước tính kích thước bảng         |
+| `execute_warehouse_query`    | LangGraph Execute Node    | Chạy truy vấn trên database với timeout và limit                         | Bắt lỗi database exception, format lỗi gửi về node ERR                        |
+| `persist_audit_log`          | LangGraph Audit Node      | Ghi vết truy vấn vào bảng audit log                                      | Lưu log bất đồng bộ, không làm crash luồng chính nếu log thất bại (Fail-Safe) |
+| **`diagnose_query_error`**   | **Error Diagnostic Node** | **LLM phân tích nguyên nhân lỗi kỹ thuật và tạo Actionable Feedback**    | **Nếu LLM timeout/lỗi, fallback dùng trực tiếp thông báo lỗi kỹ thuật raw**   |
 
 ---
 
@@ -205,13 +233,13 @@ Nằm tại lối ra của luồng lỗi (`err_node`) trong Control Pipeline Sub
 
 Để đáp ứng tiêu chí đồ án nâng cao, hệ thống xây dựng bộ eval benchmark trên tập 50 câu hỏi mẫu (tiếng Việt, phân theo 3 mức độ: Dễ, Trung bình, Khó):
 
-| Chỉ số (Metric) | Công thức / Cách đo | Mục tiêu kỳ vọng |
-|---|---|---|
-| **Valid SQL Rate (VSR)** | $\frac{\text{Số câu SQL hợp lệ cú pháp}}{\text{Tổng số câu hỏi}} \times 100\%$ | $\ge 95\%$ |
-| **Execution Accuracy (EX)** | So khớp kết quả trả về của SQL sinh ra vs Ground-truth SQL trên cùng DB | $\ge 82\%$ |
+| Chỉ số (Metric)                  | Công thức / Cách đo                                                                     | Mục tiêu kỳ vọng                                    |
+| ----------------------------------| -----------------------------------------------------------------------------------------| -----------------------------------------------------|
+| **Valid SQL Rate (VSR)**         | $\frac{\text{Số câu SQL hợp lệ cú pháp}}{\text{Tổng số câu hỏi}} \times 100\%$          | $\ge 95\%$                                          |
+| **Execution Accuracy (EX)**      | So khớp kết quả trả về của SQL sinh ra vs Ground-truth SQL trên cùng DB                 | $\ge 82\%$                                          |
 | **Self-Correction Success Rate** | $\frac{\text{Số câu sửa thành công sau retry}}{\text{Số câu lỗi lần đầu}} \times 100\%$ | **$\ge 75\%$** *(tăng từ 60% nhờ Error Diagnostic)* |
-| **Clarification Accuracy** | Độ chính xác khi nhận diện câu hỏi mơ hồ (Precision/Recall) | $\ge 90\%$ |
-| **Governance Compliance** | Tỷ lệ chặn đứng các truy vấn vượt quyền RBAC / quá ngưỡng chi phí | **100% (Zero tolerance)** |
+| **Clarification Accuracy**       | Độ chính xác khi nhận diện câu hỏi mơ hồ (Precision/Recall)                             | $\ge 90\%$                                          |
+| **Governance Compliance**        | Tỷ lệ chặn đứng các truy vấn vượt quyền RBAC / quá ngưỡng chi phí                       | **100% (Zero tolerance)**                           |
 
 ---
 

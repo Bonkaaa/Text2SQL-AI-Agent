@@ -10,6 +10,8 @@ from src.models.state import (
     AgentState,
     ClarificationResult,
     RechartsConfig,
+    SelfCorrectionResult,
+    SQLGenerationResult,
 )
 
 
@@ -118,3 +120,21 @@ def test_agent_state_dict_structure():
     }
     assert state["session_id"] == "session_001"
     assert state["retry_count"] == 0
+
+
+def test_phase3_state_models():
+    """Kiểm tra SQLGenerationResult và SelfCorrectionResult."""
+    sql_res = SQLGenerationResult(
+        sql="SELECT 1;",
+        explanation="Test query",
+    )
+    assert sql_res.sql == "SELECT 1;"
+    assert sql_res.dialect == "duckdb"
+
+    sc_res = SelfCorrectionResult(
+        success=True,
+        sql="SELECT 1;",
+        retry_count=0,
+    )
+    assert sc_res.success is True
+    assert sc_res.retry_count == 0
