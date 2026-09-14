@@ -11,6 +11,7 @@ python-dotenv>=1.0.0
 langgraph>=0.2.0
 langchain>=0.3.0
 langchain-core>=0.3.0
+deepagents>=0.7.13
 
 # LLM Providers (OpenAI, Gemini, DeepSeek, Mistral)
 langchain-openai>=0.2.0
@@ -20,6 +21,11 @@ langchain-mistralai>=0.2.0
 
 # Search & Utilities
 rapidfuzz>=3.0.0
+
+# API Gateway & Web Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
 
 # Testing & Quality
 pytest>=8.0.0

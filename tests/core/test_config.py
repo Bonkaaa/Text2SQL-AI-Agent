@@ -15,6 +15,10 @@ def test_default_settings():
     assert settings.default_row_limit == 1000
     assert settings.max_retries == 3
     assert settings.query_timeout_seconds == 30
+    assert settings.supervisor_tool_call_limit == 20
+    assert settings.supervisor_tool_call_thread_limit == 100
+    assert settings.supervisor_model_call_limit == 20
+    assert settings.supervisor_model_call_thread_limit == 100
     assert settings.max_bytes_scanned > 0
 
 

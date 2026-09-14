@@ -1,0 +1,40 @@
+flowchart TD
+    User([1. Người dùng gửi câu hỏi NL]) --> Gateway[FastAPI Gateway: Cấp session_id & thread_id]
+    Gateway --> PreFlight[Bước 0: Pre-flight Check - Clarification Gate]
+    %% Bước 0
+    PreFlight -->|Thiếu thông tin / Mơ hồ| AskUser([Dừng luồng: Trả về câu hỏi làm rõ + Gợi ý A, B, C])
+    PreFlight -->|Đủ thông tin| Supervisor[Bước 1: Deep Agent Supervisor khởi động]
+    %% Vùng nhớ dùng chung (Shared State & Virtual Filesystem)
+    subgraph ContextBus [HỘP CHỨA CONTEXT DÙNG CHUNG: LangGraph AgentState & Virtual Filesystem]
+        StateQuestion["question (Câu hỏi gốc)"]
+        StateSchema["session://schema_context.md (DDL, Values, Metrics)"]
+        StateSQL["session://draft_sql.sql (Câu lệnh SQL nháp)"]
+        StateData["session://query_result.json (Bảng dữ liệu thô từ Warehouse)"]
+        StateError["error_context (Actionable Feedback nếu lỗi)"]
+    end
+    Supervisor -.-> ContextBus
+    %% Subagent 1
+    Supervisor -->|Kích hoạt| Sub1[Subagent 1: schema-retriever]
+    StateQuestion -->|Đọc| Sub1
+    Sub1 -->|Ghi kết quả| StateSchema
+    %% Subagent 2
+    Supervisor -->|Kích hoạt| Sub2[Subagent 2: sql-generator]
+    StateQuestion -->|Đọc| Sub2
+    StateSchema -->|Đọc| Sub2
+    StateError -.->|Đọc nếu đang retry| Sub2
+    Sub2 -->|Ghi câu SQL| StateSQL
+    %% Subagent 3
+    Supervisor -->|Kích hoạt| Sub3[Subagent 3: control-pipeline LangGraph Subgraph]
+    StateSQL -->|Đọc để kiểm duyệt & chạy| Sub3
+    Sub3 -->|Nếu vi phạm / lỗi DB & retry < 3| DiagNode[Error Diagnostic Node]
+    DiagNode -->|Tạo Actionable Feedback| StateError
+    DiagNode -->|Kích hoạt lại| Sub2
+    Sub3 -->|Nếu thực thi DB thành công| StateData
+    %% Subagent 4
+    Supervisor -->|Kích hoạt| Sub4[Subagent 4: response-synthesizer]
+    StateQuestion -->|Đọc| Sub4
+    StateData -->|Đọc| Sub4
+    Sub4 --> FinalResponse([Frontend UI: Bảng dữ liệu + Biểu đồ Recharts + Insight Tiếng Việt])
+    style ContextBus fill:#f0f7ff,stroke:#0066cc,stroke-width:2px,stroke-dasharray: 5 5
+    style PreFlight fill:#fff0f5,stroke:#d63384,stroke-width:2px
+    style Sub3 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px

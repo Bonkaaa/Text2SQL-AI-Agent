@@ -9,6 +9,9 @@ Bao gồm:
 
 from src.agents.control_pipeline.builder import (
     build_control_pipeline_graph,
+    control_pipeline_subagent,
+    create_control_pipeline_runnable,
+    get_control_pipeline_subagent,
     run_control_pipeline,
 )
 from src.agents.control_pipeline.diagnostic import (
@@ -44,10 +47,13 @@ __all__ = [
     "ast_check_node",
     "audit_node",
     "build_control_pipeline_graph",
+    "control_pipeline_subagent",
     "cost_guard_node",
+    "create_control_pipeline_runnable",
     "err_node",
     "error_diagnostic_node",
     "execute_node",
+    "get_control_pipeline_subagent",
     "get_diagnostic_llm",
     "hitl_gate_node",
     "rbac_check_node",

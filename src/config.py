@@ -89,6 +89,36 @@ class Settings(BaseSettings):
         gt=0,
         description="Thời gian timeout tối đa cho 1 truy vấn SQL (giây)",
     )
+    supervisor_tool_call_limit: int = Field(
+        default=20,
+        gt=0,
+        description="Giới hạn số lần gọi công cụ (tool calls) tối đa cho Supervisor trong một lần chạy",
+    )
+    supervisor_tool_call_thread_limit: int = Field(
+        default=100,
+        gt=0,
+        description="Giới hạn số lần gọi công cụ (tool calls) tối đa cho Supervisor trong toàn bộ thread",
+    )
+    supervisor_model_call_limit: int = Field(
+        default=20,
+        gt=0,
+        description="Giới hạn số lần gọi LLM (model calls) tối đa cho Supervisor trong một lần chạy",
+    )
+    supervisor_model_call_thread_limit: int = Field(
+        default=100,
+        gt=0,
+        description="Giới hạn số lần gọi LLM (model calls) tối đa cho Supervisor trong toàn bộ thread",
+    )
+
+    # --- Observability & Execution Traces ---
+    enable_trace_logging: bool = Field(
+        default=True,
+        description="Bật/tắt tính năng lưu vết thực thi các Subagents vào thư mục outputs/",
+    )
+    trace_output_dir: str = Field(
+        default="outputs",
+        description="Đường dẫn thư mục lưu vết thực thi phiên truy vấn",
+    )
 
 
 @lru_cache

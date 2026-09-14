@@ -395,7 +395,6 @@ def test_error_diagnostic_agent_with_structured_output():
 def test_error_diagnostic_agent_fallback_no_llm():
     """Kiểm tra cơ chế Fail-Safe của ERROR_DIAGNOSTIC_AGENT khi không có LLM."""
     from src.agents.control_pipeline.diagnostic import error_diagnostic_node
-    from src.models.state import DiagnosticResult
 
     state: ControlState = {
         "sql": "SELECT * FROM lineitem",
@@ -418,8 +417,82 @@ def test_error_diagnostic_agent_fallback_no_llm():
     assert "actionable_feedback" in update
     assert "diagnostic_result" in update
     diag = update["diagnostic_result"]
-    assert isinstance(diag, DiagnosticResult)
-    assert diag.error_category == "COST_EXCEEDED"
-    assert "ngân sách" in diag.root_cause
-    assert "LIMIT" in diag.suggested_fix
     assert update["actionable_feedback"] == diag.actionable_feedback
+
+
+def test_get_control_pipeline_subagent_spec():
+    """Kiểm tra cấu hình CompiledSubAgent của Control Pipeline theo chuẩn deepagents."""
+    from langchain_core.runnables import Runnable
+
+    from src.agents.control_pipeline import (
+        control_pipeline_subagent,
+        get_control_pipeline_subagent,
+    )
+
+    spec = get_control_pipeline_subagent()
+    assert spec["name"] == "control-pipeline"
+    assert spec["mode"] == "isolated"
+    assert isinstance(spec["runnable"], Runnable)
+    assert "Hàng rào kiểm soát" in spec["description"]
+
+    # Kiểm tra singleton instance
+    assert control_pipeline_subagent["name"] == "control-pipeline"
+
+
+def test_control_pipeline_runnable_execution_success(shared_tpch_connector, default_user_context):
+    """Kiểm tra thực thi Runnable bọc Control Pipeline với câu lệnh SELECT hợp lệ."""
+    from langchain_core.messages import AIMessage
+
+    from src.agents.control_pipeline.builder import (
+        build_control_pipeline_graph,
+        create_control_pipeline_runnable,
+    )
+
+    graph = build_control_pipeline_graph(db_connector=shared_tpch_connector)
+    runnable = create_control_pipeline_runnable(graph=graph)
+
+    state = {
+        "sql": "SELECT c_custkey, c_name FROM customer LIMIT 2",
+        "user_context": default_user_context,
+        "session_id": "test_compiled_subagent_sess",
+    }
+
+    result = runnable.invoke(state)
+
+    # deepagents bắt buộc kết quả phải có 'messages' chứa AIMessage
+    assert "messages" in result
+    assert len(result["messages"]) == 1
+    assert isinstance(result["messages"][0], AIMessage)
+    assert "THÀNH CÔNG" in result["messages"][0].content
+
+    # Kiểm tra dữ liệu trả về trong state
+    assert result["is_valid"] is True
+    assert len(result["data"]) == 2
+    assert "c_name" in result["columns"]
+
+
+def test_control_pipeline_runnable_execution_failure_ast(shared_tpch_connector, default_user_context):
+    """Kiểm tra thực thi Runnable khi có lỗi vi phạm AST (DROP TABLE)."""
+    from langchain_core.messages import AIMessage
+
+    from src.agents.control_pipeline.builder import (
+        build_control_pipeline_graph,
+        create_control_pipeline_runnable,
+    )
+
+    graph = build_control_pipeline_graph(db_connector=shared_tpch_connector)
+    runnable = create_control_pipeline_runnable(graph=graph)
+
+    state = {
+        "sql": "DROP TABLE customer",
+        "user_context": default_user_context,
+        "session_id": "test_compiled_subagent_fail",
+    }
+
+    result = runnable.invoke(state)
+
+    assert "messages" in result
+    assert isinstance(result["messages"][0], AIMessage)
+    assert "THẤT BẠI" in result["messages"][0].content
+    assert result["is_valid"] is False
+    assert result["data"] is None

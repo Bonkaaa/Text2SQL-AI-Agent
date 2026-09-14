@@ -1,6 +1,9 @@
 from typing import Any
 
+from deepagents.middleware.subagents import CompiledSubAgent
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import Runnable, RunnableLambda
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -114,3 +117,84 @@ def run_control_pipeline(
         "bytes_scanned": 0,
         "execution_time_ms": 0.0,
     }
+
+
+def create_control_pipeline_runnable(
+    graph: CompiledStateGraph | None = None,
+) -> Runnable:
+    """Tạo Runnable bọc Control Pipeline tương thích với deepagents CompiledSubAgent.
+
+    deepagents yêu cầu SubAgent trả về state có chứa trường 'messages' để trích xuất nội dung
+    gửi ngược lại cho parent agent dưới dạng ToolMessage.
+    """
+    active_graph = graph or build_control_pipeline_graph()
+
+    def _sync_runner(state: dict[str, Any]) -> dict[str, Any]:
+        # 1. Trích xuất câu lệnh SQL từ state hoặc từ messages
+        sql = state.get("sql")
+        if not sql:
+            messages = state.get("messages", [])
+            for msg in reversed(messages):
+                content = getattr(msg, "content", "")
+                if content:
+                    sql = str(content)
+                    break
+
+        user_context = state.get("user_context")
+        session_id = state.get("session_id", "default_session")
+
+        input_data: ControlPipelineInput = {
+            "sql": sql or "",
+            "user_context": user_context,
+            "session_id": session_id,
+        }
+
+        output = run_control_pipeline(active_graph, input_data)
+
+        # 2. Định dạng thông điệp tóm tắt gửi về cho Supervisor
+        if output.get("is_valid", False):
+            summary = (
+                f"Truy vấn SQL thực thi THÀNH CÔNG trên database ({output.get('execution_time_ms', 0):.2f}ms). "
+                f"Đã trả về {len(output.get('data') or [])} bản ghi."
+            )
+        else:
+            summary = (
+                f"Truy vấn SQL THẤT BẠI [{output.get('error_type', 'ERROR')}]: {output.get('error_message')}. "
+                f"Actionable Feedback: {output.get('actionable_feedback')}"
+            )
+
+        return {
+            **state,
+            "messages": [AIMessage(content=summary)],
+            "execution_result": output,
+            "is_valid": output.get("is_valid", False),
+            "data": output.get("data"),
+            "columns": output.get("columns"),
+            "status": output.get("status"),
+        }
+
+    return RunnableLambda(_sync_runner)
+
+
+def get_control_pipeline_subagent(
+    graph: CompiledStateGraph | None = None,
+) -> CompiledSubAgent:
+    """Tạo cấu hình CompiledSubAgent cho Control Pipeline theo chuẩn deepagents.
+
+    Đóng gói StateGraph tất định Phase 1 thành một CompiledSubAgent mà Deep Agent
+    có thể gọi qua công cụ task('control-pipeline', ...).
+    """
+    runnable = create_control_pipeline_runnable(graph=graph)
+    return {
+        "name": "control-pipeline",
+        "description": (
+            "Hàng rào kiểm soát tất định (CompiledSubAgent) thực thi kiểm tra cú pháp AST (sqlglot), "
+            "chính sách phân quyền RBAC, dự toán chi phí Cost guard, Human-in-the-loop (HITL) "
+            "và thực thi truy vấn an toàn trên Data Warehouse."
+        ),
+        "runnable": runnable,
+        "mode": "isolated",
+    }
+
+
+control_pipeline_subagent: CompiledSubAgent = get_control_pipeline_subagent()

@@ -268,15 +268,18 @@
 
 ### PHASE 4: ĐIỀU PHỐI TỔNG THỂ & TƯƠNG TÁC (CLARIFICATION, SUPERVISOR & SYNTHESIZER)
 
-#### Component 4.1: Khâu Làm Rõ Câu Hỏi Mơ Hồ (Clarification Agent)
-- **File**: `src/agents/clarification.py`
+#### Component 4.1: Khâu Làm Rõ Câu Hỏi Mơ Hồ (One-shot Clarification Gatekeeper)
+- **File**: `src/agents/clarification.py` & `src/agents/prompts/clarification_prompt.py`
+- **Bản chất kiến trúc (v3.0)**: Là một **Pre-flight Decision Gate (One-shot Prompt Gatekeeper Node)** chạy trước khi gọi Supervisor/Subagents, KHÔNG phải là một DeepAgents SubAgent dictionary nhằm tránh lãng phí token suy luận.
 - **Nhiệm vụ**: Đánh giá câu hỏi người dùng có đủ điều kiện lọc cần thiết hay không trước khi tốn token sinh SQL.
 - **Nội dung code**:
-  - Hàm `check_clarification_needed(question: str) -> ClarificationResult`:
+  - Hàm `check_clarification_needed(question: str, llm: BaseChatModel | None = None) -> ClarificationResult`:
+    - Xử lý chuỗi rỗng / khoảng trắng nhanh chóng (Fast-path): tự động bốc ngẫu nhiên 3 gợi ý từ Pool 10 câu hỏi nghiệp vụ chuẩn TPC-H.
     - Nhận biết các câu hỏi quá chung chung (ví dụ: *"Doanh thu thế nào?"* -> thiếu khoảng thời gian, thiếu khu vực).
-    - Nếu thiếu: Trả về `needs_clarification = True`, kèm câu hỏi làm rõ gợi ý các phương án lựa chọn A, B, C.
+    - Nếu thiếu: Trả về `needs_clarification = True`, kèm lý do và câu hỏi làm rõ gợi ý các phương án lựa chọn A, B, C.
     - Nếu câu hỏi đã rõ ràng (ví dụ: *"Top 5 khách hàng mua nhiều nhất năm 1995 tại Châu Á"*): Trả về `needs_clarification = False`.
-- **Unit Test**: `tests/test_clarification.py` (kiểm tra với bộ câu hỏi mơ hồ mẫu và câu hỏi rõ ràng mẫu).
+    - Cơ chế Fail-Open an toàn: nếu LLM timeout/lỗi mạng, không làm sập ứng dụng mà fallback cho phép tiếp tục luồng.
+- **Unit Test**: `tests/agents/test_clarification.py` (kiểm tra với bộ câu hỏi mơ hồ mẫu, câu hỏi rõ ràng mẫu, pool 10 gợi ý và fail-open fallback).
 
 #### Component 4.2: Subagent: Response Synthesizer & Đề Xuất Biểu Đồ (Dictionary-based SubAgent)
 - **File**: `src/agents/synthesizer.py`

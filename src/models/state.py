@@ -22,6 +22,11 @@ class ClarificationResult(BaseModel):
         description="Danh sách các tùy chọn gợi ý (A, B, C...)",
     )
 
+    @property
+    def is_ambiguous(self) -> bool:
+        """Alias tương thích cho needs_clarification."""
+        return self.needs_clarification
+
 
 class SchemaContextResult(BaseModel):
     """Kết quả trích xuất ngữ cảnh lược đồ từ Schema & Value Retriever Subagent."""
@@ -143,6 +148,26 @@ class RechartsConfig(BaseModel):
     )
     description: str | None = Field(
         default=None, description="Mô tả ngắn gọn về biểu đồ"
+    )
+
+
+class SynthesizerResult(BaseModel):
+    """Kết quả phân tích dữ liệu, diễn giải insight và cấu hình biểu đồ từ Response Synthesizer Subagent."""
+
+    chart_type: Literal["bar", "line", "pie", "area", "table"] = Field(
+        default="table",
+        description="Loại biểu đồ trực quan hóa được đề xuất",
+    )
+    recharts_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Cấu hình JSON chi tiết cho Recharts Frontend (x_key, y_keys, series_labels, title...)",
+    )
+    business_insight: str = Field(
+        description="2-3 câu diễn giải số liệu nổi bật bằng tiếng Việt, nêu rõ con số cụ thể và xu hướng",
+    )
+    summary_metrics: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Các giá trị tổng hợp định lượng cốt lõi (ví dụ: total_revenue, top_segment, max_value, count)",
     )
 
 
