@@ -9,6 +9,7 @@ __pycache__
 tpch_csv/
 data/*.duckdb
 data/*.parquet
+data/*.sql
 data/logs
 outputs/*
 !outputs/.gitkeep
