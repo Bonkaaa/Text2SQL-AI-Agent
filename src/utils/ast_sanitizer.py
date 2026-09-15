@@ -140,7 +140,7 @@ def sanitize_and_validate_sql(
                 current_limit_val = int(limit_node.expression.this)
                 if current_limit_val > default_limit:
                     expression = expression.limit(default_limit, copy=False)
-            except ValueError, TypeError, AttributeError:
+            except (ValueError, TypeError, AttributeError):
                 expression = expression.limit(default_limit, copy=False)
 
     sanitized_sql = expression.sql(dialect=dialect)

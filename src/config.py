@@ -1,8 +1,14 @@
-from functools import lru_cache
-from typing import Literal
+from __future__ import annotations
 
-from pydantic import Field
+from functools import lru_cache
+from typing import Literal, Self
+
+from dotenv import load_dotenv
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Tự động nạp các biến môi trường vào os.environ cho LangChain/LangSmith
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -32,25 +38,74 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "gemini", "deepseek", "mistral"] = Field(
         default="openai", description="Nhà cung cấp LLM mặc định"
     )
+    # 1. OpenAI
     openai_api_key: str | None = Field(default=None, description="Khóa API OpenAI")
+    openai_tier1_model: str = Field(
+        default="gpt-4o", description="Model Tier 1 của OpenAI"
+    )
+    openai_tier2_model: str = Field(
+        default="gpt-4o-mini", description="Model Tier 2 của OpenAI"
+    )
+
+    # 2. Google Gemini
     gemini_api_key: str | None = Field(
         default=None, description="Khóa API Google Gemini"
     )
+    gemini_tier1_model: str = Field(
+        default="gemini-1.5-pro", description="Model Tier 1 của Google Gemini"
+    )
+    gemini_tier2_model: str = Field(
+        default="gemini-1.5-flash", description="Model Tier 2 của Google Gemini"
+    )
+
+    # 3. DeepSeek
     deepseek_api_key: str | None = Field(default=None, description="Khóa API DeepSeek")
     deepseek_base_url: str = Field(
         default="https://api.deepseek.com/v1",
         description="Base URL của DeepSeek API",
     )
-    mistral_api_key: str | None = Field(default=None, description="Khóa API Mistral AI")
+    deepseek_tier1_model: str = Field(
+        default="deepseek-reasoner", description="Model Tier 1 của DeepSeek"
+    )
+    deepseek_tier2_model: str = Field(
+        default="deepseek-chat", description="Model Tier 2 của DeepSeek"
+    )
 
-    # Tier 1 Model: Dành cho tác vụ suy luận & sinh SQL phức tạp
-    tier1_model: str = Field(
-        default="gpt-4o", description="Model mạnh mẽ cho SQL Generator"
+    # 4. Mistral AI
+    mistral_api_key: str | None = Field(default=None, description="Khóa API Mistral AI")
+    mistral_tier1_model: str = Field(
+        default="mistral-large-latest", description="Model Tier 1 của Mistral AI"
     )
-    # Tier 2 Model: Dành cho tác vụ nhẹ như Schema Retriever & Response Synthesizer
-    tier2_model: str = Field(
-        default="gpt-4o-mini", description="Model nhẹ tối ưu chi phí"
+    mistral_tier2_model: str = Field(
+        default="mistral-small-latest", description="Model Tier 2 của Mistral AI"
     )
+
+    # Tier 1 & 2 Models: Nếu để None hoặc rỗng, sẽ tự động phân giải theo provider được chọn
+    tier1_model: str | None = Field(
+        default=None,
+        description="Model mạnh mẽ cho SQL Generator (nếu không set sẽ lấy theo provider)",
+    )
+    tier2_model: str | None = Field(
+        default=None,
+        description="Model nhẹ tối ưu chi phí (nếu không set sẽ lấy theo provider)",
+    )
+
+    @model_validator(mode="after")
+    def resolve_tier_models(self) -> Self:
+        provider_defaults = {
+            "openai": (self.openai_tier1_model, self.openai_tier2_model),
+            "gemini": (self.gemini_tier1_model, self.gemini_tier2_model),
+            "deepseek": (self.deepseek_tier1_model, self.deepseek_tier2_model),
+            "mistral": (self.mistral_tier1_model, self.mistral_tier2_model),
+        }
+        default_t1, default_t2 = provider_defaults.get(
+            self.llm_provider, (self.openai_tier1_model, self.openai_tier2_model)
+        )
+        if not self.tier1_model:
+            self.tier1_model = default_t1
+        if not self.tier2_model:
+            self.tier2_model = default_t2
+        return self
     llm_temperature: float = Field(
         default=0.0,
         ge=0.0,
@@ -109,6 +164,20 @@ class Settings(BaseSettings):
         gt=0,
         description="Giới hạn số lần gọi LLM (model calls) tối đa cho Supervisor trong toàn bộ thread",
     )
+    max_conversation_history_messages: int = Field(
+        default=40,
+        gt=0,
+        description="Ngưỡng số lượng tin nhắn tối đa kích hoạt tóm tắt để tránh tràn context window",
+    )
+    keep_recent_messages: int = Field(
+        default=20,
+        gt=0,
+        description="Số lượng tin nhắn hội thoại gần nhất được giữ nguyên vẹn khi tóm tắt",
+    )
+    enable_context_summarization: bool = Field(
+        default=True,
+        description="Bật/tắt tính năng tự động tóm tắt ngữ cảnh cũ khi hội thoại kéo dài nhiều lượt",
+    )
 
     # --- Observability & Execution Traces ---
     enable_trace_logging: bool = Field(
@@ -118,6 +187,21 @@ class Settings(BaseSettings):
     trace_output_dir: str = Field(
         default="outputs",
         description="Đường dẫn thư mục lưu vết thực thi phiên truy vấn",
+    )
+
+    # --- LangSmith Tracing & Observability ---
+    langchain_tracing_v2: bool = Field(
+        default=False, description="Bật/tắt tính năng LangSmith Tracing v2"
+    )
+    langchain_api_key: str | None = Field(
+        default=None, description="Khóa API của LangSmith"
+    )
+    langchain_project: str = Field(
+        default="text2sql-agent", description="Tên project lưu vết trên LangSmith"
+    )
+    langchain_endpoint: str = Field(
+        default="https://api.smith.langchain.com",
+        description="Endpoint của LangSmith API",
     )
 
 

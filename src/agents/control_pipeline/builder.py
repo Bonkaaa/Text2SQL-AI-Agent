@@ -1,3 +1,5 @@
+import json
+import re
 from typing import Any
 
 from deepagents.middleware.subagents import CompiledSubAgent
@@ -25,6 +27,7 @@ from src.agents.control_pipeline.routers import (
     route_after_hitl,
     route_after_rbac,
 )
+from src.models.rbac import UserContext, UserRole
 from src.models.state import ControlPipelineInput, ControlPipelineOutput, ControlState
 from src.utils.audit_logger import AuditLogger
 from src.utils.db_connector import BaseWarehouseConnector
@@ -119,6 +122,55 @@ def run_control_pipeline(
     }
 
 
+def extract_sql_from_text(raw_text: str) -> str:
+    """Trích xuất câu lệnh SQL thuần túy từ văn bản tự nhiên, Markdown hoặc JSON.
+
+    Xử lý các tình huống:
+    1. JSON object chứa key 'sql' hoặc 'query' (ví dụ tool output: {"sql": "SELECT ..."})
+    2. Markdown codeblock: ```sql ... ``` hoặc ``` ... ```
+    3. Văn bản tự nhiên có kèm SQL (ví dụ: 'Kiểm duyệt cú pháp AST: SELECT COUNT(*) FROM customer')
+    4. Câu SQL thuần túy: SELECT ... hoặc WITH ...
+    """
+    if not raw_text or not isinstance(raw_text, str):
+        return ""
+
+    text = raw_text.strip()
+
+    # 1. Thử parse JSON nếu chuỗi bắt đầu bằng '{'
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                for key in ("sql", "query", "sql_query"):
+                    if key in data and isinstance(data[key], str):
+                        return data[key].strip()
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 2. Trích xuất từ Markdown Code Block ```sql ... ```
+    code_block_match = re.search(r"```(?:sql)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    if code_block_match:
+        extracted = code_block_match.group(1).strip()
+        if extracted:
+            return extracted
+
+    # 3. Dùng Regex tìm mệnh đề SQL hợp lệ bắt đầu bằng SELECT hoặc WITH
+    sql_pattern = re.compile(
+        r"\b(SELECT\s+[\s\S]+?|WITH\s+[\s\S]+?)(?:;|\Z)",
+        re.IGNORECASE,
+    )
+    match = sql_pattern.search(text)
+    if match:
+        extracted = match.group(1).strip()
+        if (extracted.startswith('"') and extracted.endswith('"')) or (
+            extracted.startswith("'") and extracted.endswith("'")
+        ):
+            extracted = extracted[1:-1].strip()
+        return extracted
+
+    return text
+
+
 def create_control_pipeline_runnable(
     graph: CompiledStateGraph | None = None,
 ) -> Runnable:
@@ -131,17 +183,28 @@ def create_control_pipeline_runnable(
 
     def _sync_runner(state: dict[str, Any]) -> dict[str, Any]:
         # 1. Trích xuất câu lệnh SQL từ state hoặc từ messages
-        sql = state.get("sql")
-        if not sql:
+        raw_sql = state.get("sql")
+        if not raw_sql:
             messages = state.get("messages", [])
             for msg in reversed(messages):
                 content = getattr(msg, "content", "")
                 if content:
-                    sql = str(content)
+                    raw_sql = str(content)
                     break
+
+        sql = extract_sql_from_text(raw_sql or "")
 
         user_context = state.get("user_context")
         session_id = state.get("session_id", "default_session")
+
+        # Phòng thủ chiều sâu (Defense-in-Depth):
+        # Nếu state chưa có user_context, tự động gán vai trò quyền hạn tối thiểu (Analyst)
+        if not user_context:
+            user_context = UserContext(
+                user_id="default_analyst",
+                session_id=session_id,
+                role=UserRole.ANALYST,
+            )
 
         input_data: ControlPipelineInput = {
             "sql": sql or "",
@@ -153,14 +216,19 @@ def create_control_pipeline_runnable(
 
         # 2. Định dạng thông điệp tóm tắt gửi về cho Supervisor
         if output.get("is_valid", False):
+            data = output.get("data") or []
+            data_sample = data[:10]
             summary = (
-                f"Truy vấn SQL thực thi THÀNH CÔNG trên database ({output.get('execution_time_ms', 0):.2f}ms). "
-                f"Đã trả về {len(output.get('data') or [])} bản ghi."
+                f"Truy vấn SQL thực thi THÀNH CÔNG trên database ({output.get('execution_time_ms', 0):.2f}ms).\n"
+                f"- Câu lệnh đã chạy: {sql}\n"
+                f"- Số lượng bản ghi: {len(data)}\n"
+                f"- Dữ liệu mẫu thực tế: {json.dumps(data_sample, ensure_ascii=False, default=str)}"
             )
         else:
             summary = (
-                f"Truy vấn SQL THẤT BẠI [{output.get('error_type', 'ERROR')}]: {output.get('error_message')}. "
-                f"Actionable Feedback: {output.get('actionable_feedback')}"
+                f"Truy vấn SQL THẤT BẠI [{output.get('error_type', 'ERROR')}]: {output.get('error_message')}.\n"
+                f"- Câu lệnh bị lỗi: {sql}\n"
+                f"- Actionable Feedback: {output.get('actionable_feedback')}"
             )
 
         return {
@@ -171,6 +239,7 @@ def create_control_pipeline_runnable(
             "data": output.get("data"),
             "columns": output.get("columns"),
             "status": output.get("status"),
+            "executed_sql": sql,
         }
 
     return RunnableLambda(_sync_runner)

@@ -38,10 +38,10 @@ Nhiệm vụ của bạn là tiếp nhận câu hỏi nghiệp vụ gốc của 
 ### QUY TẮC VIẾT BUSINESS INSIGHT (business_insight):
 - Viết 2 đến 3 câu tiếng Việt chuyên nghiệp, tự nhiên, dễ hiểu cho cấp quản lý.
 - BẮT BUỘC nêu các con số cụ thể, giá trị cao nhất/thấp nhất hoặc đối tượng dẫn đầu dựa trên dữ liệu thật.
-- Tuyệt đối KHÔNG hallucinate hoặc bịa thêm các số liệu không có trong bảng dữ liệu.
+- NẾU DỮ LIỆU BẢNG LÀ RỖNG HOẶC NULL: BẮT BUỘC trả về insight thông báo: "Không tìm thấy dữ liệu phù hợp trong cơ sở dữ liệu để trả lời câu hỏi." Tuyệt đối KHÔNG tự suy đoán, bịa đặt số liệu hoặc lấy số liệu mặc định từ tài liệu TPC-H (như quy chuẩn SF-1 hay 150,000 bản ghi).
 
 ### QUY TẮC TÍNH SUMMARY METRICS (summary_metrics):
-- Trả về dictionary các giá trị tóm tắt định lượng (ví dụ: `{{"total_revenue": 12500000.0, "top_category": "BUILDING", "record_count": 5}}`).
+- Trả về dictionary các giá trị tóm tắt định lượng (ví dụ: `{{"total_revenue": 12500000.0, "top_category": "BUILDING", "record_count": 5}}`). Nếu không có dữ liệu, trả về `{{}}`.
 
 Hãy luôn trả về kết quả theo đúng cấu trúc SynthesizerResult."""
 

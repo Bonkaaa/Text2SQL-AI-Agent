@@ -496,3 +496,43 @@ def test_control_pipeline_runnable_execution_failure_ast(shared_tpch_connector, 
     assert "THẤT BẠI" in result["messages"][0].content
     assert result["is_valid"] is False
     assert result["data"] is None
+
+
+def test_extract_sql_from_text_various_formats():
+    """Kiểm tra trích xuất SQL sạch từ nhiều định dạng prompt/LLM output."""
+    from src.agents.control_pipeline.builder import extract_sql_from_text
+
+    # 1. Câu SQL thuần túy
+    pure_sql = "SELECT COUNT(*) FROM customer"
+    assert extract_sql_from_text(pure_sql) == "SELECT COUNT(*) FROM customer"
+
+    # 2. Markdown code block
+    md_sql = "```sql\nSELECT c_custkey, c_name FROM customer WHERE c_acctbal > 1000;\n```"
+    assert "SELECT c_custkey" in extract_sql_from_text(md_sql)
+    assert "```" not in extract_sql_from_text(md_sql)
+
+    # 3. Chứa tiền tố tiếng Việt (lỗi trước đây làm sqlglot bị crash)
+    prefix_sql = (
+        "Kiểm duyệt cú pháp và thực thi câu lệnh SQL sau trên cơ sở dữ liệu DuckDB:\n"
+        "SELECT COUNT(*) AS total_customers FROM customer;"
+    )
+    extracted = extract_sql_from_text(prefix_sql)
+    assert extracted.startswith("SELECT COUNT(*)")
+    assert "Kiểm duyệt" not in extracted
+
+    # 4. Dạng JSON
+    json_sql = '{"sql": "SELECT c_custkey FROM customer LIMIT 10"}'
+    assert extract_sql_from_text(json_sql) == "SELECT c_custkey FROM customer LIMIT 10"
+
+    # 5. CTE WITH query có tiền tố
+    cte_sql = (
+        "Hãy chạy câu query sau:\n"
+        "WITH cust_orders AS (\n"
+        "    SELECT o_custkey, COUNT(*) as cnt FROM orders GROUP BY o_custkey\n"
+        ")\n"
+        "SELECT * FROM cust_orders LIMIT 5;"
+    )
+    extracted_cte = extract_sql_from_text(cte_sql)
+    assert extracted_cte.startswith("WITH cust_orders AS")
+    assert "Hãy chạy" not in extracted_cte
+

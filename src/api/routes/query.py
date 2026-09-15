@@ -15,7 +15,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 from langgraph.types import Command
 
-from src.agents.supervisor import arun_supervisor
+from src.agents.supervisor import arun_supervisor, extract_message_text
 from src.api.dependencies import get_current_user_context, get_shared_checkpointer
 from src.config import get_settings
 from src.models.api_schemas import (
@@ -65,11 +65,12 @@ async def ask_query(
         request.question,
     )
 
-    # 2. Gọi Supervisor bất đồng bộ
+    # 2. Gọi Supervisor bất đồng bộ với shared checkpointer để lưu trữ context đa lượt
     result: dict[str, Any] = await arun_supervisor(
         question=request.question,
         user_context=active_user,
         session_id=active_session_id,
+        checkpointer=get_shared_checkpointer(),
     )
 
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -82,12 +83,12 @@ async def ask_query(
     columns = result.get("columns")
     recharts_config = result.get("recharts_config")
     sql = result.get("sql")
-    final_answer = result.get("final_answer")
+    final_answer = extract_message_text(result.get("final_answer"))
 
     # Nếu agent hoàn tất mà có messages, trích xuất final_answer từ message cuối
     messages = result.get("messages", [])
     if not final_answer and messages:
-        final_answer = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
+        final_answer = extract_message_text(getattr(messages[-1], "content", messages[-1]))
 
     return QueryResponse(
         session_id=active_session_id,

@@ -123,7 +123,7 @@ class DuckDBConnector(BaseWarehouseConnector):
 
                         try:
                             cardinality = int(cardinality_str)
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             cardinality = 1000
 
                         num_cols = len(projections) if projections else 5

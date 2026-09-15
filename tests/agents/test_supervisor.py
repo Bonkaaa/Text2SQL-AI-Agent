@@ -281,3 +281,90 @@ def test_supervisor_invoke_with_mock_model(mock_analyst_user):
     assert len(output["messages"]) >= 2
     assert "Supervisor" in output["messages"][-1].content
 
+
+def test_format_failed_query_fallback_response():
+    """Kiểm tra phản hồi mẫu chuẩn mực khi truy vấn dữ liệu thất bại."""
+    from src.agents.supervisor import format_failed_query_fallback_response
+
+    res = format_failed_query_fallback_response(
+        question="Có bao nhiêu khách hàng?",
+        last_error_message="Table 'custome' does not exist",
+    )
+    assert "Có bao nhiêu khách hàng?" in res
+    assert "Zero Hallucination" in res
+    assert "Table 'custome' does not exist" in res
+    assert "Gợi ý" in res
+
+
+def test_verify_pipeline_execution_integrity():
+    """Kiểm tra logic nhận diện truy vấn thất bại toàn bộ từ message history."""
+    from langchain_core.messages import AIMessage
+
+    from src.agents.supervisor import verify_pipeline_execution_integrity
+
+    # Case 1: Không gọi control-pipeline
+    msgs_no_call = [AIMessage(content="Chào bạn")]
+    is_compromised, last_error = verify_pipeline_execution_integrity(msgs_no_call)
+    assert is_compromised is False
+    assert last_error is None
+
+    # Case 2: Có gọi và có lần thành công
+    msgs_success = [
+        AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Syntax error"),
+        AIMessage(content="[control-pipeline] Truy vấn SQL thực thi THÀNH CÔNG (1500 records)"),
+    ]
+    is_compromised, last_error = verify_pipeline_execution_integrity(msgs_success)
+    assert is_compromised is False
+
+    # Case 3: Có gọi nhưng tất cả các lần đều thất bại
+    msgs_all_fail = [
+        AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Syntax error at or near 'Kiem'"),
+        AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Table not found"),
+    ]
+    is_compromised, last_error = verify_pipeline_execution_integrity(msgs_all_fail)
+    assert is_compromised is True
+    assert "Table not found" in last_error
+
+
+def test_run_supervisor_failed_query_triggers_deterministic_fallback(mock_analyst_user, tmp_path: Path):
+    """Kiểm tra khi control-pipeline thất bại toàn bộ, Supervisor bắt buộc trả về EXECUTION_FAILED thay vì ảo tưởng số liệu."""
+    from langchain_core.messages import AIMessage
+
+    from src.agents.supervisor import run_supervisor
+
+    clarification_mock = ClarificationResult(needs_clarification=False)
+    tracer = SessionTracer(session_id="sess_fallback_test", base_dir=tmp_path)
+
+    # Mock output mà trong đó control-pipeline thất bại nhưng model lại sinh câu trả lời hallucinate "150,000"
+    mock_agent = MagicMock()
+    mock_agent.invoke.return_value = {
+        "messages": [
+            AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: AST_ERROR"),
+            AIMessage(content="Theo thống kê, có khoảng 150,000 khách hàng trong hệ thống."),
+        ]
+    }
+
+    with (
+        patch(
+            "src.agents.supervisor.check_clarification_needed",
+            return_value=clarification_mock,
+        ),
+        patch(
+            "src.agents.supervisor.create_text2sql_supervisor",
+            return_value=mock_agent,
+        ),
+    ):
+        result = run_supervisor(
+            question="Có bao nhiêu khách hàng?",
+            user_context=mock_analyst_user,
+            tracer=tracer,
+            agent=mock_agent,
+        )
+
+        # Chốt chặn phải chặn đứng kết quả ảo tưởng
+        assert result["status"] == "EXECUTION_FAILED"
+        assert "150,000" not in result["final_answer"]
+        assert "Zero Hallucination" in result["final_answer"]
+        assert "AST_ERROR" in result["final_answer"]
+
+

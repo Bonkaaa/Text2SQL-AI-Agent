@@ -33,6 +33,7 @@ from deepagents.backends import StateBackend
 from langchain.agents.middleware import (
     AgentMiddleware,
     ModelCallLimitMiddleware,
+    SummarizationMiddleware,
     TodoListMiddleware,
     ToolCallLimitMiddleware,
 )
@@ -41,6 +42,20 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
+
+# Singleton Checkpointer dùng chung cho toàn bộ Agent Supervisor để duy trì ngữ cảnh phiên
+_shared_supervisor_checkpointer: MemorySaver = MemorySaver()
+
+
+def get_default_checkpointer() -> BaseCheckpointSaver:
+    """Singleton getter cung cấp Checkpointer chung cho toàn bộ Agent Supervisor."""
+    return _shared_supervisor_checkpointer
+
+
+def reset_default_checkpointer() -> None:
+    """Reset dữ liệu checkpointer phục vụ cho unit testing."""
+    global _shared_supervisor_checkpointer
+    _shared_supervisor_checkpointer = MemorySaver()
 
 from src.agents.clarification import check_clarification_needed
 from src.agents.control_pipeline import get_control_pipeline_subagent
@@ -179,6 +194,21 @@ def create_text2sql_supervisor(
             exit_behavior="end",
         ),
     ]
+
+    # Context Window Guardrail: Tự động tóm tắt tin nhắn cũ khi vượt ngưỡng
+    if settings.enable_context_summarization:
+        summary_model = get_chat_model(tier="tier2") or (
+            active_model if isinstance(active_model, BaseChatModel) else None
+        )
+        if summary_model is not None:
+            active_middleware.append(
+                SummarizationMiddleware(
+                    model=summary_model,
+                    trigger=("messages", settings.max_conversation_history_messages),
+                    keep=("messages", settings.keep_recent_messages),
+                )
+            )
+
     if middleware:
         for m in middleware:
             if not isinstance(
@@ -187,6 +217,7 @@ def create_text2sql_supervisor(
                     TodoListMiddleware,
                     ToolCallLimitMiddleware,
                     ModelCallLimitMiddleware,
+                    SummarizationMiddleware,
                 ),
             ):
                 active_middleware.append(m)
@@ -205,9 +236,9 @@ def create_text2sql_supervisor(
     active_skills = DEFAULT_SUPERVISOR_SKILLS if skills is None else skills
     active_memory = DEFAULT_SUPERVISOR_MEMORY if memory is None else memory
 
-    # 5. Khởi tạo Backend và Checkpointer
+    # 5. Khởi tạo Backend và Checkpointer (Dùng checkpointer truyền vào hoặc Singleton mặc định)
     active_backend = backend or StateBackend()
-    active_checkpointer = checkpointer or MemorySaver()
+    active_checkpointer = checkpointer or get_default_checkpointer()
 
     # 6. Tạo Deep Agent qua harness chính thức
     return create_deep_agent(
@@ -231,6 +262,71 @@ def create_text2sql_supervisor(
 # ==============================================================================
 
 
+def extract_message_text(content: Any) -> str:
+    """Trích xuất chuỗi văn bản sạch từ message content (hỗ trợ cả str, list[dict] của Gemini)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict) and "text" in part:
+                text_parts.append(str(part["text"]))
+        return "\n".join(text_parts).strip()
+    return str(content) if content is not None else ""
+
+
+def format_failed_query_fallback_response(
+    question: str,
+    last_error_message: str | None = None,
+) -> str:
+    """Tạo thông báo phản hồi chuẩn mực (Deterministic Fallback) khi truy vấn SQL thất bại."""
+    err_detail = (
+        f"\n- **Chi tiết kỹ thuật**: {last_error_message}"
+        if last_error_message
+        else ""
+    )
+    return (
+        f"Rất tiếc, hệ thống không thể thực thi thành công câu truy vấn dữ liệu cho câu hỏi: *\"{question}\"*.\n\n"
+        f"### ⚠️ Thông báo an toàn dữ liệu\n"
+        f"Câu lệnh SQL đã không vượt qua được hàng rào kiểm duyệt hoặc gặp lỗi thực thi trong cơ sở dữ liệu. "
+        f"Để đảm bảo tính chính xác tuyệt đối và tránh giả lập số liệu không có thực (Zero Hallucination), "
+        f"hệ thống đã dừng quá trình phân tích.{err_detail}\n\n"
+        f"### 💡 Gợi ý:\n"
+        f"- Bạn vui lòng kiểm tra lại câu hỏi hoặc cung cấp thêm tiêu chí cụ thể hơn (ví dụ: khoảng thời gian, nhóm trạng thái, mã định danh).\n"
+        f"- Nếu cần xem thông tin tổng quan, bạn có thể thử các mẫu câu hỏi đơn giản hơn."
+    )
+
+
+def verify_pipeline_execution_integrity(
+    messages: list[Any],
+) -> tuple[bool, str | None]:
+    """Kiểm tra xem control-pipeline có được gọi và có lượt gọi nào thành công không.
+
+    Returns:
+        tuple[is_compromised, last_error]:
+        - is_compromised = True nếu control-pipeline được gọi nhưng TẤT CẢ các lần gọi đều THẤT BẠI.
+        - last_error = Nội dung lỗi kỹ thuật cuối cùng ghi nhận được.
+    """
+    control_calls = 0
+    control_successes = 0
+    last_error: str | None = None
+
+    for msg in messages:
+        content = str(getattr(msg, "content", ""))
+        if "Truy vấn SQL thực thi THÀNH CÔNG" in content:
+            control_calls += 1
+            control_successes += 1
+        elif "Truy vấn SQL THẤT BẠI" in content:
+            control_calls += 1
+            lines = content.strip().split("\n")
+            last_error = lines[0] if lines else content
+
+    is_compromised = control_calls > 0 and control_successes == 0
+    return is_compromised, last_error
+
+
 def run_supervisor(
     question: str,
     user_context: UserContext | None = None,
@@ -240,6 +336,7 @@ def run_supervisor(
     thread_id: str | None = None,
     skip_clarification: bool = False,
     clarification_llm: BaseChatModel | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> dict[str, Any]:
     """Thực thi câu hỏi phân tích của người dùng qua Deep Agent Supervisor (Đồng bộ).
 
@@ -324,10 +421,13 @@ def run_supervisor(
             }
 
     # 3. Stage 2: Thực thi Deep Agent Supervisor
-    active_agent = agent or create_text2sql_supervisor()
+    active_checkpointer = checkpointer or get_default_checkpointer()
+    active_agent = agent or create_text2sql_supervisor(checkpointer=active_checkpointer)
     config = {"configurable": {"thread_id": active_thread_id}}
     input_state = {
         "messages": [HumanMessage(content=question)],
+        "user_context": active_user_context,
+        "session_id": active_session_id,
     }
 
     try:
@@ -338,13 +438,43 @@ def run_supervisor(
         )
 
         messages = output_state.get("messages", [])
-        final_answer = messages[-1].content if messages else ""
+        final_answer = extract_message_text(messages[-1].content) if messages else ""
         files = output_state.get("files", {})
 
         # Ghi nhận artifacts từ virtual filesystem
         if isinstance(files, dict):
             for fname, fcontent in files.items():
                 active_tracer.log_artifact(fname, fcontent)
+
+        # Chốt chặn kiểm tra tính toàn vẹn (Integrity Guard):
+        # Nếu control-pipeline được gọi nhưng tất cả các lần đều thất bại,
+        # tuyệt đối không để LLM hallucinate kết quả hoặc giả định số liệu.
+        is_compromised, last_error = verify_pipeline_execution_integrity(messages)
+        if is_compromised:
+            logger.warning(
+                f"Phát hiện truy vấn SQL thất bại toàn bộ nhưng Supervisor cố gắng trả lời. "
+                f"Kích hoạt chốt chặn trả lời mẫu (Deterministic Fallback). Lỗi: {last_error}"
+            )
+            final_answer = format_failed_query_fallback_response(
+                question=question,
+                last_error_message=last_error,
+            )
+            active_tracer.log_summary(
+                status="EXECUTION_FAILED",
+                question=question,
+                error=last_error,
+            )
+            return {
+                "status": "EXECUTION_FAILED",
+                "question": question,
+                "session_id": active_session_id,
+                "is_ambiguous": False,
+                "error": last_error,
+                "messages": messages,
+                "final_answer": final_answer,
+                "files": files,
+                "tracer": active_tracer,
+            }
 
         active_tracer.log_summary(status="COMPLETED", question=question)
 
@@ -386,6 +516,7 @@ async def arun_supervisor(
     thread_id: str | None = None,
     skip_clarification: bool = False,
     clarification_llm: BaseChatModel | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> dict[str, Any]:
     """Thực thi câu hỏi phân tích qua Deep Agent Supervisor (Bất đồng bộ - Async).
 
@@ -447,10 +578,13 @@ async def arun_supervisor(
             }
 
     # 2. Invoke Agent bất đồng bộ qua ainvoke
-    active_agent = agent or create_text2sql_supervisor()
+    active_checkpointer = checkpointer or get_default_checkpointer()
+    active_agent = agent or create_text2sql_supervisor(checkpointer=active_checkpointer)
     config = {"configurable": {"thread_id": active_thread_id}}
     input_state = {
         "messages": [HumanMessage(content=question)],
+        "user_context": active_user_context,
+        "session_id": active_session_id,
     }
 
     try:
@@ -461,12 +595,42 @@ async def arun_supervisor(
         )
 
         messages = output_state.get("messages", [])
-        final_answer = messages[-1].content if messages else ""
+        final_answer = extract_message_text(messages[-1].content) if messages else ""
         files = output_state.get("files", {})
 
         if isinstance(files, dict):
             for fname, fcontent in files.items():
                 active_tracer.log_artifact(fname, fcontent)
+
+        # Chốt chặn kiểm tra tính toàn vẹn (Integrity Guard):
+        # Nếu control-pipeline được gọi nhưng tất cả các lần đều thất bại,
+        # tuyệt đối không để LLM hallucinate kết quả hoặc giả định số liệu.
+        is_compromised, last_error = verify_pipeline_execution_integrity(messages)
+        if is_compromised:
+            logger.warning(
+                f"[Async] Phát hiện truy vấn SQL thất bại toàn bộ nhưng Supervisor cố gắng trả lời. "
+                f"Kích hoạt chốt chặn trả lời mẫu (Deterministic Fallback). Lỗi: {last_error}"
+            )
+            final_answer = format_failed_query_fallback_response(
+                question=question,
+                last_error_message=last_error,
+            )
+            active_tracer.log_summary(
+                status="EXECUTION_FAILED",
+                question=question,
+                error=last_error,
+            )
+            return {
+                "status": "EXECUTION_FAILED",
+                "question": question,
+                "session_id": active_session_id,
+                "is_ambiguous": False,
+                "error": last_error,
+                "messages": messages,
+                "final_answer": final_answer,
+                "files": files,
+                "tracer": active_tracer,
+            }
 
         active_tracer.log_summary(status="COMPLETED", question=question)
 
@@ -504,6 +668,11 @@ __all__ = [
     "DEFAULT_SUPERVISOR_SKILLS",
     "arun_supervisor",
     "create_text2sql_supervisor",
+    "extract_message_text",
+    "format_failed_query_fallback_response",
+    "get_default_checkpointer",
     "get_supervisor_subagents",
+    "reset_default_checkpointer",
     "run_supervisor",
+    "verify_pipeline_execution_integrity",
 ]

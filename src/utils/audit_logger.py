@@ -103,7 +103,7 @@ class AuditLogger:
                         event = AuditEvent.model_validate_json(stripped)
                         if session_id is None or event.session_id == session_id:
                             events.append(event)
-                    except json.JSONDecodeError, ValueError:
+                    except (json.JSONDecodeError, ValueError):
                         continue
         except (OSError, UnicodeDecodeError) as exc:
             logger.warning("Không thể đọc file audit log: %s", exc)

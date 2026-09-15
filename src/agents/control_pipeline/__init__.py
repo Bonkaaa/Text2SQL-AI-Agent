@@ -11,6 +11,7 @@ from src.agents.control_pipeline.builder import (
     build_control_pipeline_graph,
     control_pipeline_subagent,
     create_control_pipeline_runnable,
+    extract_sql_from_text,
     get_control_pipeline_subagent,
     run_control_pipeline,
 )
@@ -53,6 +54,7 @@ __all__ = [
     "err_node",
     "error_diagnostic_node",
     "execute_node",
+    "extract_sql_from_text",
     "get_control_pipeline_subagent",
     "get_diagnostic_llm",
     "hitl_gate_node",

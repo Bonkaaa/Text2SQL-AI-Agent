@@ -78,7 +78,7 @@ def transpile_sql(
             pretty=True,
         )
         return transpiled_queries[0] if transpiled_queries else sql
-    except ParseError, SqlglotError, ValueError:
+    except (ParseError, SqlglotError, ValueError):
         # Fail-safe: Nếu không thể transpile được, giữ nguyên chuỗi SQL gốc
         return sql
 

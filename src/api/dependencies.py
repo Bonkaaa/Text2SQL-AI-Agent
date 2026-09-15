@@ -11,22 +11,20 @@ from typing import Annotated
 
 from fastapi import Header, HTTPException, status
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 
+from src.agents.supervisor import get_default_checkpointer
 from src.config import get_settings
 from src.models.rbac import UserContext, UserRole
 from src.utils.audit_logger import get_audit_logger
 from src.utils.db_connector import DuckDBConnector
 from src.utils.tpch_seeder import seed_tpch_data
 
-# Singleton checkpointer lưu trạng thái đồ thị và interrupt qua các lượt request
-_shared_checkpointer: MemorySaver = MemorySaver()
 _shared_duckdb_connector: DuckDBConnector | None = None
 
 
 def get_shared_checkpointer() -> BaseCheckpointSaver:
     """Singleton getter cung cấp Checkpointer chung cho toàn bộ ứng dụng."""
-    return _shared_checkpointer
+    return get_default_checkpointer()
 
 
 def get_duckdb_connector() -> Generator[DuckDBConnector]:

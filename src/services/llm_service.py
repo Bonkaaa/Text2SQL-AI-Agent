@@ -39,9 +39,26 @@ def get_chat_model(
     temp = temperature if temperature is not None else settings.llm_temperature
     max_toks = max_tokens if max_tokens is not None else settings.llm_max_tokens
 
+    # Hỗ trợ trường hợp gọi get_chat_model("model-name") trực tiếp
+    if tier not in ("tier1", "tier2") and model_name is None:
+        model_name = str(tier)
+        tier = "tier2"
+
     # Xác định model name theo tier nếu không được truyền trực tiếp
     if not model_name:
-        model_name = settings.tier1_model if tier == "tier1" else settings.tier2_model
+        provider_model_map = {
+            "openai": (settings.openai_tier1_model, settings.openai_tier2_model),
+            "gemini": (settings.gemini_tier1_model, settings.gemini_tier2_model),
+            "deepseek": (settings.deepseek_tier1_model, settings.deepseek_tier2_model),
+            "mistral": (settings.mistral_tier1_model, settings.mistral_tier2_model),
+        }
+        if provider and provider in provider_model_map:
+            t1, t2 = provider_model_map[provider]
+            model_name = t1 if tier == "tier1" else t2
+        else:
+            model_name = (
+                settings.tier1_model if tier == "tier1" else settings.tier2_model
+            )
 
     try:
         if active_provider == "openai":
