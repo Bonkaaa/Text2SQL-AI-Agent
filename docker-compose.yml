@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: text2sql-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DUCKDB_PATH=/app/data/tpch.duckdb
+      - TRACE_OUTPUT_DIR=/app/outputs
+    volumes:
+      - duckdb_data:/app/data
+      - trace_outputs:/app/outputs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    container_name: text2sql-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  duckdb_data:
+    driver: local
+  trace_outputs:
+    driver: local

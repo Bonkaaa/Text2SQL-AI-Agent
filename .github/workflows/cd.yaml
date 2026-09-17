@@ -1,0 +1,138 @@
+name: Continuous Deployment (CD)
+
+on:
+  # Tạm thời tắt tự động kích hoạt khi push để chỉ chạy CI trước
+  # push:
+  #   branches:
+  #     - main
+  #   tags:
+  #     - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: "Môi trường triển khai"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ============================================================================
+  # 1. BUILD & PUSH BACKEND IMAGE TO GHCR
+  # ============================================================================
+  build-and-push-backend:
+    name: Build & Push Backend Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata (Tags & Labels)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 2. BUILD & PUSH FRONTEND IMAGE TO GHCR
+  # ============================================================================
+  build-and-push-frontend:
+    name: Build & Push Frontend Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata (Tags & Labels)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/frontend
+          file: ./src/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 3. DEPLOYMENT TRIGGER (Webhook / Server Notification)
+  # ============================================================================
+  deploy:
+    name: Trigger Deployment
+    needs: [build-and-push-backend, build-and-push-frontend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deployment Notification
+        run: |
+          echo "========================================================"
+          echo " Docker Images đã được build & push thành công lên GHCR:"
+          echo "  - Backend : ghcr.io/${{ github.repository }}/backend:latest"
+          echo "  - Frontend: ghcr.io/${{ github.repository }}/frontend:latest"
+          echo " Git Commit SHA: ${{ github.sha }}"
+          echo " Môi trường    : ${{ inputs.deploy_env || 'production' }}"
+          echo "========================================================"
+
+      - name: Call Deploy Webhook (Nếu cấu hình DEPLOY_WEBHOOK_URL)
+        if: env.DEPLOY_WEBHOOK_URL != ''
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          curl -X POST "${DEPLOY_WEBHOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -d "{\"repository\": \"${{ github.repository }}\", \"sha\": \"${{ github.sha }}\"}"

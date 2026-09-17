@@ -1,0 +1,88 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # 1. BACKEND CI (Python 3.11 + Ruff + Pytest Coverage)
+  # ============================================================================
+  backend-ci:
+    name: Backend CI (Ruff & Pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest-cov
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .
+
+      - name: Run Pytest Suite with Coverage
+        run: |
+          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+
+      - name: Upload Test Coverage Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+  # ============================================================================
+  # 2. FRONTEND CI (Next.js 14 + TypeScript Build & Lint)
+  # ============================================================================
+  frontend-ci:
+    name: Frontend CI (Next.js & TypeScript)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          npm ci
+
+      - name: Validate TypeScript & Build Next.js
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NODE_ENV: "production"
+        run: |
+          npm run build

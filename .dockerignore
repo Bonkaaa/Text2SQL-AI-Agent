@@ -1,0 +1,49 @@
+# Version Control & Metadata
+.git/
+.gitignore
+.github/
+
+# Python Virtual Environments & Caches
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Testing, Evals & Docs
+tests/
+evals/
+docs/
+*.md
+!README.md
+
+# Application Data & Large Artifacts
+data/*.duckdb
+data/*.parquet
+data/logs/*.jsonl
+outputs/*
+!outputs/.gitkeep
+
+# Frontend & Node Dependencies
+src/frontend/
+node_modules/
+.next/
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
