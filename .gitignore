@@ -13,3 +13,4 @@ data/*.sql
 data/logs
 outputs/*
 !outputs/.gitkeep
+.agents/
