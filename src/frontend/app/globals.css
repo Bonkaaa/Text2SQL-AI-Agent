@@ -52,6 +52,58 @@ body {
   transform: translateY(-1px);
 }
 
+/* 3D Iridescent Holographic Orb (tái tạo orb phát sáng như trong ảnh mẫu) */
+.orb-3d {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #d8b4fe 25%, #818cf8 55%, #3b82f6 75%, #1e1b4b 100%);
+  box-shadow:
+    inset -8px -8px 20px rgba(15, 23, 42, 0.7),
+    inset 6px 6px 12px rgba(255, 255, 255, 0.9),
+    0 10px 30px rgba(129, 140, 248, 0.35),
+    0 0 60px rgba(192, 132, 252, 0.25);
+  filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.4));
+}
+
+.orb-3d::before {
+  content: "";
+  position: absolute;
+  top: 12%;
+  left: 22%;
+  width: 20px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 80%);
+  transform: rotate(-30deg);
+}
+
+.orb-3d::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(59, 130, 246, 0.05) 60%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Desktop Command Input Box */
+.command-input-container {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.command-input-container:focus-within {
+  border-color: rgba(129, 140, 248, 0.4);
+  box-shadow: 0 20px 45px -10px rgba(99, 102, 241, 0.2), 0 0 0 1px rgba(129, 140, 248, 0.3);
+}
+
 /* Pulse Glow Effect for reasoning timeline */
 @keyframes pulse-glow {
   0%, 100% {

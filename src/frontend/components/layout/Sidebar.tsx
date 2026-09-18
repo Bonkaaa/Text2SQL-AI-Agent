@@ -1,53 +1,50 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  Clock,
-  Lock,
-  MessageSquare,
+  Check,
+  ChevronsUpDown,
+  Home,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
+  Search,
   ShieldCheck,
   Sparkles,
+  SquarePen,
   Trash2,
-  X,
 } from "lucide-react";
 import { SessionRecord, useAppContext } from "@/context/AppContext";
 
 export const PROMPT_PRESETS = [
   {
     id: "top_customers",
-    icon: "🏢",
-    title: "Top 5 khách hàng",
     prompt: "Top 5 khách hàng có tổng chi tiêu lớn nhất năm 1995",
+    timeGroup: "today",
   },
   {
     id: "revenue_by_region",
-    icon: "🌍",
-    title: "Doanh số 5 khu vực",
     prompt: "Phân tích doanh thu thuần theo 5 khu vực địa lý",
+    timeGroup: "today",
   },
   {
     id: "late_shipments",
-    icon: "🚚",
-    title: "Tỷ lệ đơn giao trễ",
     prompt: "Tỷ lệ đơn hàng giao trễ theo phương thức vận chuyển (AIR, TRUCK, SHIP)",
+    timeGroup: "past",
   },
   {
     id: "discount_analysis",
-    icon: "📦",
-    title: "Chiết khấu sản phẩm",
     prompt: "Mức chiết khấu trung bình của các dòng sản phẩm TPC-H",
+    timeGroup: "past",
   },
 ];
 
 interface SidebarProps {
   onSelectPrompt?: (prompt: string) => void;
+  onResetToHome?: () => void;
 }
 
-export function Sidebar({ onSelectPrompt }: SidebarProps) {
+export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
   const {
     currentSessionId,
     setCurrentSessionId,
@@ -58,50 +55,49 @@ export function Sidebar({ onSelectPrompt }: SidebarProps) {
     setSidebarOpen,
     toggleSidebar,
     currentRole,
+    setCurrentRole,
     showToast,
   } = useAppContext();
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isRoleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [isLogoHovered, setIsLogoHovered] = useState(false);
+
   const isAdmin = currentRole === "ADMIN" || currentRole === "Admin";
 
-  const handleNewSession = () => {
-    const newId = startNewSession();
-    showToast(`Đã tạo phiên làm việc mới: ${newId.substring(0, 12)}...`, "info");
+  const handleNewChat = () => {
+    startNewSession();
+    if (onResetToHome) {
+      onResetToHome();
+    }
+    showToast("Đã tạo phiên hội thoại mới", "info", 1500);
+  };
+
+  const handleHomeClick = () => {
+    if (onResetToHome) {
+      onResetToHome();
+    } else {
+      startNewSession();
+    }
+    showToast("Đã chuyển về trang hội thoại chính", "info", 1500);
   };
 
   const handlePromptClick = (promptText: string) => {
     if (onSelectPrompt) {
       onSelectPrompt(promptText);
-    } else {
-      showToast(`Đã chọn câu hỏi mẫu: "${promptText}"`, "info");
     }
   };
 
-  const formatRelativeTime = (isoString: string): string => {
-    try {
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffMinutes = Math.floor(
-        (now.getTime() - date.getTime()) / (1000 * 60)
-      );
-
-      if (diffMinutes < 1) return "Vừa xong";
-      if (diffMinutes < 60) return `${diffMinutes}m trước`;
-      const diffHours = Math.floor(diffMinutes / 60);
-      if (diffHours < 24) return `${diffHours}h trước`;
-      return date.toLocaleDateString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-      });
-    } catch {
-      return "Gần đây";
-    }
-  };
+  // Filter history by search query
+  const filteredSessions = useMemo(() => {
+    if (!searchQuery.trim()) return sessionHistory;
+    const q = searchQuery.toLowerCase();
+    return sessionHistory.filter((s) => s.title.toLowerCase().includes(q));
+  }, [sessionHistory, searchQuery]);
 
   return (
     <>
-      {/* ================================================================= */}
-      {/* 1. MOBILE BACKDROP OVERLAY */}
-      {/* ================================================================= */}
+      {/* Mobile Backdrop */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
@@ -109,242 +105,306 @@ export function Sidebar({ onSelectPrompt }: SidebarProps) {
         />
       )}
 
-      {/* ================================================================= */}
-      {/* 2. SIDEBAR CONTAINER: EXPANDED (w-72) HOẶC COLLAPSED MINI (w-16) */}
-      {/* ================================================================= */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-surface/95 border-r border-surface-border backdrop-blur-xl transition-all duration-300 ease-in-out lg:static lg:z-auto overflow-hidden ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#0b0e17] border-r border-white/5 backdrop-blur-xl transition-all duration-300 ease-in-out lg:static lg:z-auto overflow-hidden ${
           isSidebarOpen
-            ? "w-72 translate-x-0"
+            ? "w-64 translate-x-0"
             : "-translate-x-full lg:translate-x-0 lg:w-16"
         }`}
       >
-        {/* ================================================================= */}
-        {/* TOP BAR: ACTION NEW SESSION */}
-        {/* ================================================================= */}
-        <div className="flex items-center justify-between p-3 border-b border-surface-border h-16 flex-shrink-0">
+        {/* =============================================================== */}
+        {/* TOP BRAND HEADER / LOGO HOVER EXPAND                            */}
+        {/* =============================================================== */}
+        <div className="flex items-center justify-between p-3.5 border-b border-white/5 h-16 flex-shrink-0">
           {isSidebarOpen ? (
-            <>
-              <button
-                onClick={handleNewSession}
-                className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white text-xs font-semibold shadow-glow transition-all truncate"
-                title="Khởi tạo phiên phân tích mới"
-              >
-                <Plus className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">Phiên hội thoại mới</span>
-              </button>
+            /* --- EXPANDED MODE: Logo + Brand + Collapse Button --- */
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white shadow-glow flex-shrink-0">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold tracking-tight text-white">
+                    Text2SQL
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 font-semibold border border-brand-500/30">
+                    TPC-H
+                  </span>
+                </div>
+              </div>
 
               <button
                 onClick={toggleSidebar}
-                className="ml-2 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-subtle transition-colors flex-shrink-0"
-                title="Thu gọn Sidebar"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                title="Thu gọn thanh điều hướng"
               >
                 <PanelLeftClose className="w-4 h-4 hidden lg:block" />
-                <X className="w-4 h-4 lg:hidden" />
               </button>
-            </>
+            </div>
           ) : (
-            /* MINI COLLAPSED MODE: Nút dấu + tròn gọn gàng */
+            /* --- COLLAPSED MODE: Logo hover to show expand icon (Image 1 style) --- */
             <div className="w-full flex items-center justify-center">
               <button
-                onClick={handleNewSession}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-500 active:scale-95 text-white shadow-glow transition-all"
-                title="Tạo phiên hội thoại mới (+)"
+                onClick={toggleSidebar}
+                onMouseEnter={() => setIsLogoHovered(true)}
+                onMouseLeave={() => setIsLogoHovered(false)}
+                className="h-10 w-10 rounded-2xl flex items-center justify-center bg-gradient-to-tr from-brand-600 to-indigo-500 text-white shadow-glow transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Mở rộng thanh điều hướng"
               >
-                <Plus className="w-5 h-5" />
+                {isLogoHovered ? (
+                  <PanelLeftOpen className="h-5 w-5 animate-in zoom-in-75 duration-150" />
+                ) : (
+                  <Sparkles className="h-5 w-5" />
+                )}
               </button>
             </div>
           )}
         </div>
 
-        {/* ================================================================= */}
-        {/* MIDDLE: SESSIONS & PRESETS */}
-        {/* ================================================================= */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-4">
-          {isSidebarOpen ? (
-            /* --- EXPANDED MODE --- */
-            <>
-              {/* Lịch sử các phiên */}
-              <div>
-                <div className="flex items-center justify-between px-2 mb-2">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-brand-400" />
-                    <span>Lịch sử phiên</span>
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-subtle text-slate-400 font-mono">
-                    {sessionHistory.length}
-                  </span>
-                </div>
+        {/* =============================================================== */}
+        {/* COLLAPSED MODE: ONLY HOME ICON & EMPTY MIDDLE (Image 1 style)    */}
+        {/* =============================================================== */}
+        {!isSidebarOpen && (
+          <div className="flex-1 flex flex-col items-center justify-between py-4">
+            {/* Top: Home Icon (clicking returns to new chat screen) */}
+            <button
+              onClick={handleHomeClick}
+              className="h-10 w-10 rounded-2xl flex items-center justify-center bg-brand-500/20 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all shadow-sm"
+              title="Trang chủ (Cuộc trò chuyện mới)"
+            >
+              <Home className="w-5 h-5" />
+            </button>
 
-                {sessionHistory.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-500 rounded-xl border border-dashed border-surface-border">
-                    Chưa có lịch sử truy vấn
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {sessionHistory.map((session: SessionRecord) => {
-                      const isActive = session.id === currentSessionId;
-                      return (
-                        <div
-                          key={session.id}
-                          onClick={() => setCurrentSessionId(session.id)}
-                          className={`group flex items-center justify-between p-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all border ${
-                            isActive
-                              ? "bg-brand-500/15 text-white border-brand-500/40 shadow-sm"
-                              : "text-slate-400 border-transparent hover:bg-surface-subtle/80 hover:text-slate-200"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <MessageSquare
-                              className={`w-3.5 h-3.5 flex-shrink-0 ${
-                                isActive ? "text-brand-400" : "text-slate-500"
-                              }`}
-                            />
-                            <div className="truncate flex-1">
-                              <div className="truncate">{session.title}</div>
-                              <div className="text-[10px] text-slate-500 mt-0.5 font-normal">
-                                {formatRelativeTime(session.createdAt)}
-                              </div>
-                            </div>
-                          </div>
+            {/* Middle: Empty space as requested (no chat bubbles!) */}
+            <div className="flex-1" />
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSession(session.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
-                            title="Xóa phiên này"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+            {/* Bottom: User Avatar JM */}
+            <div
+              onClick={handleHomeClick}
+              className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 cursor-pointer shadow-sm hover:scale-105 transition-transform"
+              title={`Tài khoản: Judha Maygustya (${currentRole})`}
+            >
+              JM
+            </div>
+          </div>
+        )}
+
+        {/* =============================================================== */}
+        {/* EXPANDED MODE CONTENT                                           */}
+        {/* =============================================================== */}
+        {isSidebarOpen && (
+          <>
+            {/* 1. "New chat" button matching Image 2 style */}
+            <div className="p-3 pb-1">
+              <button
+                onClick={handleNewChat}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#171922] hover:bg-[#1f2230] active:scale-98 text-white text-xs font-semibold border border-white/10 shadow-sm transition-all"
+                title="Khởi tạo cuộc trò chuyện mới"
+              >
+                <SquarePen className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                <span>New chat</span>
+              </button>
+            </div>
+
+            {/* 2. Home Navigation Link */}
+            <div className="px-3 pt-1 pb-1">
+              <button
+                onClick={handleHomeClick}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+                title="Về giao diện bắt đầu"
+              >
+                <Home className="w-4 h-4 text-brand-400 flex-shrink-0" />
+                <span>Home</span>
+              </button>
+            </div>
+
+            {/* 3. Search Box with ⌘K */}
+            <div className="px-3 py-1 flex-shrink-0">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full bg-[#151824] border border-white/5 text-slate-200 text-xs rounded-xl pl-8 pr-8 py-1.5 outline-none focus:border-brand-400/40 transition-colors placeholder:text-slate-500"
+                />
+                <kbd className="absolute right-2.5 text-[10px] text-slate-400 bg-[#0e111a] px-1.5 py-0.5 rounded border border-white/10 font-mono pointer-events-none">
+                  ⌘K
+                </kbd>
               </div>
+            </div>
 
-              {/* Gợi ý câu hỏi mẫu */}
+            {/* 4. Chat History Feed (Grouped: Hôm nay, 7 ngày trước) */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-4">
+              {/* Group 1: Hôm nay */}
               <div>
-                <div className="px-2 mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Gợi ý câu hỏi mẫu</span>
+                <div className="px-2 mb-1.5 text-[11px] font-medium text-slate-500">
+                  Hôm nay
                 </div>
 
-                <div className="space-y-1.5">
-                  {PROMPT_PRESETS.map((item) => (
+                <div className="space-y-0.5">
+                  {filteredSessions.slice(0, 3).map((session) => {
+                    const isActive = session.id === currentSessionId;
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => setCurrentSessionId(session.id)}
+                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
+                          isActive
+                            ? "bg-white/10 text-white font-medium"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                        }`}
+                      >
+                        <span className="truncate flex-1 pr-2">{session.title}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(session.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-opacity"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Sample presets */}
+                  {PROMPT_PRESETS.filter((p) => p.timeGroup === "today").map((item) => (
                     <button
                       key={item.id}
                       onClick={() => handlePromptClick(item.prompt)}
-                      className="w-full text-left p-2.5 rounded-xl bg-surface-subtle/40 hover:bg-surface-subtle/80 border border-surface-border text-slate-300 hover:text-white transition-all text-xs flex items-start gap-2 active:scale-98"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all truncate block"
+                      title={item.prompt}
                     >
-                      <span className="text-sm flex-shrink-0 mt-0.5">{item.icon}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-slate-200">{item.title}</div>
-                        <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
-                          {item.prompt}
-                        </div>
-                      </div>
+                      {item.prompt}
                     </button>
                   ))}
                 </div>
               </div>
-            </>
-          ) : (
-            /* --- MINI COLLAPSED MODE: Danh sách icon phiên gọn gàng --- */
-            <div className="space-y-2 flex flex-col items-center">
-              {sessionHistory.slice(0, 8).map((session) => {
-                const isActive = session.id === currentSessionId;
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => setCurrentSessionId(session.id)}
-                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border ${
-                      isActive
-                        ? "bg-brand-500/20 text-brand-300 border-brand-500/40 shadow-glow"
-                        : "text-slate-400 border-transparent hover:bg-surface-subtle hover:text-white"
-                    }`}
-                    title={`${session.title} (${formatRelativeTime(session.createdAt)})`}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                  </button>
-                );
-              })}
 
-              <div className="w-6 border-t border-surface-border my-2" />
-
-              {/* Icon câu hỏi mẫu mini */}
-              {PROMPT_PRESETS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handlePromptClick(item.prompt)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-surface-subtle text-base transition-all"
-                  title={`${item.title}: ${item.prompt}`}
-                >
-                  {item.icon}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ================================================================= */}
-        {/* BOTTOM FOOTER: ADMIN AUDIT LINK */}
-        {/* ================================================================= */}
-        <div className="p-2.5 border-t border-surface-border bg-surface-subtle/20 flex-shrink-0">
-          {isSidebarOpen ? (
-            /* --- EXPANDED MODE: Full banner --- */
-            isAdmin ? (
-              <Link
-                href="/audit"
-                className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all text-xs font-semibold shadow-sm truncate"
-                title="Đi đến bảng điều khiển kiểm toán (Chỉ dành cho Admin)"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                  <span className="truncate">Nhật ký Audit & Quản trị</span>
+              {/* Group 2: 7 ngày trước */}
+              <div>
+                <div className="px-2 mb-1.5 text-[11px] font-medium text-slate-500">
+                  7 ngày trước
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-mono flex-shrink-0 ml-1">
-                  ADMIN
-                </span>
-              </Link>
-            ) : (
-              <div
-                className="flex items-center justify-between p-2.5 rounded-xl bg-surface-subtle/30 text-slate-500 border border-surface-border text-xs font-medium cursor-not-allowed truncate"
-                title="Chức năng yêu cầu quyền Admin (Đổi vai trò tại Header)"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Lock className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                  <span className="truncate">Nhật ký Audit</span>
+
+                <div className="space-y-0.5">
+                  {filteredSessions.slice(3, 7).map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={() => setCurrentSessionId(session.id)}
+                      className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 cursor-pointer transition-all"
+                    >
+                      <span className="truncate flex-1 pr-2">{session.title}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {PROMPT_PRESETS.filter((p) => p.timeGroup === "past").map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handlePromptClick(item.prompt)}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all truncate block"
+                      title={item.prompt}
+                    >
+                      {item.prompt}
+                    </button>
+                  ))}
                 </div>
-                <span className="text-[10px] text-slate-500 font-normal flex-shrink-0 ml-1">
-                  (Khóa)
-                </span>
               </div>
-            )
-          ) : (
-            /* --- MINI COLLAPSED MODE: Icon vuông duy nhất không tràn chữ --- */
-            <div className="w-full flex items-center justify-center">
-              {isAdmin ? (
-                <Link
-                  href="/audit"
-                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 transition-all shadow-sm"
-                  title="Nhật ký Audit & Quản trị (Admin)"
-                >
-                  <ShieldCheck className="w-5 h-5 text-amber-400" />
-                </Link>
-              ) : (
-                <div
-                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-subtle/30 text-slate-600 border border-surface-border cursor-not-allowed"
-                  title="Nhật ký Audit (Bị khóa đối với vai trò Analyst)"
-                >
-                  <Lock className="w-4 h-4 text-slate-500" />
+            </div>
+
+            {/* 5. Bottom User Profile Card (Judha Maygustya & Role Switcher) */}
+            <div className="p-2 border-t border-white/5 bg-[#090c14] flex-shrink-0 relative">
+              <div
+                onClick={() => setRoleDropdownOpen(!isRoleDropdownOpen)}
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors"
+                title="Bấm để đổi vai trò (Analyst / Admin)"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 flex-shrink-0">
+                    JM
+                  </div>
+                  <div className="truncate flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-100 truncate">
+                      Judha Maygustya
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                      <span>{currentRole}</span>
+                      <span>•</span>
+                      <span>TPC-H Lead</span>
+                    </div>
+                  </div>
+                </div>
+
+                <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              </div>
+
+              {/* Role Dropdown */}
+              {isRoleDropdownOpen && (
+                <div className="absolute bottom-full left-2 right-2 mb-1 p-1 rounded-xl bg-[#171a25] border border-white/10 shadow-card z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-1 font-semibold">
+                    Đổi vai trò
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCurrentRole("ANALYST");
+                      setRoleDropdownOpen(false);
+                      showToast("Đã chuyển sang vai trò: ANALYST", "info", 1500);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentRole === "ANALYST"
+                        ? "bg-brand-500/20 text-brand-300 font-semibold"
+                        : "text-slate-300 hover:bg-white/5"
+                    }`}
+                  >
+                    <span>Analyst (Chuyên viên)</span>
+                    {currentRole === "ANALYST" && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentRole("ADMIN");
+                      setRoleDropdownOpen(false);
+                      showToast("Đã chuyển sang vai trò: ADMIN", "info", 1500);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      currentRole === "ADMIN"
+                        ? "bg-brand-500/20 text-brand-300 font-semibold"
+                        : "text-slate-300 hover:bg-white/5"
+                    }`}
+                  >
+                    <span>Admin (Quản trị viên)</span>
+                    {currentRole === "ADMIN" && <Check className="w-3.5 h-3.5" />}
+                  </button>
+
+                  {isAdmin && (
+                    <div className="border-t border-white/10 mt-1 pt-1">
+                      <Link
+                        href="/audit"
+                        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-amber-500/15 transition-colors font-medium"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Nhật ký Audit</span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </aside>
     </>
   );

@@ -49,6 +49,19 @@ const config: Config = {
       boxShadow: {
         card: "0 4px 20px -2px rgba(0, 0, 0, 0.5)",
         glow: "0 0 25px -5px rgba(99, 102, 241, 0.3)",
+        orb: "0 0 50px 10px rgba(129, 140, 248, 0.25), 0 0 100px 30px rgba(192, 132, 252, 0.15)",
+        window: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)",
+        command: "0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+      },
+      animation: {
+        "float-subtle": "float 6s ease-in-out infinite",
+        "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+      },
+      keyframes: {
+        float: {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
       },
     },
   },
