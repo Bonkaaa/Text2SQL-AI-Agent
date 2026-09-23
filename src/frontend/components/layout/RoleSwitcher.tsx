@@ -21,7 +21,7 @@ interface RoleOption {
 
 const ROLES: RoleOption[] = [
   {
-    id: "ANALYST",
+    id: "Analyst",
     label: "Analyst",
     personaName: "Nguyễn Văn An",
     title: "Supply Chain & Sales Analyst",
@@ -29,7 +29,7 @@ const ROLES: RoleOption[] = [
     themeColor: "brand",
   },
   {
-    id: "ADMIN",
+    id: "Admin",
     label: "Admin",
     personaName: "Trần Thị Bình",
     title: "Data Lead & Governance Admin",
@@ -43,11 +43,10 @@ export function RoleSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Chuẩn hóa role hiện tại (hỗ trợ cả chữ hoa hoặc viết hoa chữ cái đầu)
-  const isAnalyst = currentRole === "ANALYST" || currentRole === "Analyst";
-  const activeRoleConfig = ROLES.find(
-    (r) => r.id === (isAnalyst ? "ANALYST" : "ADMIN")
-  ) || ROLES[0];
+  // Chuẩn hóa role hiện tại
+  const isAnalyst = currentRole === "Analyst";
+  const activeRoleConfig =
+    ROLES.find((r) => r.id === currentRole) || ROLES[0];
 
   // Đóng menu khi click ra ngoài (Click Outside)
   useEffect(() => {
@@ -85,7 +84,7 @@ export function RoleSwitcher() {
     setCurrentRole(role);
     setIsOpen(false);
 
-    const isNewRoleAnalyst = role === "ANALYST" || role === "Analyst";
+    const isNewRoleAnalyst = role === "Analyst";
     if (isNewRoleAnalyst) {
       showToast(
         "Đã chuyển sang vai trò: Analyst (Nguyễn Văn An) — Áp dụng chính sách bảo mật che PII",
@@ -158,9 +157,7 @@ export function RoleSwitcher() {
 
           <div className="space-y-1">
             {ROLES.map((role) => {
-              const isSelected =
-                (role.id === "ANALYST" && isAnalyst) ||
-                (role.id === "ADMIN" && !isAnalyst);
+              const isSelected = role.id === currentRole;
 
               return (
                 <button
@@ -182,7 +179,7 @@ export function RoleSwitcher() {
                         : "bg-amber-500/20 text-amber-300"
                     }`}
                   >
-                    {role.id === "ANALYST" ? (
+                    {role.id === "Analyst" ? (
                       <TrendingUp className="w-4 h-4" />
                     ) : (
                       <ShieldCheck className="w-4 h-4" />

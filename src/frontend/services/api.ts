@@ -165,7 +165,7 @@ export async function getQueryHistory(
 export async function getAuditLogs(
   limit: number = 50,
   offset: number = 0,
-  role: UserRole = "ADMIN"
+  role: UserRole = "Admin"
 ): Promise<AuditLogsResponse> {
   return apiFetch<AuditLogsResponse>(
     `/api/v1/audit/logs?limit=${limit}&offset=${offset}`,

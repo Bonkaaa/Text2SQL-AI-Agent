@@ -7,7 +7,7 @@
 // 1. NGƯỜI DÙNG & PHÂN QUYỀN (RBAC)
 // ==============================================================================
 
-export type UserRole = "ANALYST" | "ADMIN" | "Analyst" | "Admin";
+export type UserRole = "Analyst" | "Admin";
 
 export interface UserProfile {
   id: string;
@@ -72,6 +72,8 @@ export interface QueryResponse {
   estimated_cost_bytes?: number | null;
   execution_time_ms: number;
   error?: string | null;
+  error_type?: string | null;
+  retry_count?: number | null;
 }
 
 // ==============================================================================
@@ -115,7 +117,9 @@ export interface QueryHistoryResponse {
 // ==============================================================================
 
 export interface AuditLogItem {
-  timestamp: string;
+  timestamp?: string;
+  created_at?: string;
+  query_id?: string;
   trace_id?: string;
   session_id: string;
   user_id: string;

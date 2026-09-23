@@ -200,6 +200,8 @@ class ControlPipelineOutput(TypedDict):
     columns: list[str] | None
     bytes_scanned: int
     execution_time_ms: float
+    hitl_required: bool | None
+    hitl_reason: str | None
 
 
 class ControlState(TypedDict, total=False):
@@ -212,7 +214,7 @@ class ControlState(TypedDict, total=False):
 
     # Trạng thái xử lý và phân loại lỗi
     status: Literal[
-        "SUCCESS", "BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "DB_ERROR", "TIMEOUT"
+        "SUCCESS", "BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "BLOCKED_HITL", "DB_ERROR", "TIMEOUT"
     ]
     error_type: str | None
     error_message: str | None
@@ -233,6 +235,7 @@ class ControlState(TypedDict, total=False):
     # Phê duyệt người dùng (HITL interrupt)
     hitl_required: bool
     hitl_approved: bool | None
+    hitl_reason: str | None
 
     # Chẩn đoán lỗi thông minh (Error Diagnostic Agent)
     actionable_feedback: str | None

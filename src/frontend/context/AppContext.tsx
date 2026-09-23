@@ -80,7 +80,7 @@ function generateSessionId(): string {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   // State 1: Role
-  const [currentRole, setCurrentRoleState] = useState<UserRole>("ANALYST");
+  const [currentRole, setCurrentRoleState] = useState<UserRole>("Analyst");
 
   // State 2: Session ID & Session History
   const [currentSessionId, setCurrentSessionIdState] = useState<string>("");
@@ -107,9 +107,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Đọc dữ liệu từ localStorage khi component mount phía client (an toàn Hydration)
   useEffect(() => {
     try {
-      const savedRole = localStorage.getItem("text2sql_user_role") as UserRole;
-      if (savedRole && (savedRole === "ANALYST" || savedRole === "ADMIN")) {
-        setCurrentRoleState(savedRole);
+      const rawRole = localStorage.getItem("text2sql_user_role");
+      if (rawRole) {
+        if (rawRole.toLowerCase() === "admin") {
+          setCurrentRoleState("Admin");
+        } else {
+          setCurrentRoleState("Analyst");
+        }
       }
 
       // Khôi phục danh sách phiên
@@ -323,6 +327,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AppContext.Provider>
   );
+}
+
+/**
+ * Custom hook truy cập AppContext an toàn (không ném lỗi nếu ngoài provider).
+ */
+export function useOptionalAppContext(): AppContextType | undefined {
+  return useContext(AppContext);
 }
 
 /**

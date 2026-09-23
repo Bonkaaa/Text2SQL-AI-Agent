@@ -1,0 +1,11 @@
+Cần có check xem hiện tại là có thể chạy nhiều câu lệnh sql không
+
+check xem là có bộ dữ liệu nào lớn hơn không, loanh quanh tầm 1 đến 2 tr rows
+
+Sau mà deploy lên thì nhớ chỉnh lại rule HITL nhé:
+   - Hiện tại đang là test 30MB. Khi sang DB lớn (1-2tr rows) dùng công thức Risk Score (% budget, scan ratio, partition key).
+   - LƯU Ý KỸ: Danh sách heavy_tables (hiện là lineitem, orders) và cột partition/date filter phải cấu hình động (config-driven / metadata-driven) đổi lại theo schema của DB mới, không hardcode cố định.
+
+Thêm guardrails cho input và output
+
+MCP sql knowledge

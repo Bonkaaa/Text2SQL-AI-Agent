@@ -3,6 +3,7 @@ from typing import Any
 
 from langgraph.types import interrupt
 
+from src.agents.control_pipeline.hitl_evaluator import evaluate_query_risk
 from src.config import get_settings
 from src.models.state import ControlPipelineOutput, ControlState
 from src.utils.ast_sanitizer import sanitize_and_validate_sql
@@ -97,9 +98,19 @@ def cost_guard_node(
             or "Chi phí quét dữ liệu của truy vấn vượt quá ngân sách cho phép.",
         }
 
+    # Đánh giá rủi ro truy vấn đa tiêu chí cho enterprise database
+    is_hitl, hitl_reason, _ = evaluate_query_risk(
+        sql=sql,
+        estimate=estimate,
+        tables_used=state.get("tables_used", []),
+        user_context=user_context,
+    )
+
     return {
         "cost_valid": True,
         "estimated_bytes": estimate.estimated_bytes,
+        "hitl_required": is_hitl or state.get("hitl_required", False),
+        "hitl_reason": hitl_reason if is_hitl else None,
     }
 
 
@@ -118,6 +129,7 @@ def hitl_gate_node(state: ControlState) -> dict[str, Any]:
         "estimated_bytes": state.get("estimated_bytes", 0),
         "tables_used": state.get("tables_used", []),
         "session_id": state.get("session_id", ""),
+        "hitl_reason": state.get("hitl_reason"),
     }
 
     decision = interrupt(interrupt_payload)
@@ -176,6 +188,8 @@ def execute_node(
         "columns": result.columns,
         "bytes_scanned": state.get("estimated_bytes", 0),
         "execution_time_ms": result.execution_time_ms,
+        "hitl_required": state.get("hitl_required", False),
+        "hitl_reason": state.get("hitl_reason"),
     }
 
     return {"execution_result": output}
@@ -194,6 +208,8 @@ def err_node(state: ControlState) -> dict[str, Any]:
         "columns": None,
         "bytes_scanned": state.get("estimated_bytes", 0),
         "execution_time_ms": state.get("execution_time_ms", 0.0),
+        "hitl_required": state.get("hitl_required", False),
+        "hitl_reason": state.get("hitl_reason"),
     }
 
     return {"execution_result": output}

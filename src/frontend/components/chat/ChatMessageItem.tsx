@@ -1,62 +1,75 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  AlertCircle,
-  AlertTriangle,
-  BrainCircuit,
-  Check,
-  ChevronDown,
-  ChevronRight,
+  BarChart3,
   Clock,
-  Code2,
-  Copy,
   Database,
-  Download,
-  ShieldAlert,
-  ShieldCheck,
   Sparkles,
   User,
 } from "lucide-react";
 import { ChatMessage, QueryResponse } from "@/types/api";
-import { exportToCsv } from "@/services/exportCsv";
-import { useAppContext } from "@/context/AppContext";
+import { ReasoningTimeline } from "@/components/chat/ReasoningTimeline";
+import { ClarificationCard } from "@/components/chat/ClarificationCard";
+import { HITLApprovalCard } from "@/components/chat/HITLApprovalCard";
+import { ErrorFeedbackCard } from "@/components/chat/ErrorFeedbackCard";
+import { InsightCard } from "@/components/analytics/InsightCard";
+import { DynamicChart } from "@/components/analytics/DynamicChart";
+import { DataTable } from "@/components/analytics/DataTable";
+import { SQLViewer } from "@/components/analytics/SQLViewer";
+import { formatDurationSeconds } from "@/utils/formatters";
+import { extractChartAndDataFromMarkdown } from "@/utils/markdownChartParser";
 
-interface ChatMessageItemProps {
+export interface ChatMessageItemProps {
   message: ChatMessage;
-  onApproveHitl?: (approved: boolean) => void;
+  isGlobalLoading?: boolean;
+  isApprovingHitl?: boolean;
+  onApproveHitl?: (approved: boolean, reason?: string) => void;
+  onSelectOption?: (option: string) => void;
+  onRetry?: () => void;
 }
 
 export function ChatMessageItem({
   message,
+  isGlobalLoading = false,
+  isApprovingHitl = false,
   onApproveHitl,
+  onSelectOption,
+  onRetry,
 }: ChatMessageItemProps) {
-  const { showToast } = useAppContext();
   const isUser = message.role === "user";
   const response: QueryResponse | undefined = message.queryResponse;
 
-  const [isCopiedSql, setIsCopiedSql] = useState(false);
-  const [isReasoningOpen, setIsReasoningOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"table" | "sql">("table");
-  const [page, setPage] = useState(1);
-  const pageSize = 5;
+  // Bổ trợ trích xuất cấu hình Chart và Data từ Markdown nếu backend chưa gửi trực tiếp
+  const extractedMarkdownInfo = useMemo(() => {
+    if (!response?.final_answer) return null;
+    return extractChartAndDataFromMarkdown(response.final_answer);
+  }, [response?.final_answer]);
 
-  const handleCopySql = () => {
-    if (!response?.sql) return;
-    navigator.clipboard.writeText(response.sql);
-    setIsCopiedSql(true);
-    showToast("Đã sao chép câu lệnh SQL vào clipboard", "success", 2000);
-    setTimeout(() => setIsCopiedSql(false), 2000);
-  };
+  const effectiveRechartsConfig =
+    response?.recharts_config || extractedMarkdownInfo?.config || null;
+  const effectiveData =
+    response?.data && response.data.length > 0
+      ? response.data
+      : extractedMarkdownInfo?.data || [];
+  const effectiveColumns =
+    response?.columns && response.columns.length > 0
+      ? response.columns
+      : extractedMarkdownInfo?.columns || [];
 
-  const handleExport = () => {
-    if (!response?.data || !response.columns) return;
-    const filename = `query_result_${new Date().getTime()}`;
-    exportToCsv(filename, response.columns, response.data);
-    showToast("Đã tải xuống tệp dữ liệu CSV", "success", 2000);
-  };
+  const hasChart = !!(
+    effectiveRechartsConfig &&
+    effectiveData &&
+    effectiveData.length > 0
+  );
+  const hasData = effectiveData.length > 0;
+  const totalRows = effectiveData.length;
 
-  // User Message
+  const [activeTab, setActiveTab] = useState<"chart" | "table" | "sql">(
+    hasChart ? "chart" : "table"
+  );
+
+  // 1. Tin nhắn của Người dùng (User Message)
   if (isUser) {
     return (
       <div className="flex items-start justify-end gap-3 my-4 animate-in fade-in duration-200">
@@ -76,7 +89,7 @@ export function ChatMessageItem({
     );
   }
 
-  // Assistant Message (Loading State)
+  // 2. Tin nhắn Bot đang xử lý suy luận (Loading State)
   if (message.isLoading) {
     return (
       <div className="flex items-start gap-3 my-4 animate-in fade-in duration-200">
@@ -84,25 +97,25 @@ export function ChatMessageItem({
           <Sparkles className="w-4 h-4 animate-pulse" />
         </div>
         <div className="glass-card rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl border border-surface-border">
-          <div className="flex items-center gap-2 text-xs text-brand-300 font-medium mb-2">
-            <BrainCircuit className="w-4 h-4 animate-spin text-brand-400" />
-            <span>DeepAgents Supervisor đang phân tích câu hỏi & định tuyến schema...</span>
-          </div>
-          <div className="space-y-2">
-            <div className="h-3 bg-surface-subtle rounded-full w-3/4 animate-pulse" />
-            <div className="h-3 bg-surface-subtle rounded-full w-1/2 animate-pulse" />
-          </div>
+          <ReasoningTimeline isLoading={true} currentStep={2} />
         </div>
       </div>
     );
   }
 
-  // Assistant Completed Message
-  const hasData = response?.data && response.data.length > 0;
-  const totalRows = response?.data?.length || 0;
-  const paginatedRows =
-    response?.data?.slice((page - 1) * pageSize, page * pageSize) || [];
-  const totalPages = Math.ceil(totalRows / pageSize);
+  // 3. Tin nhắn Bot đã phản hồi (Assistant Response)
+  const isClarification =
+    response?.status === "CLARIFICATION_REQUIRED" ||
+    (response?.is_ambiguous && (response?.suggested_options?.length || 0) > 0);
+
+  const isPendingApproval =
+    (response?.requires_hitl || response?.status === "PENDING_APPROVAL") &&
+    response?.status !== "COMPLETED";
+
+  const isError =
+    !!(response?.error ||
+    response?.status === "ERROR" ||
+    response?.status === "EXECUTION_FAILED");
 
   return (
     <div className="flex items-start gap-3 my-5 animate-in fade-in duration-200">
@@ -112,7 +125,7 @@ export function ChatMessageItem({
       </div>
 
       <div className="glass-card rounded-2xl rounded-tl-sm p-4 sm:p-5 w-full max-w-3xl border border-surface-border space-y-4 shadow-card">
-        {/* Header bar of Assistant response */}
+        {/* Header Bar: Metadata & AST Badge */}
         <div className="flex items-center justify-between border-b border-surface-border pb-2.5 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-200">DeepAgents TPC-H</span>
@@ -125,7 +138,7 @@ export function ChatMessageItem({
             {response?.execution_time_ms !== undefined && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3 text-slate-500" />
-                <span>{response.execution_time_ms}ms</span>
+                <span>{formatDurationSeconds(response.execution_time_ms)}</span>
               </span>
             )}
             {hasData && (
@@ -137,241 +150,140 @@ export function ChatMessageItem({
           </div>
         </div>
 
-        {/* 1. Reasoning CoT Accordion */}
-        <div className="rounded-xl border border-surface-border bg-surface-subtle/30 overflow-hidden">
-          <button
-            onClick={() => setIsReasoningOpen(!isReasoningOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-surface-subtle/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="w-3.5 h-3.5 text-brand-400" />
-              <span>Quy trình suy luận (DeepAgents CoT)</span>
-            </div>
-            {isReasoningOpen ? (
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            )}
-          </button>
+        {/* 1. Reasoning CoT Timeline */}
+        <ReasoningTimeline
+          executionTimeMs={response?.execution_time_ms}
+          defaultExpanded={false}
+        />
 
-          {isReasoningOpen && (
-            <div className="p-3 border-t border-surface-border space-y-2 text-xs text-slate-300">
-              <div className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
-                <div>
-                  <span className="font-semibold text-slate-200">1. Làm rõ ý định:</span> Xác định câu hỏi không mơ hồ, ngữ cảnh phân tích hợp lệ.
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 mt-1.5 flex-shrink-0" />
-                <div>
-                  <span className="font-semibold text-slate-200">2. Schema Retriever:</span> Lấy ngữ cảnh bảng liên quan trong 8 bảng TPC-H.
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />
-                <div>
-                  <span className="font-semibold text-slate-200">3. SQL Generator:</span> Tạo câu truy vấn chuẩn ANSI SQL và tương thích DuckDB.
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
-                <div>
-                  <span className="font-semibold text-slate-200">4. LangGraph Control Guard:</span> AST Sanitizer kiểm tra an toàn (chỉ cho phép SELECT).
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 2. Natural Language Explanation / Final Answer */}
-        {response?.final_answer && (
-          <div className="text-sm text-slate-200 leading-relaxed font-normal bg-surface/60 p-3.5 rounded-xl border border-surface-border">
-            {response.final_answer}
-          </div>
+        {/* 2. Trạng thái YÊU CẦU LÀM RÕ (CLARIFICATION_REQUIRED) */}
+        {isClarification && (
+          <ClarificationCard
+            question={
+              response?.clarification_question ||
+              response?.final_answer ||
+              response?.question
+            }
+            options={response?.suggested_options}
+            disabled={isGlobalLoading || message.isLoading}
+            onSelectOption={onSelectOption || (() => {})}
+          />
         )}
 
-        {/* 3. Tab Switcher: Data Table vs SQL Code */}
-        {response?.sql && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-surface-border pb-2">
-              <div className="flex items-center gap-2">
-                {hasData && (
-                  <button
-                    onClick={() => setActiveTab("table")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                      activeTab === "table"
-                        ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    Bảng kết quả
-                  </button>
-                )}
-                <button
-                  onClick={() => setActiveTab("sql")}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                    activeTab === "sql" || !hasData
-                      ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  Truy vấn SQL
-                </button>
-              </div>
+        {/* 3. Trạng thái CHỜ DUYỆT HITL (PENDING_APPROVAL) */}
+        {isPendingApproval && (
+          <HITLApprovalCard
+            sql={response?.sql}
+            estimatedBytes={response?.estimated_cost_bytes}
+            isSubmitting={isApprovingHitl}
+            onApprove={() => onApproveHitl?.(true)}
+            onReject={(reason) => onApproveHitl?.(false, reason)}
+          />
+        )}
 
-              {activeTab === "table" && hasData && (
-                <button
-                  onClick={handleExport}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-surface-subtle hover:bg-surface-subtle/80 hover:text-white transition-all border border-surface-border"
-                  title="Xuất file CSV"
-                >
-                  <Download className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Xuất CSV</span>
-                </button>
-              )}
+        {/* 4. Trạng thái THÔNG BÁO LỖI (ERROR / EXECUTION_FAILED) */}
+        {isError && (
+          <ErrorFeedbackCard
+            errorMessage={
+              response?.error ||
+              "Đã xảy ra sự cố trong quá trình xử lý hoặc thẩm định an toàn"
+            }
+            errorType={response?.error_type || undefined}
+            retryCount={response?.retry_count || undefined}
+            onRetry={onRetry}
+          />
+        )}
 
-              {activeTab === "sql" && (
-                <button
-                  onClick={handleCopySql}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-surface-subtle hover:bg-surface-subtle/80 hover:text-white transition-all border border-surface-border"
-                >
-                  {isCopiedSql ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Đã chép</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Sao chép SQL</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-
-            {/* Content: SQL View */}
-            {(activeTab === "sql" || !hasData) && response.sql && (
-              <div className="relative rounded-xl overflow-hidden border border-surface-border bg-[#0a0f1d] p-3.5">
-                <pre className="text-xs font-mono text-indigo-300 overflow-x-auto custom-scrollbar leading-relaxed">
-                  <code>{response.sql}</code>
-                </pre>
-              </div>
+        {/* 5. Trạng thái HOÀN TẤT THÀNH CÔNG (COMPLETED) */}
+        {!isClarification && !isPendingApproval && !isError && (
+          <>
+            {/* Business Insight Card */}
+            {response?.final_answer && (
+              <InsightCard
+                insightText={response.final_answer}
+                executionTimeMs={response?.execution_time_ms}
+                data={effectiveData}
+              />
             )}
 
-            {/* Content: Data Table View */}
-            {activeTab === "table" && hasData && response.columns && (
+            {/* Tab Switcher: Dynamic Chart vs Data Table vs SQL Code */}
+            {(hasChart || hasData || !!response?.sql) && (
               <div className="space-y-3">
-                <div className="rounded-xl overflow-x-auto border border-surface-border custom-scrollbar">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-surface-subtle/70 border-b border-surface-border">
-                        {response.columns.map((col) => (
-                          <th
-                            key={col}
-                            className="py-2.5 px-3 font-semibold text-slate-300 whitespace-nowrap"
-                          >
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-border">
-                      {paginatedRows.map((row, idx) => (
-                        <tr
-                          key={idx}
-                          className="hover:bg-surface-subtle/40 transition-colors"
-                        >
-                          {response.columns!.map((col) => (
-                            <td
-                              key={col}
-                              className="py-2 px-3 text-slate-200 whitespace-nowrap font-mono text-[11px]"
-                            >
-                              {row[col] !== null && row[col] !== undefined
-                                ? String(row[col])
-                                : "-"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center justify-between border-b border-surface-border pb-2">
+                  <div className="flex items-center gap-2">
+                    {hasChart && (
+                      <button
+                        onClick={() => setActiveTab("chart")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                          activeTab === "chart"
+                            ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span>Biểu đồ</span>
+                      </button>
+                    )}
+                    {hasData && (
+                      <button
+                        onClick={() => setActiveTab("table")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                          activeTab === "table"
+                            ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Bảng kết quả
+                      </button>
+                    )}
+                    {response?.sql && (
+                      <button
+                        onClick={() => setActiveTab("sql")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                          activeTab === "sql" || (!hasData && !hasChart)
+                            ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Truy vấn SQL
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                    <span>
-                      Trang {page} / {totalPages} (Tổng {totalRows} dòng)
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-2.5 py-1 rounded bg-surface-subtle hover:bg-surface-subtle/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200"
-                      >
-                        Trước
-                      </button>
-                      <button
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="px-2.5 py-1 rounded bg-surface-subtle hover:bg-surface-subtle/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200"
-                      >
-                        Sau
-                      </button>
-                    </div>
-                  </div>
+                {/* Content: Dynamic Chart View */}
+                {activeTab === "chart" && hasChart && effectiveRechartsConfig && (
+                  <DynamicChart
+                    config={effectiveRechartsConfig}
+                    data={effectiveData}
+                  />
+                )}
+
+                {/* Content: Data Table View */}
+                {activeTab === "table" && hasData && (
+                  <DataTable
+                    columns={
+                      effectiveColumns.length > 0
+                        ? effectiveColumns
+                        : Object.keys(effectiveData[0] || {})
+                    }
+                    data={effectiveData}
+                    tableName={`query_result_${response?.session_id || ""}`}
+                  />
+                )}
+
+                {/* Content: SQL View */}
+                {activeTab === "sql" && response?.sql && (
+                  <SQLViewer sql={response.sql} />
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* 4. HITL Approval Request Banner (nếu cần phê duyệt) */}
-        {response?.requires_hitl && onApproveHitl && (
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-            <div className="flex items-start gap-2.5 text-amber-300 text-xs font-medium">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold text-amber-200">
-                  Cảnh báo chi phí truy vấn (HITL Required)
-                </div>
-                <div className="text-amber-300/80 mt-0.5">
-                  Truy vấn ước lượng quét qua lượng dữ liệu lớn ({response.estimated_cost_bytes || 0} bytes). Bạn có đồng ý thực thi không?
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={() => onApproveHitl(true)}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-sm transition-all"
-              >
-                Phê duyệt thực thi
-              </button>
-              <button
-                onClick={() => onApproveHitl(false)}
-                className="px-3 py-1.5 rounded-lg bg-surface-subtle hover:bg-surface-subtle/80 text-slate-300 text-xs font-medium border border-surface-border transition-all"
-              >
-                Từ chối
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 5. Error Banner */}
-        {response?.error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-rose-300 text-xs">
-            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-semibold text-rose-200">Lỗi thực thi câu truy vấn</div>
-              <div className="text-rose-300/90 leading-relaxed font-mono text-[11px]">
-                {response.error}
-              </div>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
+
+// Alias export to satisfy Component 5.1/5.3 specification
+export { ChatMessageItem as MessageItem };

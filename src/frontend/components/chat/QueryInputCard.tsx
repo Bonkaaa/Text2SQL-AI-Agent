@@ -9,22 +9,30 @@ import {
 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 
-interface QueryInputCardProps {
-  onSubmit: (prompt: string) => void;
+export interface QueryInputCardProps {
+  onSubmit?: (prompt: string) => void;
+  onSendMessage?: (text: string) => void;
   isLoading?: boolean;
+  disabled?: boolean;
   initialValue?: string;
+  placeholder?: string;
 }
 
 export function QueryInputCard({
   onSubmit,
+  onSendMessage,
   isLoading = false,
+  disabled = false,
   initialValue = "",
+  placeholder = "Ask Text2SQL...",
 }: QueryInputCardProps) {
   const [prompt, setPrompt] = useState(initialValue);
   const [selectedModel, setSelectedModel] = useState<"TPC-H" | "Flash">("TPC-H");
   const [isModelDropdownOpen, setModelDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useAppContext();
+
+  const isInputDisabled = isLoading || disabled;
 
   useEffect(() => {
     if (initialValue) {
@@ -36,9 +44,13 @@ export function QueryInputCard({
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const trimmed = prompt.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isInputDisabled) return;
 
-    onSubmit(trimmed);
+    if (onSubmit) {
+      onSubmit(trimmed);
+    } else if (onSendMessage) {
+      onSendMessage(trimmed);
+    }
     setPrompt("");
   };
 
@@ -73,8 +85,8 @@ export function QueryInputCard({
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          placeholder="Ask Text2SQL..."
+          disabled={isInputDisabled}
+          placeholder={placeholder}
           className="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-400 outline-none px-1"
         />
 
@@ -131,7 +143,7 @@ export function QueryInputCard({
           <button
             type={prompt.trim() ? "submit" : "button"}
             onClick={prompt.trim() ? handleSubmit : () => showToast("Nhập liệu bằng giọng nói (Voice input)", "info", 1800)}
-            disabled={isLoading}
+            disabled={isInputDisabled}
             className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
             title={prompt.trim() ? "Gửi câu hỏi" : "Giọng nói"}
           >
@@ -148,3 +160,6 @@ export function QueryInputCard({
     </div>
   );
 }
+
+export const ChatInput = QueryInputCard;
+export default QueryInputCard;

@@ -63,7 +63,19 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
   const [isRoleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [isLogoHovered, setIsLogoHovered] = useState(false);
 
-  const isAdmin = currentRole === "ADMIN" || currentRole === "Admin";
+  const isAnalyst = currentRole === "Analyst";
+  const isAdmin = currentRole === "Admin";
+  const persona = isAnalyst
+    ? {
+        name: "Nguyễn Văn An",
+        initials: "NA",
+        roleTitle: "Supply Chain & Sales Analyst",
+      }
+    : {
+        name: "Trần Thị Bình",
+        initials: "TB",
+        roleTitle: "Data Lead & Governance Admin",
+      };
 
   const handleNewChat = () => {
     startNewSession();
@@ -179,13 +191,17 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
             {/* Middle: Empty space as requested (no chat bubbles!) */}
             <div className="flex-1" />
 
-            {/* Bottom: User Avatar JM */}
+            {/* Bottom: User Avatar (Persona NA / TB) */}
             <div
               onClick={handleHomeClick}
-              className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 cursor-pointer shadow-sm hover:scale-105 transition-transform"
-              title={`Tài khoản: Judha Maygustya (${currentRole})`}
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 cursor-pointer shadow-sm hover:scale-105 transition-transform ${
+                isAnalyst
+                  ? "bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500"
+                  : "bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500"
+              }`}
+              title={`Tài khoản: ${persona.name} (${currentRole})`}
             >
-              JM
+              {persona.initials}
             </div>
           </div>
         )}
@@ -325,7 +341,7 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
               </div>
             </div>
 
-            {/* 5. Bottom User Profile Card (Judha Maygustya & Role Switcher) */}
+            {/* 5. Bottom User Profile Card (Persona & Role Switcher) */}
             <div className="p-2 border-t border-white/5 bg-[#090c14] flex-shrink-0 relative">
               <div
                 onClick={() => setRoleDropdownOpen(!isRoleDropdownOpen)}
@@ -333,17 +349,23 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
                 title="Bấm để đổi vai trò (Analyst / Admin)"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 flex-shrink-0">
-                    JM
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 flex-shrink-0 ${
+                      isAnalyst
+                        ? "bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500"
+                        : "bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500"
+                    }`}
+                  >
+                    {persona.initials}
                   </div>
                   <div className="truncate flex-1 min-w-0">
                     <div className="text-xs font-semibold text-slate-100 truncate">
-                      Judha Maygustya
+                      {persona.name}
                     </div>
                     <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
                       <span>{currentRole}</span>
                       <span>•</span>
-                      <span>TPC-H Lead</span>
+                      <span>{isAnalyst ? "Supply Chain" : "Governance"}</span>
                     </div>
                   </div>
                 </div>
@@ -359,34 +381,34 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
                   </div>
                   <button
                     onClick={() => {
-                      setCurrentRole("ANALYST");
+                      setCurrentRole("Analyst");
                       setRoleDropdownOpen(false);
-                      showToast("Đã chuyển sang vai trò: ANALYST", "info", 1500);
+                      showToast("Đã chuyển sang vai trò: Analyst (Nguyễn Văn An)", "info", 1500);
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      currentRole === "ANALYST"
+                      currentRole === "Analyst"
                         ? "bg-brand-500/20 text-brand-300 font-semibold"
                         : "text-slate-300 hover:bg-white/5"
                     }`}
                   >
-                    <span>Analyst (Chuyên viên)</span>
-                    {currentRole === "ANALYST" && <Check className="w-3.5 h-3.5" />}
+                    <span>Analyst (Nguyễn Văn An)</span>
+                    {currentRole === "Analyst" && <Check className="w-3.5 h-3.5" />}
                   </button>
 
                   <button
                     onClick={() => {
-                      setCurrentRole("ADMIN");
+                      setCurrentRole("Admin");
                       setRoleDropdownOpen(false);
-                      showToast("Đã chuyển sang vai trò: ADMIN", "info", 1500);
+                      showToast("Đã chuyển sang vai trò: Admin (Trần Thị Bình)", "info", 1500);
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      currentRole === "ADMIN"
-                        ? "bg-brand-500/20 text-brand-300 font-semibold"
+                      currentRole === "Admin"
+                        ? "bg-amber-500/20 text-amber-300 font-semibold"
                         : "text-slate-300 hover:bg-white/5"
                     }`}
                   >
-                    <span>Admin (Quản trị viên)</span>
-                    {currentRole === "ADMIN" && <Check className="w-3.5 h-3.5" />}
+                    <span>Admin (Trần Thị Bình)</span>
+                    {currentRole === "Admin" && <Check className="w-3.5 h-3.5" />}
                   </button>
 
                   {isAdmin && (

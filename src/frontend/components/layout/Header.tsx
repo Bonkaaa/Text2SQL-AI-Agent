@@ -3,13 +3,12 @@
 import React, { useState } from "react";
 import {
   ChevronDown,
-  Database,
-  Layers,
   RefreshCw,
   Sparkles,
   TableProperties,
 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
+import { RoleSwitcher } from "@/components/layout/RoleSwitcher";
 
 export function Header() {
   const {
@@ -79,10 +78,18 @@ export function Header() {
                     <span className="text-slate-400">Trạng thái:</span>
                     <span
                       className={`font-semibold ${
-                        health.isConnected ? "text-emerald-400" : "text-amber-400"
+                        health.isConnected
+                          ? "text-emerald-400"
+                          : health.status === "disconnected"
+                          ? "text-rose-400"
+                          : "text-amber-400"
                       }`}
                     >
-                      {health.isConnected ? "Sẵn sàng (200 OK)" : "Đang kiểm tra"}
+                      {health.isConnected
+                        ? "Sẵn sàng (200 OK)"
+                        : health.status === "disconnected"
+                        ? "Mất kết nối"
+                        : "Đang kiểm tra"}
                     </span>
                   </div>
 
@@ -110,9 +117,12 @@ export function Header() {
         </div>
 
         {/* ================================================================= */}
-        {/* RIGHT: SCHEMA DRAWER TOGGLE                                      */}
+        {/* RIGHT: ROLE SWITCHER & SCHEMA DRAWER TOGGLE                       */}
         {/* ================================================================= */}
         <div className="flex items-center gap-2.5">
+          {/* Component 1.3: Role Switcher (Analyst / Admin) */}
+          <RoleSwitcher />
+
           {/* Schema Drawer Toggle Button */}
           <button
             onClick={toggleSchemaDrawer}

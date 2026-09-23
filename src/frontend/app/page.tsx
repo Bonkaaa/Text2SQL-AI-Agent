@@ -7,42 +7,17 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { SchemaDrawer } from "@/components/layout/SchemaDrawer";
 import { IridescentOrb } from "@/components/chat/IridescentOrb";
 import { QueryInputCard } from "@/components/chat/QueryInputCard";
-import { ChatMessageItem } from "@/components/chat/ChatMessageItem";
+import { PromptPresets } from "@/components/chat/PromptPresets";
+import { MessageList } from "@/components/chat/MessageList";
 import { useAppContext } from "@/context/AppContext";
 import { askQuery, approveQuery } from "@/services/api";
 import { ChatMessage, QueryResponse } from "@/types/api";
-
-const QUICK_SUGGESTIONS = [
-  {
-    label: "Top 5 khách hàng",
-    query: "Top 5 khách hàng có tổng chi tiêu lớn nhất năm 1995",
-  },
-  {
-    label: "Doanh số 5 khu vực",
-    query: "Phân tích doanh thu thuần theo 5 khu vực địa lý",
-  },
-  {
-    label: "Đơn giao trễ",
-    query: "Tỷ lệ đơn hàng giao trễ theo phương thức vận chuyển (AIR, TRUCK, SHIP)",
-  },
-  {
-    label: "Chiết khấu trung bình",
-    query: "Mức chiết khấu trung bình của các dòng sản phẩm TPC-H",
-  },
-];
 
 export default function HomePage() {
   const { currentRole, currentSessionId, showToast } = useAppContext();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messages.length > 0) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isLoading]);
+  const [isApprovingHitl, setIsApprovingHitl] = useState(false);
 
   // Handle submitting query to FastAPI backend
   const handleSendQuery = async (
@@ -132,29 +107,82 @@ export default function HomePage() {
   };
 
   // Handle HITL approval
-  const handleApproveHitl = async (approved: boolean) => {
-    if (!currentSessionId) return;
+  const handleApproveHitl = async (approved: boolean, reason?: string) => {
+    if (!currentSessionId || isApprovingHitl) return;
+    setIsApprovingHitl(true);
     try {
-      const res = await approveQuery({
+      const response = await approveQuery({
         session_id: currentSessionId,
         approved,
+        rejection_reason: reason,
       });
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastAsstIdx = updated.findLastIndex(
+          (m) =>
+            m.role === "assistant" &&
+            (m.queryResponse?.requires_hitl ||
+              m.queryResponse?.status === "PENDING_APPROVAL")
+        );
+
+        if (lastAsstIdx !== -1) {
+          const prevMsg = updated[lastAsstIdx];
+          const prevQr = prevMsg.queryResponse;
+          updated[lastAsstIdx] = {
+            ...prevMsg,
+            status: approved ? "COMPLETED" : "ERROR",
+            content:
+              response.message ||
+              (approved
+                ? "Đã phê duyệt và thực thi thành công."
+                : `Đã từ chối truy vấn: ${reason || "Người dùng từ chối"}`),
+            queryResponse: prevQr
+              ? {
+                  ...prevQr,
+                  status: approved ? "COMPLETED" : "ERROR",
+                  requires_hitl: false,
+                  final_answer:
+                    response.message ||
+                    (approved
+                      ? "Đã phê duyệt và thực thi thành công."
+                      : `Đã từ chối truy vấn: ${reason || "Người dùng từ chối"}`),
+                  data: response.data || prevQr.data,
+                  columns: response.columns || prevQr.columns,
+                }
+              : undefined,
+          };
+        }
+        return updated;
+      });
+
       showToast(
-        approved ? "Đã phê duyệt truy vấn" : "Đã từ chối truy vấn",
-        "info",
-        2000
+        approved ? "Đã phê duyệt và thực thi truy vấn" : "Đã từ chối truy vấn",
+        approved ? "success" : "info",
+        2500
       );
     } catch (err: any) {
       showToast(err.message || "Lỗi xử lý phê duyệt", "error", 2500);
+    } finally {
+      setIsApprovingHitl(false);
     }
   };
 
-  // Dynamic greeting based on user's current time
+  // Handle retry last query
+  const handleRetryLastQuery = () => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMsg && lastUserMsg.content) {
+      handleSendQuery(lastUserMsg.content);
+    }
+  };
+
+  // Dynamic greeting based on user's current time & active persona
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning, Judha";
-    if (hour < 18) return "Good Afternoon, Judha";
-    return "Good Evening, Judha";
+    const personaName = currentRole === "Analyst" ? "An" : "Bình";
+    if (hour < 12) return `Chào buổi sáng, ${personaName}`;
+    if (hour < 18) return `Chào buổi chiều, ${personaName}`;
+    return `Chào buổi tối, ${personaName}`;
   };
 
   const handleResetToHome = () => {
@@ -208,34 +236,26 @@ export default function HomePage() {
                   isLoading={isLoading}
                 />
 
-                {/* Quick Suggestion Chips */}
-                <div className="flex items-center justify-center flex-wrap gap-2 mt-6 max-w-2xl px-4">
-                  {QUICK_SUGGESTIONS.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSendQuery(item.query)}
-                      className="px-3 py-1.5 rounded-full text-xs font-medium text-slate-400 bg-surface-subtle/40 hover:bg-surface-subtle/90 hover:text-slate-200 border border-surface-border transition-all active:scale-95"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Quick Suggestion Chips (Component 2.2: PromptPresets) */}
+                <PromptPresets
+                  onSelectPrompt={(query) => handleSendQuery(query)}
+                  disabled={isLoading}
+                  className="mt-6"
+                />
               </div>
             ) : (
               /* ========================================================= */
               /* ACTIVE CONVERSATION STATE: Chat Thread + Bottom Docked Bar*/
               /* ========================================================= */
               <div className="flex-1 flex flex-col justify-between p-4 sm:p-8 max-w-4xl mx-auto w-full">
-                <div className="space-y-2 pb-6">
-                  {messages.map((msg) => (
-                    <ChatMessageItem
-                      key={msg.id}
-                      message={msg}
-                      onApproveHitl={handleApproveHitl}
-                    />
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
+                <MessageList
+                  messages={messages}
+                  isLoading={isLoading}
+                  isApprovingHitl={isApprovingHitl}
+                  onApproveHitl={handleApproveHitl}
+                  onSelectOption={(option) => handleSendQuery(option)}
+                  onRetry={handleRetryLastQuery}
+                />
 
                 {/* Bottom Docked Input Box */}
                 <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-[#090d19] via-[#090d19]/90 to-transparent">

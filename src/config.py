@@ -179,6 +179,41 @@ class Settings(BaseSettings):
         description="Bật/tắt tính năng tự động tóm tắt ngữ cảnh cũ khi hội thoại kéo dài nhiều lượt",
     )
 
+    # --- Dynamic Risk-based HITL Gatekeeper Policy ---
+    hitl_enabled: bool = Field(
+        default=True,
+        description="Bật/tắt cơ chế đánh giá rủi ro và phê duyệt Human-In-The-Loop (HITL)",
+    )
+    hitl_budget_ratio_threshold: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="Tỷ lệ dung lượng quét so với max_bytes_scanned kích hoạt HITL (mặc định: 0.4 = 40%)",
+    )
+    hitl_rows_threshold: int = Field(
+        default=500_000,
+        gt=0,
+        description="Số lượng dòng quét ước tính tối đa cho phép chạy tự động mà không cần duyệt HITL",
+    )
+    hitl_heavy_tables: str = Field(
+        default="lineitem,orders",
+        description="Danh sách các bảng kích thước lớn (Heavy Tables) phân tách bằng dấu phẩy, cấu hình linh hoạt theo từng DB",
+    )
+    hitl_time_columns: str = Field(
+        default="shipdate,orderdate,date,created_at,timestamp",
+        description="Danh sách các cột phân vùng / mốc thời gian dùng để kiểm tra tính đầy đủ của bộ lọc WHERE",
+    )
+
+    @property
+    def heavy_tables_set(self) -> set[str]:
+        """Tập hợp các bảng lớn có rủi ro chi phí cao (chuẩn hóa viết thường)."""
+        return {t.strip().lower() for t in self.hitl_heavy_tables.split(",") if t.strip()}
+
+    @property
+    def time_columns_set(self) -> set[str]:
+        """Tập hợp tên các cột thời gian/phân vùng để kiểm tra điều kiện lọc (chuẩn hóa viết thường)."""
+        return {c.strip().lower() for c in self.hitl_time_columns.split(",") if c.strip()}
+
     # --- Observability & Execution Traces ---
     enable_trace_logging: bool = Field(
         default=True,

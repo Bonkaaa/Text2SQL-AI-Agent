@@ -97,8 +97,8 @@ def run_control_pipeline(
         "sql": input_data["sql"],
         "user_context": input_data["user_context"],
         "session_id": session_id,
-        "hitl_required": False,
-        "hitl_approved": None,
+        "hitl_required": input_data.get("hitl_required", False),
+        "hitl_approved": input_data.get("hitl_approved"),
     }
 
     final_state = graph.invoke(initial_state, config=config)
@@ -224,6 +224,13 @@ def create_control_pipeline_runnable(
                 f"- Số lượng bản ghi: {len(data)}\n"
                 f"- Dữ liệu mẫu thực tế: {json.dumps(data_sample, ensure_ascii=False, default=str)}"
             )
+        elif output.get("status") == "BLOCKED_HITL":
+            summary = (
+                f"Truy vấn SQL TẠM DỪNG CHỜ PHÊ DUYỆT (HITL Required) [BLOCKED_HITL].\n"
+                f"- Câu lệnh: {sql}\n"
+                f"- Dung lượng quét ước tính: {output.get('bytes_scanned', 0)} bytes\n"
+                f"- Lý do rủi ro: {output.get('hitl_reason') or output.get('error_message')}"
+            )
         else:
             summary = (
                 f"Truy vấn SQL THẤT BẠI [{output.get('error_type', 'ERROR')}]: {output.get('error_message')}.\n"
@@ -240,6 +247,9 @@ def create_control_pipeline_runnable(
             "columns": output.get("columns"),
             "status": output.get("status"),
             "executed_sql": sql,
+            "hitl_required": output.get("hitl_required", False),
+            "hitl_reason": output.get("hitl_reason"),
+            "estimated_bytes": output.get("bytes_scanned", 0),
         }
 
     return RunnableLambda(_sync_runner)

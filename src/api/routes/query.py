@@ -90,6 +90,72 @@ async def ask_query(
     if not final_answer and messages:
         final_answer = extract_message_text(getattr(messages[-1], "content", messages[-1]))
 
+    # Fallback trích xuất recharts_config từ final_answer nếu chưa có trực tiếp
+    if not recharts_config and final_answer:
+        import json
+        import re
+        json_matches = re.findall(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", final_answer)
+        for jm in json_matches:
+            try:
+                pj = json.loads(jm)
+                if isinstance(pj, dict):
+                    if "recharts_config" in pj and isinstance(pj["recharts_config"], dict):
+                        recharts_config = pj["recharts_config"]
+                        if "chart_type" in pj and "chart_type" not in recharts_config:
+                            recharts_config["chart_type"] = pj["chart_type"]
+                        break
+                    elif "chart_type" in pj or "x_key" in pj:
+                        recharts_config = pj
+                        break
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+    # Fallback trích xuất SQL và Data thực tế từ các ToolMessages của control-pipeline
+    if not sql and messages:
+        import re
+        for msg in reversed(messages):
+            c_text = str(getattr(msg, "content", ""))
+            sql_match = re.search(r"-\s*Câu lệnh đã chạy:\s*(SELECT[\s\S]+?)(?:\n-|\Z)", c_text, re.IGNORECASE)
+            if sql_match:
+                sql = sql_match.group(1).strip()
+                break
+
+    if not data and messages:
+        import json
+        import re
+        for msg in reversed(messages):
+            c_text = str(getattr(msg, "content", ""))
+            data_match = re.search(r"-\s*Dữ liệu mẫu thực tế:\s*(\[[\s\S]+?\])", c_text)
+            if data_match:
+                try:
+                    parsed_sample = json.loads(data_match.group(1))
+                    if isinstance(parsed_sample, list) and parsed_sample:
+                        data = parsed_sample
+                        if not columns and isinstance(data[0], dict):
+                            columns = list(data[0].keys())
+                    break
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+    # Fallback kiểm tra nếu có thông điệp tạm dừng chờ duyệt HITL
+    requires_hitl = (status_str == "PENDING_APPROVAL") or bool(result.get("hitl_required", False))
+    estimated_cost_bytes = result.get("estimated_cost_bytes")
+
+    if not requires_hitl and messages:
+        import re
+        for msg in reversed(messages):
+            c_text = str(getattr(msg, "content", ""))
+            if "BLOCKED_HITL" in c_text or "HITL Required" in c_text or "TẠM DỪNG CHỜ PHÊ DUYỆT" in c_text:
+                requires_hitl = True
+                status_str = "PENDING_APPROVAL"
+                cost_m = re.search(r"Dung lượng quét ước tính:\s*(\d+)", c_text)
+                if cost_m:
+                    estimated_cost_bytes = int(cost_m.group(1))
+                sql_m = re.search(r"-\s*Câu lệnh:\s*(SELECT[\s\S]+?)(?:\n-|\Z)", c_text, re.IGNORECASE)
+                if sql_m and not sql:
+                    sql = sql_m.group(1).strip()
+                break
+
     return QueryResponse(
         session_id=active_session_id,
         status=status_str,
@@ -102,8 +168,8 @@ async def ask_query(
         data=data,
         columns=columns,
         recharts_config=recharts_config,
-        requires_hitl=(status_str == "PENDING_APPROVAL"),
-        estimated_cost_bytes=result.get("estimated_cost_bytes"),
+        requires_hitl=requires_hitl,
+        estimated_cost_bytes=estimated_cost_bytes,
         execution_time_ms=elapsed_ms,
         error=result.get("error"),
     )

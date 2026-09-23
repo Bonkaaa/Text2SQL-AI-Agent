@@ -33,7 +33,7 @@ export function SchemaDrawer() {
     "lineitem"
   );
 
-  const isAnalyst = currentRole === "ANALYST" || currentRole === "Analyst";
+  const isAnalyst = currentRole === "Analyst";
 
   // Đóng Drawer khi bấm phím Escape
   useEffect(() => {
