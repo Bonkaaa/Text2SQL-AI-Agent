@@ -8,8 +8,9 @@ Thư mục này lưu trữ toàn bộ các biên bản quyết định kiến tr
 
 | Mã bản ghi | Tiêu đề quyết định | Trạng thái | Ngày quyết định | Tài liệu liên quan |
 | :--- | :--- | :---: | :---: | :--- |
-| [ADR-0001](file:///c:/text2sql-agent/docs/decisions/0001-hybrid-agent-architecture.md) | Lựa chọn Mô hình Hybrid (DeepAgents + LangGraph) và Chuẩn hóa trên TPC-H Benchmark | `Accepted` | 2026-09-08 | [agent-architecture-v2.md](file:///c:/text2sql-agent/docs/agent/agent-architecture-v2.md) |
-| [ADR-0002](file:///c:/text2sql-agent/docs/decisions/0002-error-diagnostic-agent-and-modular-control-pipeline.md) | Bổ sung Node Agentic "Error Diagnostic Agent" và Mô-đun Hóa Package Control Pipeline (Kiến trúc v3.0) | `Accepted` | 2026-09-11 | [agent-architecture-v3.md](file:///c:/text2sql-agent/docs/agent/agent-architecture-v3.md), [agent-components-breakdown.md](file:///c:/text2sql-agent/docs/agent/agent-components-breakdown.md) |
+| [ADR-0001](file:///d:/Text2SQL-AI-Agent/docs/decisions/0001-hybrid-agent-architecture.md) | Lựa chọn Mô hình Hybrid (DeepAgents + LangGraph) và Chuẩn hóa trên TPC-H Benchmark | `Accepted` | 2026-09-08 | [agent-architecture-v2.md](file:///d:/Text2SQL-AI-Agent/docs/agent-architecture-v2.md) |
+| [ADR-0002](file:///d:/Text2SQL-AI-Agent/docs/decisions/0002-error-diagnostic-agent-and-modular-control-pipeline.md) | Bổ sung Node Agentic "Error Diagnostic Agent" và Mô-đun Hóa Package Control Pipeline (Kiến trúc v3.0) | `Accepted` | 2026-09-11 | [agent-architecture-v3.md](file:///d:/Text2SQL-AI-Agent/docs/agent-architecture-v3.md) |
+| [ADR-0003](file:///d:/Text2SQL-AI-Agent/docs/decisions/0003-agentic-analytics-architecture-v4.md) | Chuyển Đổi Từ Single-Query Text2SQL Sang Agentic Self-Service Analytics Engine (Kiến trúc v4.0) | `Accepted` | 2026-09-24 | [agent-architecture-v4.md](file:///d:/Text2SQL-AI-Agent/docs/agent-architecture-v4.md) |
 
 ---
 

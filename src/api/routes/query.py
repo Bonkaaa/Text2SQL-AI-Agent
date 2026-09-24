@@ -184,35 +184,61 @@ async def ask_query(
 async def approve_query(
     request: ApprovalRequest,
 ) -> ApprovalResponse:
-    """Xử lý tiếp tục luồng thực thi sau khi nhận quyết định phê duyệt từ người dùng."""
+    """Xử lý tiếp tục luồng thực thi sau khi nhận quyết định phê duyệt từ người dùng.
+
+    Resume graph đang bị tạm dừng tại hitl_gate_node bằng cách gửi Command(resume=...)
+    với key 'hitl_approved' đúng với contract mà hitl_gate_node mong đợi.
+    """
     logger.info(
         "Nhận quyết định phê duyệt cho session '%s': approved=%s",
         request.session_id,
         request.approved,
     )
 
-    # Resume graph thông qua checkpointer và Command
-    _ = get_shared_checkpointer()
-    _ = Command(
+    # Tạo Command với key 'hitl_approved' đúng contract của hitl_gate_node
+    resume_command = Command(
         resume={
-            "approved": request.approved,
+            "hitl_approved": request.approved,
             "rejection_reason": request.rejection_reason,
         }
     )
 
-    if request.approved:
+    # Resume graph thực sự bằng cách gọi ainvoke với Command
+    checkpointer = get_shared_checkpointer()
+    config = {"configurable": {"thread_id": request.session_id}}
+
+    try:
+        from src.agents.supervisor import create_text2sql_supervisor, extract_message_text
+
+        agent = create_text2sql_supervisor(checkpointer=checkpointer)
+        output_state = await agent.ainvoke(resume_command, config=config)
+
+        if request.approved:
+            # Trích xuất kết quả sau khi graph resume thành công
+            messages = output_state.get("messages", [])
+            final_text = extract_message_text(messages[-1].content) if messages else ""
+
+            return ApprovalResponse(
+                session_id=request.session_id,
+                approved=True,
+                status="SUCCESS",
+                message=final_text or "Đã tiếp nhận phê duyệt thành công. Truy vấn được phép thực thi.",
+            )
+        else:
+            return ApprovalResponse(
+                session_id=request.session_id,
+                approved=False,
+                status="REJECTED",
+                message=f"Đã từ chối thực thi truy vấn. Lý do: {request.rejection_reason or 'Người dùng từ chối.'}",
+            )
+
+    except Exception as exc:
+        logger.exception("Lỗi khi resume graph sau phê duyệt HITL cho session '%s'", request.session_id)
         return ApprovalResponse(
             session_id=request.session_id,
-            approved=True,
-            status="SUCCESS",
-            message="Đã tiếp nhận phê duyệt thành công. Truy vấn được phép thực thi.",
-        )
-    else:
-        return ApprovalResponse(
-            session_id=request.session_id,
-            approved=False,
-            status="REJECTED",
-            message=f"Đã từ chối thực thi truy vấn. Lý do: {request.rejection_reason or 'Người dùng từ chối.'}",
+            approved=request.approved,
+            status="ERROR",
+            message=f"Lỗi khi xử lý phê duyệt: {exc}",
         )
 
 

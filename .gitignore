@@ -14,3 +14,6 @@ data/logs
 outputs/*
 !outputs/.gitkeep
 .agents/
+project-ex-pdf/
+skills-lock.json
+conversation.md

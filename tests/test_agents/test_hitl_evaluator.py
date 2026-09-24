@@ -54,7 +54,7 @@ def test_evaluate_query_risk_safe_query():
         is_within_budget=True,
         max_budget_bytes=1_000_000_000,
     )
-    is_hitl, reason, score = evaluate_query_risk(
+    is_hitl, _reason, score = evaluate_query_risk(
         sql="SELECT * FROM nation WHERE n_regionkey = 1",
         estimate=estimate,
         tables_used=["nation"],
@@ -103,7 +103,7 @@ def test_evaluate_query_risk_heavy_table_with_time_filter():
         is_within_budget=True,
         max_budget_bytes=1_000_000_000,
     )
-    is_hitl, reason, score = evaluate_query_risk(
+    is_hitl, _reason, score = evaluate_query_risk(
         sql="SELECT sum(l_extendedprice) FROM lineitem WHERE l_shipdate >= DATE '1995-01-01'",
         estimate=estimate,
         tables_used=["lineitem"],
@@ -122,7 +122,7 @@ def test_evaluate_query_risk_disabled():
         is_within_budget=True,
         max_budget_bytes=1_000_000_000,
     )
-    is_hitl, reason, score = evaluate_query_risk(
+    is_hitl, _reason, score = evaluate_query_risk(
         sql="SELECT * FROM lineitem",
         estimate=estimate,
         tables_used=["lineitem"],

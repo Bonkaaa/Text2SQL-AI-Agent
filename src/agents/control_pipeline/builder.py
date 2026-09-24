@@ -107,6 +107,25 @@ def run_control_pipeline(
     if execution_result:
         return execution_result
 
+    # Trường hợp đồ thị bị tạm dừng bởi HITL Gatekeeper qua interrupt()
+    if final_state.get("__interrupt__") or (
+        final_state.get("hitl_required") and final_state.get("hitl_approved") is not True
+    ):
+        return {
+            "is_valid": False,
+            "status": "BLOCKED_HITL",
+            "error_type": "HITL_REQUIRED",
+            "error_message": final_state.get("hitl_reason") or "Truy vấn cần phê duyệt từ quản trị viên.",
+            "actionable_feedback": "Vui lòng xác nhận phê duyệt truy vấn hoặc bổ sung điều kiện lọc.",
+            "diagnostic_result": None,
+            "data": None,
+            "columns": None,
+            "bytes_scanned": final_state.get("estimated_bytes", 0),
+            "execution_time_ms": 0.0,
+            "hitl_required": True,
+            "hitl_reason": final_state.get("hitl_reason"),
+        }
+
     # Trường hợp dự phòng nếu graph kết thúc bất thường
     return {
         "is_valid": False,

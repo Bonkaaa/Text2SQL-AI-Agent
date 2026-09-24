@@ -23,6 +23,7 @@ Kiến trúc lai (Hybrid Architecture) kết hợp:
 """
 
 import logging
+import re
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
@@ -327,6 +328,39 @@ def verify_pipeline_execution_integrity(
     return is_compromised, last_error
 
 
+def check_hitl_pending(
+    messages: list[Any],
+) -> tuple[bool, str | None, str | None, int | None]:
+    """Kiểm tra xem trong chuỗi tin nhắn có sự kiện BLOCKED_HITL từ control-pipeline hay không.
+
+    Returns:
+        tuple[is_hitl, hitl_reason, sql, estimated_cost_bytes]:
+        - is_hitl: True nếu phát hiện yêu cầu duyệt HITL
+        - hitl_reason: Lý do rủi ro cần duyệt
+        - sql: Câu lệnh SQL đề xuất
+        - estimated_cost_bytes: Dung lượng quét ước tính
+    """
+    for msg in reversed(messages):
+        content = extract_message_text(getattr(msg, "content", msg))
+        if "BLOCKED_HITL" in content or "HITL Required" in content or "TẠM DỪNG CHỜ PHÊ DUYỆT" in content:
+            sql_m = re.search(r"-\s*Câu lệnh:\s*(SELECT[\s\S]+?)(?:\n-|\Z)", content, re.IGNORECASE)
+            sql = sql_m.group(1).strip() if sql_m else None
+
+            bytes_m = re.search(r"Dung lượng quét ước tính:\s*(\d+)", content)
+            est_bytes = int(bytes_m.group(1)) if bytes_m else None
+
+            reason_m = re.search(r"-\s*Lý do rủi ro:\s*(.+?)(?:\n-|\Z)", content)
+            reason = (
+                reason_m.group(1).strip()
+                if reason_m
+                else "Truy vấn có mức độ rủi ro cao hoặc chi phí lớn, cần người quản trị phê duyệt."
+            )
+
+            return True, reason, sql, est_bytes
+
+    return False, None, None, None
+
+
 def run_supervisor(
     question: str,
     user_context: UserContext | None = None,
@@ -445,6 +479,39 @@ def run_supervisor(
         if isinstance(files, dict):
             for fname, fcontent in files.items():
                 active_tracer.log_artifact(fname, fcontent)
+
+        # Chốt chặn kiểm tra Human-in-the-loop (HITL Approval Gate):
+        is_hitl, hitl_reason, hitl_sql, hitl_bytes = check_hitl_pending(messages)
+        if is_hitl:
+            logger.info(
+                f"Phát hiện yêu cầu HITL phê duyệt truy vấn cho session: {active_session_id}. Lý do: {hitl_reason}"
+            )
+            hitl_answer = (
+                f"⚠️ **Truy vấn yêu cầu phê duyệt từ quản trị viên (Human-in-the-loop - HITL)**\n\n"
+                f"- **Lý do rủi ro**: {hitl_reason}\n"
+                f"- **Dung lượng quét ước tính**: {hitl_bytes or 0:,} bytes\n"
+                f"- **Câu lệnh SQL đề xuất**:\n```sql\n{hitl_sql or ''}\n```\n\n"
+                f"Vui lòng nhấn **Phê duyệt** để cho phép thực thi hoặc **Từ chối** để hủy bỏ."
+            )
+            active_tracer.log_summary(
+                status="PENDING_APPROVAL",
+                question=question,
+                extra={"hitl_reason": hitl_reason},
+            )
+            return {
+                "status": "PENDING_APPROVAL",
+                "question": question,
+                "session_id": active_session_id,
+                "is_ambiguous": False,
+                "requires_hitl": True,
+                "hitl_reason": hitl_reason,
+                "sql": hitl_sql,
+                "estimated_cost_bytes": hitl_bytes,
+                "messages": messages,
+                "final_answer": hitl_answer,
+                "files": files,
+                "tracer": active_tracer,
+            }
 
         # Chốt chặn kiểm tra tính toàn vẹn (Integrity Guard):
         # Nếu control-pipeline được gọi nhưng tất cả các lần đều thất bại,
@@ -602,6 +669,39 @@ async def arun_supervisor(
             for fname, fcontent in files.items():
                 active_tracer.log_artifact(fname, fcontent)
 
+        # Chốt chặn kiểm tra Human-in-the-loop (HITL Approval Gate):
+        is_hitl, hitl_reason, hitl_sql, hitl_bytes = check_hitl_pending(messages)
+        if is_hitl:
+            logger.info(
+                f"[Async] Phát hiện yêu cầu HITL phê duyệt truy vấn cho session: {active_session_id}. Lý do: {hitl_reason}"
+            )
+            hitl_answer = (
+                f"⚠️ **Truy vấn yêu cầu phê duyệt từ quản trị viên (Human-in-the-loop - HITL)**\n\n"
+                f"- **Lý do rủi ro**: {hitl_reason}\n"
+                f"- **Dung lượng quét ước tính**: {hitl_bytes or 0:,} bytes\n"
+                f"- **Câu lệnh SQL đề xuất**:\n```sql\n{hitl_sql or ''}\n```\n\n"
+                f"Vui lòng nhấn **Phê duyệt** để cho phép thực thi hoặc **Từ chối** để hủy bỏ."
+            )
+            active_tracer.log_summary(
+                status="PENDING_APPROVAL",
+                question=question,
+                extra={"hitl_reason": hitl_reason},
+            )
+            return {
+                "status": "PENDING_APPROVAL",
+                "question": question,
+                "session_id": active_session_id,
+                "is_ambiguous": False,
+                "requires_hitl": True,
+                "hitl_reason": hitl_reason,
+                "sql": hitl_sql,
+                "estimated_cost_bytes": hitl_bytes,
+                "messages": messages,
+                "final_answer": hitl_answer,
+                "files": files,
+                "tracer": active_tracer,
+            }
+
         # Chốt chặn kiểm tra tính toàn vẹn (Integrity Guard):
         # Nếu control-pipeline được gọi nhưng tất cả các lần đều thất bại,
         # tuyệt đối không để LLM hallucinate kết quả hoặc giả định số liệu.
@@ -667,6 +767,7 @@ __all__ = [
     "DEFAULT_SUPERVISOR_MEMORY",
     "DEFAULT_SUPERVISOR_SKILLS",
     "arun_supervisor",
+    "check_hitl_pending",
     "create_text2sql_supervisor",
     "extract_message_text",
     "format_failed_query_fallback_response",

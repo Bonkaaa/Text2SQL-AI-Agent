@@ -9,3 +9,7 @@ Sau mà deploy lên thì nhớ chỉnh lại rule HITL nhé:
 Thêm guardrails cho input và output
 
 MCP sql knowledge
+
+Có thể thêm 1 node trả lời câu hỏi hoặc đề xuất plan ở đoạn route đầu tiên.
+- 1 là route LLM trả lời câu hỏi hoặc gợi ý plan
+- 2 là route vào orchestrator bình thường
