@@ -5,6 +5,7 @@ from langgraph.types import interrupt
 
 from src.agents.control_pipeline.hitl_evaluator import evaluate_query_risk
 from src.config import get_settings
+from src.models.artifacts import QueryArtifact
 from src.models.state import ControlPipelineOutput, ControlState
 from src.utils.ast_sanitizer import sanitize_and_validate_sql
 from src.utils.audit_logger import AuditEvent, AuditLogger, log_audit_event
@@ -192,7 +193,24 @@ def execute_node(
         "hitl_reason": state.get("hitl_reason"),
     }
 
-    return {"execution_result": output}
+    artifact = QueryArtifact(
+        sql=sql,
+        status="SUCCESS",
+        data=result.data or [],
+        columns=result.columns or [],
+        row_count=len(result.data) if result.data else 0,
+        execution_time_ms=result.execution_time_ms,
+        tables_used=state.get("tables_used", []),
+        columns_used=state.get("columns_used", []),
+    )
+
+    return {
+        "execution_result": output,
+        "is_valid": True,
+        "data": result.data,
+        "columns": result.columns,
+        "query_artifact": artifact,
+    }
 
 
 def err_node(state: ControlState) -> dict[str, Any]:
@@ -212,7 +230,39 @@ def err_node(state: ControlState) -> dict[str, Any]:
         "hitl_reason": state.get("hitl_reason"),
     }
 
-    return {"execution_result": output}
+    status_val = state.get("status")
+    error_type = state.get("error_type", "")
+    if status_val in ("BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "BLOCKED_HITL", "TIMEOUT"):
+        art_status = status_val
+    elif "AST" in error_type:
+        art_status = "BLOCKED_AST"
+    elif "RBAC" in error_type:
+        art_status = "BLOCKED_RBAC"
+    elif "COST" in error_type:
+        art_status = "BLOCKED_COST"
+    elif "HITL" in error_type:
+        art_status = "BLOCKED_HITL"
+    elif "TIMEOUT" in error_type:
+        art_status = "TIMEOUT"
+    else:
+        art_status = "DB_ERROR"
+
+    artifact = QueryArtifact(
+        sql=state.get("sql", ""),
+        status=art_status,
+        data=[],
+        columns=[],
+        row_count=0,
+        execution_time_ms=state.get("execution_time_ms", 0.0),
+        error_message=state.get("error_message", "Đã xảy ra lỗi kiểm duyệt."),
+    )
+
+    return {
+        "execution_result": output,
+        "is_valid": False,
+        "query_artifact": artifact,
+    }
+
 
 
 def audit_node(

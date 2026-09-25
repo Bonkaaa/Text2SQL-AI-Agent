@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from src.models.artifacts import ArtifactBundle, QueryArtifact
 from src.models.rbac import UserRole
 
 # ==============================================================================
@@ -104,6 +105,15 @@ class QueryResponse(BaseModel):
         default=None,
         description="Thông báo lỗi chi tiết nếu status là ERROR",
     )
+    artifacts: list[QueryArtifact] | None = Field(
+        default=None,
+        description="Danh sách bằng chứng truy vấn đã thực thi (QueryArtifacts)",
+    )
+    artifact_bundle: ArtifactBundle | None = Field(
+        default=None,
+        description="Gói kết quả phân tích dữ liệu hoàn chỉnh",
+    )
+
 
 
 # ==============================================================================

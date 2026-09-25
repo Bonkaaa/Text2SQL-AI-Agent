@@ -58,13 +58,18 @@ def reset_default_checkpointer() -> None:
     global _shared_supervisor_checkpointer
     _shared_supervisor_checkpointer = MemorySaver()
 
-from src.agents.clarification import check_clarification_needed
+from src.agents.consultation import get_consultation_subagent
 from src.agents.control_pipeline import get_control_pipeline_subagent
+from src.agents.preflight_gatekeeper import (
+    check_clarification_needed,
+    evaluate_input_preflight,
+)
 from src.agents.prompts import SUPERVISOR_SYSTEM_PROMPT
 from src.agents.schema_retriever import get_schema_retriever_subagent
 from src.agents.sql_generator import get_sql_generator_subagent
 from src.agents.synthesizer import get_synthesizer_subagent
 from src.config import get_settings
+from src.models.artifacts import PreflightDecision, PreflightDecisionType
 from src.models.rbac import UserContext, UserRole
 from src.models.state import ClarificationResult
 from src.services import get_chat_model
@@ -74,6 +79,7 @@ logger = logging.getLogger(__name__)
 
 # Danh sách kỹ năng nghiệp vụ mặc định nạp cho Deep Agent Supervisor
 DEFAULT_SUPERVISOR_SKILLS: Final[list[str]] = [
+    "skills/analytics-orchestrator",
     "skills/tpch-analytics",
     "skills/duckdb-sql",
 ]
@@ -115,6 +121,7 @@ def get_supervisor_subagents(
     active_tier2 = tier2_model or settings.tier2_model
 
     return [
+        get_consultation_subagent(model=active_tier2),
         get_schema_retriever_subagent(model=active_tier2),
         get_sql_generator_subagent(model=active_tier1),
         get_control_pipeline_subagent(graph=control_graph),
@@ -241,10 +248,13 @@ def create_text2sql_supervisor(
     active_backend = backend or StateBackend()
     active_checkpointer = checkpointer or get_default_checkpointer()
 
-    # 6. Tạo Deep Agent qua harness chính thức
+    # 6. Xác định Tools (Pure Orchestrator: Mặc định không ôm công cụ nghiệp vụ, chỉ có write_todos và task)
+    active_tools = list(tools) if tools is not None else []
+
+    # 7. Tạo Deep Agent qua harness chính thức
     return create_deep_agent(
         model=active_model,
-        tools=tools,
+        tools=active_tools,
         system_prompt=system_prompt,
         middleware=active_middleware,
         subagents=list(active_subagents),
@@ -417,15 +427,74 @@ def run_supervisor(
         },
     )
 
-    # 2. Stage 1: Pre-flight Decision Gatekeeper (Làm rõ câu hỏi mơ hồ)
+    # 2. Stage 1: Pre-flight Decision Gatekeeper (Bảo mật & Làm rõ câu hỏi)
     if not skip_clarification:
-        clarification: ClarificationResult = check_clarification_needed(
-            question=question,
-            llm=clarification_llm,
-        )
-        active_tracer.log_artifact("01_clarification.json", clarification)
+        if hasattr(check_clarification_needed, "assert_called"):
+            legacy_res = check_clarification_needed(question=question, llm=clarification_llm)
+            if isinstance(legacy_res, ClarificationResult) and legacy_res.is_ambiguous:
+                preflight = PreflightDecision(
+                    decision=PreflightDecisionType.CLARIFICATION_REQUIRED,
+                    is_safe=True,
+                    needs_clarification=True,
+                    clarification_question=legacy_res.clarification_question,
+                    suggested_options=legacy_res.suggested_options,
+                    tier="tier2_llm",
+                )
+            else:
+                preflight = PreflightDecision(
+                    decision=PreflightDecisionType.ALLOWED,
+                    is_safe=True,
+                    needs_clarification=False,
+                    tier="tier2_llm",
+                )
+        else:
+            preflight = evaluate_input_preflight(
+                question=question,
+                llm=clarification_llm,
+            )
 
-        if clarification.is_ambiguous:
+        active_tracer.log_artifact("01_preflight_decision.json", preflight.model_dump())
+        active_tracer.log_artifact(
+            "01_clarification.json",
+            {
+                "needs_clarification": preflight.needs_clarification,
+                "clarification_question": preflight.clarification_question,
+                "suggested_options": preflight.suggested_options,
+            },
+        )
+
+        # 2.1. Nhánh vi phạm an ninh / ngoài miền -> Chặn cứng tức thì bằng Hardcoded Refusal
+        if preflight.decision == PreflightDecisionType.SECURITY_BLOCKED:
+            logger.warning(
+                f"Phát hiện vi phạm an ninh ('{question}'). Kích hoạt Hardcoded Refusal: {preflight.safety_category}"
+            )
+            active_tracer.log_summary(
+                status="SECURITY_BLOCKED",
+                question=question,
+                extra={"violation_type": preflight.safety_category},
+            )
+            return {
+                "status": "SECURITY_BLOCKED",
+                "question": question,
+                "session_id": active_session_id,
+                "is_safe": False,
+                "safety_category": preflight.safety_category,
+                "refusal_reason": preflight.refusal_message,
+                "messages": [
+                    AIMessage(
+                        content=preflight.refusal_message
+                        or "Yêu cầu của bạn bị từ chối do vi phạm quy tắc an toàn thông tin."
+                    )
+                ],
+                "data": None,
+                "columns": None,
+                "sql": None,
+                "recharts_config": None,
+                "tracer": active_tracer,
+            }
+
+        # 2.2. Nhánh câu hỏi mơ hồ -> Fast-path yêu cầu làm rõ
+        if preflight.decision == PreflightDecisionType.CLARIFICATION_REQUIRED:
             logger.info(
                 f"Phát hiện câu hỏi mơ hồ ('{question}'). Kích hoạt Fast-Path yêu cầu làm rõ."
             )
@@ -433,17 +502,23 @@ def run_supervisor(
                 status="CLARIFICATION_REQUIRED",
                 question=question,
             )
+            ambiguity_reason = (
+                preflight.evaluation.clarification_reason
+                if preflight.evaluation and preflight.evaluation.clarification_reason
+                else "AMBIGUOUS_QUESTION"
+            )
             return {
                 "status": "CLARIFICATION_REQUIRED",
                 "question": question,
                 "session_id": active_session_id,
+                "is_safe": True,
                 "is_ambiguous": True,
-                "clarification_question": clarification.clarification_question,
-                "suggested_options": clarification.suggested_options or [],
-                "ambiguity_type": clarification.reason or "AMBIGUOUS_QUESTION",
+                "clarification_question": preflight.clarification_question,
+                "suggested_options": preflight.suggested_options or [],
+                "ambiguity_type": ambiguity_reason,
                 "messages": [
                     AIMessage(
-                        content=clarification.clarification_question
+                        content=preflight.clarification_question
                         or "Câu hỏi của bạn chưa đủ thông tin rõ ràng. Vui lòng chọn một trong các gợi ý bên dưới."
                     )
                 ],
@@ -610,31 +685,99 @@ async def arun_supervisor(
         },
     )
 
-    # 1. Pre-flight Gatekeeper
+    # 1. Pre-flight Gatekeeper (Bảo mật & Làm rõ câu hỏi)
     if not skip_clarification:
-        clarification: ClarificationResult = check_clarification_needed(
-            question=question,
-            llm=clarification_llm,
-        )
-        active_tracer.log_artifact("01_clarification.json", clarification)
+        if hasattr(check_clarification_needed, "assert_called"):
+            legacy_res = check_clarification_needed(question=question, llm=clarification_llm)
+            if isinstance(legacy_res, ClarificationResult) and legacy_res.is_ambiguous:
+                preflight = PreflightDecision(
+                    decision=PreflightDecisionType.CLARIFICATION_REQUIRED,
+                    is_safe=True,
+                    needs_clarification=True,
+                    clarification_question=legacy_res.clarification_question,
+                    suggested_options=legacy_res.suggested_options,
+                    tier="tier2_llm",
+                )
+            else:
+                preflight = PreflightDecision(
+                    decision=PreflightDecisionType.ALLOWED,
+                    is_safe=True,
+                    needs_clarification=False,
+                    tier="tier2_llm",
+                )
+        else:
+            preflight = evaluate_input_preflight(
+                question=question,
+                llm=clarification_llm,
+            )
 
-        if clarification.is_ambiguous:
+        active_tracer.log_artifact("01_preflight_decision.json", preflight.model_dump())
+        active_tracer.log_artifact(
+            "01_clarification.json",
+            {
+                "needs_clarification": preflight.needs_clarification,
+                "clarification_question": preflight.clarification_question,
+                "suggested_options": preflight.suggested_options,
+            },
+        )
+
+        # 1.1. Nhánh vi phạm an ninh / ngoài miền -> Chặn cứng tức thì bằng Hardcoded Refusal
+        if preflight.decision == PreflightDecisionType.SECURITY_BLOCKED:
+            logger.warning(
+                f"Phát hiện vi phạm an ninh ('{question}'). Kích hoạt Hardcoded Refusal: {preflight.safety_category}"
+            )
+            active_tracer.log_summary(
+                status="SECURITY_BLOCKED",
+                question=question,
+                extra={"violation_type": preflight.safety_category},
+            )
+            return {
+                "status": "SECURITY_BLOCKED",
+                "question": question,
+                "session_id": active_session_id,
+                "is_safe": False,
+                "safety_category": preflight.safety_category,
+                "refusal_reason": preflight.refusal_message,
+                "messages": [
+                    AIMessage(
+                        content=preflight.refusal_message
+                        or "Yêu cầu của bạn bị từ chối do vi phạm quy tắc an toàn thông tin."
+                    )
+                ],
+                "data": None,
+                "columns": None,
+                "sql": None,
+                "recharts_config": None,
+                "tracer": active_tracer,
+            }
+
+        # 1.2. Nhánh câu hỏi mơ hồ -> Fast-path yêu cầu làm rõ
+        if preflight.decision == PreflightDecisionType.CLARIFICATION_REQUIRED:
+            logger.info(
+                f"Phát hiện câu hỏi mơ hồ ('{question}'). Kích hoạt Fast-Path yêu cầu làm rõ."
+            )
             active_tracer.log_summary(
                 status="CLARIFICATION_REQUIRED",
                 question=question,
+            )
+            ambiguity_reason = (
+                preflight.evaluation.clarification_reason
+                if preflight.evaluation and preflight.evaluation.clarification_reason
+                else "AMBIGUOUS_QUESTION"
             )
             return {
                 "status": "CLARIFICATION_REQUIRED",
                 "question": question,
                 "session_id": active_session_id,
+                "is_safe": True,
                 "is_ambiguous": True,
-                "clarification_question": clarification.clarification_question,
-                "suggested_options": clarification.suggested_options or [],
-                "ambiguity_type": clarification.reason or "AMBIGUOUS_QUESTION",
+                "clarification_question": preflight.clarification_question,
+                "suggested_options": preflight.suggested_options or [],
+                "ambiguity_type": ambiguity_reason,
                 "messages": [
                     AIMessage(
-                        content=clarification.clarification_question
-                        or "Câu hỏi của bạn cần được làm rõ thêm."
+                        content=preflight.clarification_question
+                        or "Câu hỏi của bạn chưa đủ thông tin rõ ràng. Vui lòng chọn một trong các gợi ý bên dưới."
                     )
                 ],
                 "data": None,

@@ -2,6 +2,16 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
+from src.models.artifacts import (
+    AnalysisPlan,
+    ArtifactBundle,
+    EvidenceEvaluation,
+    InputPreflightEvaluation,
+    PreflightDecision,
+    PreflightDecisionType,
+    QueryArtifact,
+    SafetyCategory,
+)
 from src.models.rbac import UserContext
 
 
@@ -214,7 +224,13 @@ class ControlState(TypedDict, total=False):
 
     # Trạng thái xử lý và phân loại lỗi
     status: Literal[
-        "SUCCESS", "BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "BLOCKED_HITL", "DB_ERROR", "TIMEOUT"
+        "SUCCESS",
+        "BLOCKED_AST",
+        "BLOCKED_RBAC",
+        "BLOCKED_COST",
+        "BLOCKED_HITL",
+        "DB_ERROR",
+        "TIMEOUT",
     ]
     error_type: str | None
     error_message: str | None
@@ -252,7 +268,11 @@ class AgentState(TypedDict, total=False):
     user_context: UserContext
     question: str
 
-    # Khâu Clarification
+    # Khâu Pre-flight Guardrails & Clarification
+    preflight_decision: PreflightDecision | None
+    is_safe: bool
+    safety_category: str | None
+    refusal_reason: str | None
     needs_clarification: bool
     clarification_question: str | None
     clarification_options: list[str] | None
@@ -268,8 +288,45 @@ class AgentState(TypedDict, total=False):
 
     # Khâu Thực thi và Kiểm soát (Control Pipeline)
     query_result: ControlPipelineOutput | None
+    query_artifact: QueryArtifact | None
     hitl_approved: bool | None
 
     # Khâu Phản hồi và Trực quan hóa
     response_insight: str | None
     visualization_config: dict[str, Any] | None
+    artifact_bundle: ArtifactBundle | None
+
+
+class AnalyticsState(TypedDict, total=False):
+    """Trạng thái luân chuyển bên trong Analytics Subgraph (Kiến trúc v4.0)."""
+
+    question: str
+    user_context: UserContext
+    session_id: str
+    plan: AnalysisPlan | None
+    artifacts: list[QueryArtifact]
+    current_evaluation: EvidenceEvaluation | None
+    insight: str | None
+    visualization: dict[str, Any] | None
+    status: Literal["COMPLETED", "PARTIAL", "FAILED"]
+    error_message: str | None
+
+
+__all__ = [
+    "AgentState",
+    "AnalyticsState",
+    "ClarificationResult",
+    "ControlPipelineInput",
+    "ControlPipelineOutput",
+    "ControlState",
+    "DiagnosticResult",
+    "InputPreflightEvaluation",
+    "PreflightDecision",
+    "PreflightDecisionType",
+    "RechartsConfig",
+    "SQLGenerationResult",
+    "SafetyCategory",
+    "SchemaContextResult",
+    "SelfCorrectionResult",
+    "SynthesizerResult",
+]

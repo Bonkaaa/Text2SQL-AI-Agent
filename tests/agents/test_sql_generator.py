@@ -21,7 +21,7 @@ def test_subagent_dict_structure():
     assert "suy luận và sinh câu lệnh SQL" in sql_generator_subagent["description"]
     assert sql_generator_subagent["system_prompt"] == SQL_GENERATOR_SYSTEM_PROMPT
     assert sql_generator_subagent["mode"] == "isolated"
-    assert sql_generator_subagent["tools"] == []
+    assert len(sql_generator_subagent["tools"]) == 4
     assert sql_generator_subagent["response_format"] == SQLGenerationResult
     assert isinstance(sql_generator_subagent["model"], str)
     assert len(sql_generator_subagent["model"]) > 0
@@ -182,3 +182,56 @@ def test_generate_sql_missing_llm_raises_error(monkeypatch):
         )
 
     assert "Không thể khởi tạo mô hình Chat Model Tier 1" in str(exc_info.value)
+
+
+def test_generate_sql_active_tool_calling_loop():
+    """Kiểm tra luồng Active Tool Calling: LLM gọi find_join_path trước khi sinh câu SQL."""
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    mock_tool_call_msg = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "find_join_path",
+                "args": {"table_a": "customer", "table_b": "orders"},
+                "id": "call_123",
+            }
+        ],
+    )
+    mock_done_msg = AIMessage(content="Đã tìm thấy join path, tiến hành sinh SQL.")
+
+    mock_final_result = SQLGenerationResult(
+        sql="SELECT c.c_name, o.o_totalprice FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey;",
+        dialect="duckdb",
+        explanation="Nối bảng customer và orders.",
+        assumptions=[],
+    )
+
+    mock_tools_runnable = MagicMock()
+    # Lần 1: LLM gọi tool. Lần 2: LLM nhận ToolMessage và dừng gọi tool
+    mock_tools_runnable.invoke.side_effect = [mock_tool_call_msg, mock_done_msg]
+
+    mock_structured_runnable = MagicMock()
+    mock_structured_runnable.invoke.return_value = mock_final_result
+
+    mock_llm = MagicMock()
+    mock_llm.bind_tools.return_value = mock_tools_runnable
+    mock_llm.with_structured_output.return_value = mock_structured_runnable
+
+    result = generate_sql(
+        question="Lấy tên khách hàng và tổng tiền đơn hàng",
+        schema_context="customer, orders",
+        llm=mock_llm,
+    )
+
+    assert result.sql == "SELECT c.c_name, o.o_totalprice FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey;"
+    assert mock_llm.bind_tools.called
+    assert mock_tools_runnable.invoke.call_count == 2
+    mock_structured_runnable.invoke.assert_called_once()
+
+    # Kiểm tra tin nhắn gửi đến structured_runnable chứa ToolMessage phản hồi từ find_join_path
+    messages_passed = mock_structured_runnable.invoke.call_args[0][0]
+    tool_messages = [m for m in messages_passed if isinstance(m, ToolMessage)]
+    assert len(tool_messages) == 1
+    assert "orders.o_custkey = customer.c_custkey" in tool_messages[0].content or "c_custkey" in tool_messages[0].content
+

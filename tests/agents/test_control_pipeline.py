@@ -439,7 +439,9 @@ def test_get_control_pipeline_subagent_spec():
     assert control_pipeline_subagent["name"] == "control-pipeline"
 
 
-def test_control_pipeline_runnable_execution_success(shared_tpch_connector, default_user_context):
+def test_control_pipeline_runnable_execution_success(
+    shared_tpch_connector, default_user_context
+):
     """Kiểm tra thực thi Runnable bọc Control Pipeline với câu lệnh SELECT hợp lệ."""
     from langchain_core.messages import AIMessage
 
@@ -471,7 +473,9 @@ def test_control_pipeline_runnable_execution_success(shared_tpch_connector, defa
     assert "c_name" in result["columns"]
 
 
-def test_control_pipeline_runnable_execution_failure_ast(shared_tpch_connector, default_user_context):
+def test_control_pipeline_runnable_execution_failure_ast(
+    shared_tpch_connector, default_user_context
+):
     """Kiểm tra thực thi Runnable khi có lỗi vi phạm AST (DROP TABLE)."""
     from langchain_core.messages import AIMessage
 
@@ -507,7 +511,9 @@ def test_extract_sql_from_text_various_formats():
     assert extract_sql_from_text(pure_sql) == "SELECT COUNT(*) FROM customer"
 
     # 2. Markdown code block
-    md_sql = "```sql\nSELECT c_custkey, c_name FROM customer WHERE c_acctbal > 1000;\n```"
+    md_sql = (
+        "```sql\nSELECT c_custkey, c_name FROM customer WHERE c_acctbal > 1000;\n```"
+    )
     assert "SELECT c_custkey" in extract_sql_from_text(md_sql)
     assert "```" not in extract_sql_from_text(md_sql)
 
@@ -535,4 +541,3 @@ def test_extract_sql_from_text_various_formats():
     extracted_cte = extract_sql_from_text(cte_sql)
     assert extracted_cte.startswith("WITH cust_orders AS")
     assert "Hãy chạy" not in extracted_cte
-

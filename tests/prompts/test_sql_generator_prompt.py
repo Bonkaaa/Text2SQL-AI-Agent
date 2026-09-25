@@ -87,6 +87,11 @@ def test_sql_generator_prompt_structure():
     assert "SQL Generator" in SQL_GENERATOR_SYSTEM_PROMPT
     assert "TPC-H" in SQL_GENERATOR_SYSTEM_PROMPT
     assert "SELECT" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "search_tables_and_columns" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "get_column_samples_and_values" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "find_join_path" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "search_business_definition" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "TOOL CALLING WORKFLOW" in SQL_GENERATOR_SYSTEM_PROMPT
     assert (
         "dbt Semantic Metrics" in SQL_GENERATOR_SYSTEM_PROMPT
         or "công thức" in SQL_GENERATOR_SYSTEM_PROMPT.lower()

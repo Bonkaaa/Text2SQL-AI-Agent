@@ -48,14 +48,15 @@ def fake_llm() -> FakeListChatModel:
 
 
 def test_get_supervisor_subagents(fake_llm):
-    """Kiểm tra khởi tạo danh sách 4 subagent chuyên biệt cho Supervisor."""
+    """Kiểm tra khởi tạo danh sách 5 subagent chuyên biệt cho Supervisor."""
     subagents = get_supervisor_subagents(
         tier1_model=fake_llm,
         tier2_model=fake_llm,
     )
-    assert len(subagents) == 4
+    assert len(subagents) == 5
 
     subagent_names = [sub["name"] for sub in subagents]
+    assert "consultation-agent" in subagent_names
     assert "schema-retriever" in subagent_names
     assert "sql-generator" in subagent_names
     assert "control-pipeline" in subagent_names
@@ -94,6 +95,12 @@ def test_create_text2sql_supervisor_graph_structure(fake_llm):
     tool_names = list(tools_node.bound.tools_by_name.keys())
     assert "write_todos" in tool_names
     assert "task" in tool_names
+    # Pure Orchestrator: Supervisor không trực tiếp ôm metadata tools (ủy quyền cho consultation-agent)
+    assert "search_tables_and_columns" not in tool_names
+    assert "get_column_samples_and_values" not in tool_names
+    assert "search_business_definition" not in tool_names
+
+
 
 
 def test_create_text2sql_supervisor_custom_skills_and_memory(fake_llm):
@@ -153,7 +160,10 @@ def test_run_supervisor_fast_path_clarification(mock_analyst_user, tmp_path: Pat
 
         assert result["status"] == "CLARIFICATION_REQUIRED"
         assert result["is_ambiguous"] is True
-        assert result["clarification_question"] == clarification_mock.clarification_question
+        assert (
+            result["clarification_question"]
+            == clarification_mock.clarification_question
+        )
         assert len(result["suggested_options"]) == 2
         assert result["data"] is None
 
@@ -179,7 +189,9 @@ def test_run_supervisor_execution_flow(mock_analyst_user, fake_llm, tmp_path: Pa
     mock_agent.invoke.return_value = {
         "messages": [
             MagicMock(content="Đã phân tích xong câu hỏi."),
-            MagicMock(content="Top 5 khách hàng chi tiêu cao nhất gồm Customer#001, Customer#002..."),
+            MagicMock(
+                content="Top 5 khách hàng chi tiêu cao nhất gồm Customer#001, Customer#002..."
+            ),
         ]
     }
 
@@ -212,7 +224,9 @@ def test_run_supervisor_execution_flow(mock_analyst_user, fake_llm, tmp_path: Pa
 
 
 @pytest.mark.asyncio
-async def test_arun_supervisor_execution_flow(mock_analyst_user, fake_llm, tmp_path: Path):
+async def test_arun_supervisor_execution_flow(
+    mock_analyst_user, fake_llm, tmp_path: Path
+):
     """Kiểm tra hàm bất đồng bộ arun_supervisor tương thích FastAPI endpoint."""
     clear_question = "Tổng doanh thu năm 1995 là bao nhiêu?"
 
@@ -311,14 +325,18 @@ def test_verify_pipeline_execution_integrity():
     # Case 2: Có gọi và có lần thành công
     msgs_success = [
         AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Syntax error"),
-        AIMessage(content="[control-pipeline] Truy vấn SQL thực thi THÀNH CÔNG (1500 records)"),
+        AIMessage(
+            content="[control-pipeline] Truy vấn SQL thực thi THÀNH CÔNG (1500 records)"
+        ),
     ]
     is_compromised, last_error = verify_pipeline_execution_integrity(msgs_success)
     assert is_compromised is False
 
     # Case 3: Có gọi nhưng tất cả các lần đều thất bại
     msgs_all_fail = [
-        AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Syntax error at or near 'Kiem'"),
+        AIMessage(
+            content="[control-pipeline] Truy vấn SQL THẤT BẠI: Syntax error at or near 'Kiem'"
+        ),
         AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: Table not found"),
     ]
     is_compromised, last_error = verify_pipeline_execution_integrity(msgs_all_fail)
@@ -326,7 +344,9 @@ def test_verify_pipeline_execution_integrity():
     assert "Table not found" in last_error
 
 
-def test_run_supervisor_failed_query_triggers_deterministic_fallback(mock_analyst_user, tmp_path: Path):
+def test_run_supervisor_failed_query_triggers_deterministic_fallback(
+    mock_analyst_user, tmp_path: Path
+):
     """Kiểm tra khi control-pipeline thất bại toàn bộ, Supervisor bắt buộc trả về EXECUTION_FAILED thay vì ảo tưởng số liệu."""
     from langchain_core.messages import AIMessage
 
@@ -340,7 +360,9 @@ def test_run_supervisor_failed_query_triggers_deterministic_fallback(mock_analys
     mock_agent.invoke.return_value = {
         "messages": [
             AIMessage(content="[control-pipeline] Truy vấn SQL THẤT BẠI: AST_ERROR"),
-            AIMessage(content="Theo thống kê, có khoảng 150,000 khách hàng trong hệ thống."),
+            AIMessage(
+                content="Theo thống kê, có khoảng 150,000 khách hàng trong hệ thống."
+            ),
         ]
     }
 
@@ -366,5 +388,53 @@ def test_run_supervisor_failed_query_triggers_deterministic_fallback(mock_analys
         assert "150,000" not in result["final_answer"]
         assert "Zero Hallucination" in result["final_answer"]
         assert "AST_ERROR" in result["final_answer"]
+
+
+def test_supervisor_delegates_to_consultation_subagent(mock_analyst_user):
+    """Kiểm tra Pure Orchestrator Supervisor ủy quyền cho consultation-agent qua task() để trả lời câu hỏi catalog."""
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    class TaskDelegationFakeChatModel(FakeListChatModel):
+        call_count: int = 0
+
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+        def invoke(self, messages, **kwargs):
+            self.call_count += 1
+            if self.call_count == 1:
+                # Lần 1: Supervisor gọi task(subagent_name="consultation-agent")
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "task",
+                            "args": {
+                                "subagent_name": "consultation-agent",
+                                "description": "Kiểm tra xem hệ thống có bảng customer không",
+                            },
+                            "id": "call_task_consult_1",
+                        }
+                    ],
+                )
+            # Lần 2: Nhận kết quả từ consultation-agent và trả lời người dùng
+            return AIMessage(
+                content="Hệ thống có bảng customer chứa thông tin khách hàng."
+            )
+
+    fake_model = TaskDelegationFakeChatModel(responses=[""])
+    subagents = get_supervisor_subagents(tier1_model=fake_model, tier2_model=fake_model)
+    agent = create_text2sql_supervisor(
+        model=fake_model,
+        subagents=subagents,
+    )
+
+    config = {"configurable": {"thread_id": "test_thread_delegation_consult"}}
+    input_state = {"messages": [HumanMessage(content="Hệ thống có bảng customer không?")]}
+    output = agent.invoke(input_state, config=config, context=mock_analyst_user)
+
+    assert "messages" in output
+    final_content = output["messages"][-1].content
+    assert "customer" in final_content
 
 

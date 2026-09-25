@@ -13,6 +13,7 @@ import re
 from typing import Any, Final
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import ToolMessage
 
 from src.agents.prompts import (
     SQL_GENERATOR_PROMPT,
@@ -20,6 +21,7 @@ from src.agents.prompts import (
     SQL_GENERATOR_SYSTEM_PROMPT,
     get_dialect_rules,
 )
+from src.agents.tools.metadata_tools import SQL_GENERATOR_TOOLS
 from src.config import get_settings
 from src.models.state import SQLGenerationResult
 from src.services import get_chat_model
@@ -80,7 +82,7 @@ def get_sql_generator_subagent(model: str | None = None) -> dict[str, Any]:
         ),
         "system_prompt": SQL_GENERATOR_SYSTEM_PROMPT,
         "mode": "isolated",
-        "tools": [],
+        "tools": SQL_GENERATOR_TOOLS,
         "model": active_model,
         "response_format": SQLGenerationResult,
     }
@@ -97,16 +99,20 @@ sql_generator_subagent: Final[dict[str, Any]] = get_sql_generator_subagent()
 
 def generate_sql(
     question: str,
-    schema_context: str,
+    schema_context: str = "",
     dialect: str = "duckdb",
     error_context: dict[str, Any] | None = None,
     llm: BaseChatModel | None = None,
+    tools: list[Any] | None = None,
+    max_tool_iterations: int = 5,
 ) -> SQLGenerationResult:
     """Sinh câu lệnh SQL chuẩn từ câu hỏi nghiệp vụ và ngữ cảnh lược đồ.
 
-    Hỗ trợ 2 luồng:
-    - First Attempt: Dùng SQL_GENERATOR_PROMPT (lần đầu tiên).
-    - Retry Flow: Dùng SQL_GENERATOR_RETRY_PROMPT nạp actionable_feedback từ error_context.
+    Hỗ trợ cơ chế Active Tool Calling trước khi sinh kết quả structured output:
+    - Tool 1: search_tables_and_columns (tra cứu DDL)
+    - Tool 2: get_column_samples_and_values (tra cứu categorical literals)
+    - Tool 3: find_join_path (tìm lộ trình JOIN & khóa ngoại qua BFS)
+    - Tool 4: search_business_definition (tra cứu công thức dbt Semantic Metrics)
 
     Args:
         question: Câu hỏi tự nhiên của người dùng.
@@ -114,6 +120,8 @@ def generate_sql(
         dialect: Dialect mục tiêu ('duckdb' hoặc 'bigquery').
         error_context: Lịch sử lỗi từ Control Pipeline ở chu kỳ retry trước (nếu có).
         llm: Instance Chat Model (nếu None sẽ tự khởi tạo Tier 1 qua get_chat_model).
+        tools: Danh sách tools cung cấp cho agent (mặc định SQL_GENERATOR_TOOLS).
+        max_tool_iterations: Số vòng lặp gọi tool tối đa (mặc định 5).
 
     Returns:
         SQLGenerationResult: Kết quả sinh câu lệnh SQL có cấu trúc.
@@ -156,8 +164,48 @@ def generate_sql(
             dialect_rules=dialect_rules,
         )
 
+    messages = list(prompt_messages)
+    active_tools = tools if tools is not None else SQL_GENERATOR_TOOLS
+    tool_map = {t.name: t for t in active_tools if hasattr(t, "name")}
+
+    # Vòng lặp Tool Calling điều tra ngữ cảnh (nếu mô hình hỗ trợ bind_tools)
+    if active_tools and hasattr(active_llm, "bind_tools"):
+        try:
+            llm_with_tools = active_llm.bind_tools(active_tools)
+            for _ in range(max_tool_iterations):
+                ai_msg = llm_with_tools.invoke(messages)
+                tool_calls = getattr(ai_msg, "tool_calls", None)
+                if not tool_calls or not isinstance(tool_calls, list):
+                    break
+
+                messages.append(ai_msg)
+                for tc in tool_calls:
+                    if not isinstance(tc, dict):
+                        continue
+                    tool_name = tc.get("name")
+                    tool_args = tc.get("args", {})
+                    tool_id = tc.get("id", "tool_call_id")
+
+                    selected_tool = tool_map.get(tool_name)
+                    if selected_tool is not None:
+                        try:
+                            tool_output = selected_tool.invoke(tool_args)
+                        except Exception as e:  # noqa: BLE001
+                            tool_output = f"Lỗi khi thực thi tool {tool_name}: {e}"
+                    else:
+                        tool_output = f"Công cụ '{tool_name}' không tồn tại."
+
+                    messages.append(
+                        ToolMessage(content=str(tool_output), tool_call_id=tool_id)
+                    )
+        except Exception as tool_err:  # noqa: BLE001
+            logger.debug(
+                "Bỏ qua bước gọi tool điều tra và chuyển sang structured output: %s",
+                tool_err,
+            )
+
     structured_llm = active_llm.with_structured_output(SQLGenerationResult)
-    result = structured_llm.invoke(prompt_messages)
+    result = structured_llm.invoke(messages)
 
     # Đảm bảo kết quả là instance SQLGenerationResult
     if isinstance(result, dict):

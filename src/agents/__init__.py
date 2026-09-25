@@ -5,6 +5,10 @@ from src.agents.clarification import (
     check_clarification_needed,
     get_random_suggested_options,
 )
+from src.agents.consultation import (
+    consultation_subagent,
+    get_consultation_subagent,
+)
 from src.agents.schema_retriever import (
     get_schema_retriever_subagent,
     retrieve_schema_context,
@@ -36,8 +40,10 @@ __all__ = [
     "arun_supervisor",
     "check_clarification_needed",
     "clean_sql_query",
+    "consultation_subagent",
     "create_text2sql_supervisor",
     "generate_sql",
+    "get_consultation_subagent",
     "get_random_suggested_options",
     "get_schema_retriever_subagent",
     "get_sql_generator_subagent",

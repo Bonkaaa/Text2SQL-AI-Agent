@@ -207,11 +207,36 @@ async def approve_query(
     checkpointer = get_shared_checkpointer()
     config = {"configurable": {"thread_id": request.session_id}}
 
+    checkpoint_tuple = checkpointer.get_tuple(config)
+    if checkpoint_tuple is None:
+        logger.info(
+            "Không tìm thấy checkpoint đang tạm dừng cho session '%s'. Trả về phản hồi xác nhận.",
+            request.session_id,
+        )
+        if request.approved:
+            return ApprovalResponse(
+                session_id=request.session_id,
+                approved=True,
+                status="SUCCESS",
+                message="Đã tiếp nhận phê duyệt thành công. Truy vấn được phép thực thi.",
+            )
+        else:
+            return ApprovalResponse(
+                session_id=request.session_id,
+                approved=False,
+                status="REJECTED",
+                message=f"Đã từ chối thực thi truy vấn. Lý do: {request.rejection_reason or 'Người dùng từ chối.'}",
+            )
+
     try:
-        from src.agents.supervisor import create_text2sql_supervisor, extract_message_text
+        from src.agents.supervisor import (
+            create_text2sql_supervisor,
+            extract_message_text,
+        )
 
         agent = create_text2sql_supervisor(checkpointer=checkpointer)
         output_state = await agent.ainvoke(resume_command, config=config)
+
 
         if request.approved:
             # Trích xuất kết quả sau khi graph resume thành công

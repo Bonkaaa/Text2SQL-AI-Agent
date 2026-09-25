@@ -18,7 +18,9 @@ def test_supervisor_prompt_structure_and_reexport():
     assert "supervisor" in prompt_lower
     assert "tpc-h" in prompt_lower
 
-    # 2. Kiểm tra danh sách 4 Subagents
+    # 2. Kiểm tra danh sách Subagents chính
+    assert "consultation-agent" in prompt_lower
+    assert "analytics-subagent" in prompt_lower
     assert "schema-retriever" in prompt_lower
     assert "sql-generator" in prompt_lower
     assert "control-pipeline" in prompt_lower
@@ -33,3 +35,24 @@ def test_supervisor_prompt_structure_and_reexport():
     # 4. Kiểm tra nguyên tắc an toàn
     assert "select" in prompt_lower
     assert "chỉ cho phép truy vấn đọc" in prompt_lower or "chỉ cho phép" in prompt_lower
+
+
+def test_supervisor_prompt_pure_orchestrator_delegation():
+    """Kiểm tra Supervisor Prompt tuân thủ Pure Orchestrator: ủy quyền consultation-agent và analytics-subagent."""
+    prompt = SUPERVISOR_SYSTEM_PROMPT
+    prompt_lower = prompt.lower()
+
+    # 1. Kiểm tra vai trò Pure Orchestrator
+    assert "orchestrator" in prompt_lower or "nhạc trưởng" in prompt_lower or "điều phối" in prompt_lower
+
+    # 2. Kiểm tra ủy quyền consultation-agent cho câu hỏi xã giao & metadata
+    assert "consultation-agent" in prompt
+    assert "task(" in prompt
+
+    # 3. Kiểm tra ủy quyền analytics-subagent cho câu hỏi phân tích dữ liệu
+    assert "analytics-subagent" in prompt
+
+    # 4. Kiểm tra nguyên tắc zero data = zero insight
+    assert "zero data = zero insight" in prompt_lower
+
+

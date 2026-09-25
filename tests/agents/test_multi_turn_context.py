@@ -100,12 +100,24 @@ def test_run_supervisor_uses_shared_checkpointer(analyst_user):
     mock_agent = MagicMock()
     mock_agent.invoke.side_effect = [
         {"messages": [HumanMessage(content="Câu 1"), AIMessage(content="Đáp án 1")]},
-        {"messages": [HumanMessage(content="Câu 1"), AIMessage(content="Đáp án 1"), HumanMessage(content="Câu 2"), AIMessage(content="Đáp án 2")]},
+        {
+            "messages": [
+                HumanMessage(content="Câu 1"),
+                AIMessage(content="Đáp án 1"),
+                HumanMessage(content="Câu 2"),
+                AIMessage(content="Đáp án 2"),
+            ]
+        },
     ]
 
     with (
-        patch("src.agents.supervisor.check_clarification_needed", return_value=clarification_mock),
-        patch("src.agents.supervisor.create_text2sql_supervisor", return_value=mock_agent),
+        patch(
+            "src.agents.supervisor.check_clarification_needed",
+            return_value=clarification_mock,
+        ),
+        patch(
+            "src.agents.supervisor.create_text2sql_supervisor", return_value=mock_agent
+        ),
     ):
         res1 = run_supervisor(
             question="Câu 1",

@@ -214,6 +214,23 @@ class Settings(BaseSettings):
         """Tập hợp tên các cột thời gian/phân vùng để kiểm tra điều kiện lọc (chuẩn hóa viết thường)."""
         return {c.strip().lower() for c in self.hitl_time_columns.split(",") if c.strip()}
 
+    # --- Analytics Subagent & Multi-Query Budget (Architecture v4.0) ---
+    max_analysis_tasks: int = Field(
+        default=3,
+        gt=0,
+        description="Số lượng nhiệm vụ tối đa được phân rã trong một kế hoạch phân tích AnalysisPlan",
+    )
+    max_analysis_queries: int = Field(
+        default=5,
+        gt=0,
+        description="Số lượng truy vấn SQL tối đa được phép chạy trong một phiên phân tích (bao gồm retry)",
+    )
+    max_analysis_runtime_seconds: int = Field(
+        default=120,
+        gt=0,
+        description="Thời gian tối đa (giây) cho toàn bộ phiên phân tích dữ liệu đa truy vấn",
+    )
+
     # --- Observability & Execution Traces ---
     enable_trace_logging: bool = Field(
         default=True,
