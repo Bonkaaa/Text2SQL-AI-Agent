@@ -541,3 +541,30 @@ def test_extract_sql_from_text_various_formats():
     extracted_cte = extract_sql_from_text(cte_sql)
     assert extracted_cte.startswith("WITH cust_orders AS")
     assert "Hãy chạy" not in extracted_cte
+
+
+def test_pipeline_audit_records_natural_question(
+    shared_tpch_connector: DuckDBConnector, temp_audit_logger: AuditLogger
+):
+    """Kiểm tra AuditEvent ghi nhận đúng câu hỏi tự nhiên thay vì ghi đè bằng câu SQL."""
+    user_context = UserContext(
+        user_id="analyst_1",
+        session_id="session_audit_q",
+        role=UserRole.ANALYST,
+    )
+    input_data: ControlPipelineInput = {
+        "sql": "SELECT count(*) FROM customer",
+        "question": "Có bao nhiêu khách hàng trong cơ sở dữ liệu?",
+        "user_context": user_context,
+        "session_id": "session_audit_q",
+    }
+    graph = build_control_pipeline_graph(
+        db_connector=shared_tpch_connector, audit_logger=temp_audit_logger
+    )
+    output = run_control_pipeline(graph, input_data)
+    assert output["is_valid"] is True
+
+    logs = temp_audit_logger.get_logs(session_id="session_audit_q")
+    assert len(logs) == 1
+    assert logs[0].question == "Có bao nhiêu khách hàng trong cơ sở dữ liệu?"
+    assert "COUNT(*)" in logs[0].sql.upper()

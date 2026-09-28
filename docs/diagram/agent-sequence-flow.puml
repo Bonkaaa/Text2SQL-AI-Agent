@@ -1,0 +1,115 @@
+@startuml
+skinparam handwritten false
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam roundcorner 4
+skinparam participantBorderColor #334155
+skinparam participantBackgroundColor #F8FAFC
+skinparam sequenceLifeLineBorderColor #64748B
+
+actor "Người Dùng (Client)" as User
+participant "FastAPI\n(/query/ask)" as API
+participant "PreflightGatekeeper\n(Regex & LLM)" as Gatekeeper
+participant "Master Supervisor\n(DeepAgent Tier 1)" as Supervisor
+participant "Analytics Subgraph\n(LangGraph v4.0)" as Analytics
+participant "Task Executor &\nSQL Generator" as Executor
+participant "Control Pipeline\n(Deterministic Subgraph)" as Control
+participant "HITL Gatekeeper\n(interrupt)" as HITL
+database "Warehouse\n(DuckDB Engine)" as Warehouse
+
+User -> API: POST /ask (question, user_context, session_id)
+activate API
+
+API -> Gatekeeper: evaluate_input_preflight(question)
+activate Gatekeeper
+alt Phát hiện DDL/DML / Prompt Injection
+    Gatekeeper --> API: PreflightDecision(SECURITY_BLOCKED, refusal_message)
+    API --> User: QueryResponse(status="SECURITY_BLOCKED", refusal_reason)
+else Phát hiện câu hỏi mơ hồ
+    Gatekeeper --> API: PreflightDecision(CLARIFICATION_REQUIRED, options)
+    API --> User: QueryResponse(status="CLARIFICATION_REQUIRED", suggested_options)
+else Câu hỏi hợp lệ (ALLOWED)
+    Gatekeeper --> API: PreflightDecision(ALLOWED)
+end
+deactivate Gatekeeper
+
+API -> Supervisor: arun_supervisor(question, user_context, checkpointer)
+activate Supervisor
+
+Supervisor -> Supervisor: TodoListMiddleware: lập kế hoạch phân bổ tác vụ
+
+alt Intent = CONVERSATION / METADATA
+    Supervisor -> Supervisor: Giao cho consultation-agent (Metadata Tools)
+    Supervisor --> API: Tra cứu danh mục / Trả lời xã giao (No SQL)
+else Intent = ANALYTICS
+    Supervisor -> Analytics: ainvoke() Analytics Subgraph
+    activate Analytics
+
+    Analytics -> Analytics: planner_node: sinh AnalysisPlan (1-3 tasks)
+
+    loop Cho từng Task trong AnalysisPlan (Tối đa 3 lần Retry nếu lỗi)
+        Analytics -> Executor: aexecute_analysis_task(task, prior_artifacts)
+        activate Executor
+
+        Executor -> Executor: Schema Retriever: DDL bảng & Categorical Values
+        Executor -> Executor: SQL Generator: sinh câu lệnh DuckDB SQL
+
+        Executor -> Control: run_control_pipeline(sql, user_context)
+        activate Control
+
+        Control -> Control: ast_check: sqlglot kiểm tra gốc cú pháp SELECT
+        Control -> Control: rbac_check: kiểm tra quyền bảng/cột nhạy cảm
+        Control -> Control: cost_guard: EXPLAIN dry-run & quét dung lượng
+
+        alt Truy vấn vượt ngưỡng rủi ro (Composite Risk > Threshold)
+            Control -> HITL: hitl_gate: kích hoạt interrupt()
+            activate HITL
+            HITL --> Supervisor: Trạng thái PENDING_APPROVAL
+            Supervisor --> API: Phản hồi yêu cầu phê duyệt
+            API --> User: QueryResponse(status="PENDING_APPROVAL", requires_hitl=True)
+            
+            note over User, HITL
+              Người dùng gửi POST /approve (approved=True)
+              API resume graph: Command(resume={"hitl_approved": True})
+            end note
+            
+            User -> API: POST /approve (session_id, approved=True)
+            API -> HITL: Resume graph với Command(resume=True)
+            HITL --> Control: Cho phép tiếp tục thực thi
+            deactivate HITL
+        end
+
+        Control -> Warehouse: Thực thi truy vấn (Timeout 30s, Row Limit)
+        activate Warehouse
+        Warehouse --> Control: Kết quả dữ liệu thô (Rows, Columns, Scanned Bytes)
+        deactivate Warehouse
+
+        alt Thực thi thành công
+            Control -> Control: audit_node: ghi log kiểm toán
+            Control --> Executor: ControlPipelineOutput(is_valid=True, data, columns)
+        else Gặp lỗi cú pháp / schema / runtime
+            Control -> Control: err_node -> diagnostic (LLM phân tích & gợi ý sửa)
+            Control --> Executor: ControlPipelineOutput(is_valid=False, error_context)
+            note over Executor: Tự sửa lỗi (Self-Correction Loop attempt <= 3)
+        end
+        deactivate Control
+
+        Executor --> Analytics: QueryArtifact(status="SUCCESS" / "FAILED", sql, data)
+        deactivate Executor
+    end
+
+    Analytics -> Analytics: evidence_node: đánh giá tính đầy đủ của dữ liệu
+    Analytics -> Analytics: presentation_node: ResponseSynthesizer (2 nhịp)
+    Analytics -> Analytics: Data Hydration: rót dữ liệu thật 100% vào KPI & Recharts
+    Analytics --> Supervisor: ResponsePackage(direct_answer, artifacts, insights)
+    deactivate Analytics
+end
+
+Supervisor -> Supervisor: Zero-Hallucination Integrity Guard: kiểm tra tính toàn vẹn
+Supervisor --> API: Kết quả tổng hợp cuối cùng
+deactivate Supervisor
+
+API --> User: QueryResponse(status="COMPLETED", data, columns, recharts_config, artifacts)
+deactivate API
+@enduml

@@ -8,9 +8,14 @@ START -> planner -> executor -> evidence -> [should_continue?] -> presentation -
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
-from typing import Literal
+from typing import Any, Literal
 
+from deepagents import CompiledSubAgent
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -21,6 +26,7 @@ from src.agents.analytics.nodes import (
     planner_node,
     presentation_node,
 )
+from src.models.rbac import UserContext, UserRole
 from src.models.state import AnalyticsState
 
 logger = logging.getLogger(__name__)
@@ -98,3 +104,128 @@ def build_analytics_graph(
 
     # 4. Biên dịch đồ thị
     return workflow.compile(checkpointer=checkpointer)
+
+
+def create_analytics_subagent_runnable(
+    graph: CompiledStateGraph | None = None,
+) -> RunnableLambda:
+    """Tạo RunnableLambda bọc LangGraph Analytics Subgraph.
+
+    deepagents yêu cầu SubAgent trả về state có chứa trường 'messages' để trích xuất nội dung
+    gửi ngược lại cho parent agent dưới dạng ToolMessage.
+    """
+    active_graph = graph or build_analytics_graph()
+
+    async def _async_runner(state: dict[str, Any]) -> dict[str, Any]:
+        # 1. Trích xuất câu hỏi từ state hoặc từ messages
+        question = state.get("question")
+        if not question:
+            messages = state.get("messages", [])
+            for msg in reversed(messages):
+                content = getattr(msg, "content", "")
+                if content:
+                    question = str(content)
+                    break
+        if not question:
+            question = state.get("description", "")
+
+        user_context = state.get("user_context")
+        session_id = state.get("session_id", "default_session")
+
+        if not user_context:
+            user_context = UserContext(
+                user_id="default_analyst",
+                session_id=session_id,
+                role=UserRole.ANALYST,
+            )
+
+        input_data = {
+            "question": question or "",
+            "user_context": user_context,
+            "session_id": session_id,
+            "artifacts": [],
+        }
+
+        output = await active_graph.ainvoke(input_data)
+
+        # 2. Định dạng thông điệp tóm tắt gửi về cho Supervisor
+        response_package = output.get("response_package")
+        insight = output.get("insight")
+        if response_package and getattr(response_package, "direct_answer", None):
+            summary = response_package.direct_answer
+        elif insight:
+            summary = str(insight)
+        else:
+            summary = "Hoàn tất phân tích dữ liệu chuyên sâu."
+
+        # 3. Trích xuất primary SQL và data cho backward compatibility
+        artifacts = output.get("artifacts", []) or []
+        primary_sql = None
+        primary_data = None
+        primary_columns = None
+        for a in artifacts:
+            if getattr(a, "status", "") == "SUCCESS":
+                primary_sql = getattr(a, "sql", None)
+                primary_data = getattr(a, "data", None)
+                primary_columns = getattr(a, "columns", None)
+                break
+
+        output_artifacts_dump: list[dict[str, Any]] = []
+        if response_package and hasattr(response_package, "artifacts"):
+            for item in response_package.artifacts:
+                if hasattr(item, "model_dump"):
+                    output_artifacts_dump.append(item.model_dump())
+                elif isinstance(item, dict):
+                    output_artifacts_dump.append(item)
+
+        return {
+            **state,
+            "messages": [AIMessage(content=summary)],
+            "response_package": response_package.model_dump()
+            if response_package and hasattr(response_package, "model_dump")
+            else response_package,
+            "output_artifacts": output_artifacts_dump,
+            "artifacts": artifacts,
+            "plan": output.get("plan"),
+            "insight": summary,
+            "visualization": output.get("visualization"),
+            "sql": primary_sql,
+            "data": primary_data,
+            "columns": primary_columns,
+            "status": output.get("status", "COMPLETED"),
+        }
+
+    def _sync_runner(state: dict[str, Any]) -> dict[str, Any]:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(lambda: asyncio.run(_async_runner(state))).result()
+        else:
+            return asyncio.run(_async_runner(state))
+
+    return RunnableLambda(func=_sync_runner, afunc=_async_runner)
+
+
+def get_analytics_subagent(
+    graph: CompiledStateGraph | None = None,
+) -> CompiledSubAgent:
+    """Tạo cấu hình CompiledSubAgent cho Analytics Subgraph theo chuẩn deepagents.
+
+    Đóng gói StateGraph phân tích v4 (Phase 2 & 3) thành một CompiledSubAgent mà
+    Deep Agent Master Supervisor có thể gọi qua công cụ task('analytics-subagent', ...).
+    """
+    runnable = create_analytics_subagent_runnable(graph=graph)
+    return {
+        "name": "analytics-subagent",
+        "description": (
+            "Subagent phân tích dữ liệu thông minh toàn trình (CompiledSubAgent bọc LangGraph Analytics Subgraph), "
+            "tự động lập kế hoạch phân tích (AnalysisPlan), điều phối các truy vấn SQL qua chốt chặn an toàn, "
+            "đánh giá tính đầy đủ của dữ liệu (Evidence Analyzer) và tổng hợp trực quan hóa đa chiều (ResponsePackage)."
+        ),
+        "runnable": runnable,
+        "mode": "isolated",
+    }

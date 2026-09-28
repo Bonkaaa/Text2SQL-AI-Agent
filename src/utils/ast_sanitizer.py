@@ -18,6 +18,9 @@ class ASTValidationResult(BaseModel):
     columns_used: list[str] = Field(
         default_factory=list, description="Danh sách các cột được tham chiếu"
     )
+    has_star: bool = Field(
+        default=False, description="True nếu câu lệnh có sử dụng wildcard (*)"
+    )
     error_type: str | None = Field(
         default=None, description="Mã phân loại lỗi (nếu có)"
     )
@@ -122,11 +125,31 @@ def sanitize_and_validate_sql(
         if tbl_name and tbl_name not in cte_names:
             tables_used_set.add(tbl_name)
 
+    has_star = False
+    for star in expression.find_all(exp.Star):
+        if star.find_ancestor(exp.Count) is None:
+            has_star = True
+            break
+
     columns_used_set: set[str] = set()
     for col in expression.find_all(exp.Column):
         col_name = col.name.lower()
         if col_name and col_name != "*":
             columns_used_set.add(col_name)
+        elif col_name == "*" and col.find_ancestor(exp.Count) is None:
+            has_star = True
+
+    # Nếu câu lệnh sử dụng wildcard (*), mở rộng danh sách cột theo schema chuẩn (Phòng thủ RBAC)
+    if has_star:
+        from src.utils.schema_context import TPCH_TABLE_COLUMNS
+
+        for tbl in tables_used_set:
+            if tbl in TPCH_TABLE_COLUMNS:
+                for col_name in TPCH_TABLE_COLUMNS[tbl]:
+                    columns_used_set.add(col_name.lower())
+            else:
+                # Đánh dấu bảng ngoài danh mục có wildcard để RBAC thực hiện Fail-Closed
+                columns_used_set.add("*")
 
     # 6. Ép mệnh đề LIMIT an toàn
     if enforce_limit:
@@ -150,4 +173,5 @@ def sanitize_and_validate_sql(
         sanitized_sql=sanitized_sql,
         tables_used=sorted(tables_used_set),
         columns_used=sorted(columns_used_set),
+        has_star=has_star,
     )

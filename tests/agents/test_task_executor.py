@@ -329,4 +329,3 @@ async def test_execute_task_wires_schema_retriever(sample_user_context):
 
         mock_retrieve.assert_called_once_with(task.description)
         assert mock_gen.call_args[1]["schema_context"] == "### Schema Context Orders"
-

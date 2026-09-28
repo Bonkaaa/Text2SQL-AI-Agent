@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", description="Host lắng nghe của FastAPI")
     api_port: int = Field(default=8000, description="Port chạy server")
     api_prefix: str = Field(default="/api/v1", description="Prefix đường dẫn API")
+    admin_api_key: str | None = Field(
+        default=None,
+        description="Mã khóa API bí mật bảo vệ quyền ADMIN server-side (X-Admin-Token)",
+    )
 
     # --- LLM Providers & Tiering Strategy ---
     llm_provider: Literal["openai", "gemini", "deepseek", "mistral"] = Field(
@@ -106,6 +110,18 @@ class Settings(BaseSettings):
         if not self.tier2_model:
             self.tier2_model = default_t2
         return self
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Self:
+        """Đảm bảo bảo mật nghiêm ngặt trong môi trường production (Fail-closed at startup)."""
+        if self.app_env == "production" and (
+            not self.admin_api_key or len(self.admin_api_key.strip()) < 16
+        ):
+            raise ValueError(
+                "admin_api_key bắt buộc phải được cấu hình và dài tối thiểu 16 ký tự trong môi trường production."
+            )
+        return self
+
     llm_temperature: float = Field(
         default=0.0,
         ge=0.0,
@@ -118,7 +134,12 @@ class Settings(BaseSettings):
 
     # --- Database & Warehouse ---
     duckdb_path: str = Field(
-        default="./data/tpch.duckdb", description="Đường dẫn file DuckDB local"
+        default="./data/tpcds.duckdb",
+        description="Đường dẫn file DuckDB local (chuẩn TPC-DS 24 bảng)",
+    )
+    pending_approvals_db_path: str = Field(
+        default="./data/pending_approvals.sqlite",
+        description="Đường dẫn SQLite lưu trữ bền vững pending approvals và session ownership",
     )
     bigquery_project: str | None = Field(
         default=None, description="Google Cloud Project ID"
@@ -132,7 +153,9 @@ class Settings(BaseSettings):
         default=1000, gt=0, description="Giới hạn số dòng tối đa cho phép trả về"
     )
     max_retries: int = Field(
-        default=3, gt=0, description="Số lần tối đa tự sửa lỗi SQL khi gặp ngoại lệ"
+        default=3,
+        gt=0,
+        description="Số lần tối đa tự sửa lỗi SQL khi gặp ngoại lệ (được clamp tối đa 3 ở runtime theo guardrail)",
     )
     max_bytes_scanned: int = Field(
         default=1073741824,
@@ -184,6 +207,11 @@ class Settings(BaseSettings):
         default=True,
         description="Bật/tắt cơ chế đánh giá rủi ro và phê duyệt Human-In-The-Loop (HITL)",
     )
+    hitl_lease_timeout_seconds: int = Field(
+        default=60,
+        gt=0,
+        description="Thời gian timeout (giây) cho lease trạng thái PROCESSING trước khi cho phép reclaim",
+    )
     hitl_budget_ratio_threshold: float = Field(
         default=0.4,
         ge=0.0,
@@ -196,29 +224,34 @@ class Settings(BaseSettings):
         description="Số lượng dòng quét ước tính tối đa cho phép chạy tự động mà không cần duyệt HITL",
     )
     hitl_heavy_tables: str = Field(
-        default="lineitem,orders",
+        default="store_sales,catalog_sales,web_sales,inventory,lineitem,orders",
         description="Danh sách các bảng kích thước lớn (Heavy Tables) phân tách bằng dấu phẩy, cấu hình linh hoạt theo từng DB",
     )
     hitl_time_columns: str = Field(
-        default="shipdate,orderdate,date,created_at,timestamp",
+        default="sold_date_sk,d_date,date_sk,shipdate,orderdate,date,created_at,timestamp",
         description="Danh sách các cột phân vùng / mốc thời gian dùng để kiểm tra tính đầy đủ của bộ lọc WHERE",
     )
 
     @property
     def heavy_tables_set(self) -> set[str]:
         """Tập hợp các bảng lớn có rủi ro chi phí cao (chuẩn hóa viết thường)."""
-        return {t.strip().lower() for t in self.hitl_heavy_tables.split(",") if t.strip()}
+        return {
+            t.strip().lower() for t in self.hitl_heavy_tables.split(",") if t.strip()
+        }
 
     @property
     def time_columns_set(self) -> set[str]:
         """Tập hợp tên các cột thời gian/phân vùng để kiểm tra điều kiện lọc (chuẩn hóa viết thường)."""
-        return {c.strip().lower() for c in self.hitl_time_columns.split(",") if c.strip()}
+        return {
+            c.strip().lower() for c in self.hitl_time_columns.split(",") if c.strip()
+        }
 
     # --- Analytics Subagent & Multi-Query Budget (Architecture v4.0) ---
     max_analysis_tasks: int = Field(
         default=3,
-        gt=0,
-        description="Số lượng nhiệm vụ tối đa được phân rã trong một kế hoạch phân tích AnalysisPlan",
+        ge=1,
+        le=3,
+        description="Số lượng nhiệm vụ tối đa được phân rã trong một kế hoạch phân tích AnalysisPlan (tối đa 3 theo architecture v4)",
     )
     max_analysis_queries: int = Field(
         default=5,

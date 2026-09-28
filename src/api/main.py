@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse
 from src.api.routes import audit_router, query_router
 from src.config import get_settings
 from src.models.api_schemas import HealthResponse
-from src.utils.tpch_seeder import seed_tpch_data
+from src.utils.tpcds_seeder import seed_tpcds_data
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +35,19 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     """Quản lý vòng đời khởi động và tắt ứng dụng FastAPI.
 
-    - Khởi động: Kiểm tra / nạp dữ liệu mẫu TPC-H vào DuckDB nếu chưa có.
+    - Khởi động: Kiểm tra / nạp dữ liệu mẫu TPC-DS (24 bảng) vào DuckDB nếu chưa có.
     - Dọn dẹp: Đóng các kết nối khi ứng dụng dừng hoạt động.
     """
     settings = get_settings()
     logger.info("Đang khởi động FastAPI Gateway (%s)...", settings.app_env)
 
     try:
-        # Nạp dữ liệu DuckDB TPC-H scale factor 0.01 phục vụ truy vấn
-        seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.01)
-        logger.info("Khởi tạo kết nối DuckDB TPC-H thành công tại '%s'.", settings.duckdb_path)
+        # Nạp dữ liệu DuckDB TPC-DS scale factor 0.01 phục vụ truy vấn
+        seed_tpcds_data(db_path=settings.duckdb_path, scale_factor=0.01)
+        logger.info(
+            "Khởi tạo kết nối DuckDB TPC-DS (24 bảng) thành công tại '%s'.",
+            settings.duckdb_path,
+        )
     except (OSError, RuntimeError, duckdb.DatabaseError) as exc:
         logger.warning("Cảnh báo khi khởi tạo DuckDB trong lifespan: %s", exc)
 
@@ -63,7 +66,7 @@ app = FastAPI(
     title="Text-to-SQL AI Agent Self-Service Analytics API",
     description=(
         "Hệ thống AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp "
-        "(Chuẩn TPC-H Benchmark). Tích hợp DeepAgents Supervisor, LangGraph Control Pipeline, "
+        "(Chuẩn TPC-DS Benchmark - 24 bảng). Tích hợp DeepAgents Supervisor, LangGraph Control Pipeline, "
         "và Recharts JSON Visualization."
     ),
     version="1.0.0",

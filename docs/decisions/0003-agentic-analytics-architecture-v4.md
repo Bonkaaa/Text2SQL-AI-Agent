@@ -46,9 +46,8 @@ Trong quá trình đánh giá thực tế trên bộ dữ liệu chuỗi cung �
   - **Tầng Điều Phối Trò Chuyện (DeepAgents Supervisor)**: Tiếp tục giữ vai trò Front Controller, quản lý `thread_id`, context hội thoại, và phân luồng thông qua `Intent Router` (`CONVERSATION` vs `ANALYTICS`).
   - **Tầng Phân Tích Chuyên Sâu (Analytics Subgraph)**: Đóng gói toàn bộ quy trình phân tích thành một Subgraph LangGraph khép kín, được đăng ký dưới dạng `CompiledSubAgent` (hoặc Callable Structured Tool) trong Supervisor.
   - **Kế hoạch Phân Tích Tuần Tự (`AnalysisPlan`)**: Cho phép phân rã bài toán thành tối đa 3 nhiệm vụ truy vấn tuần tự.
-  - **Kế Thừa Hàng Rào Kiểm Duyệt Tất Định**: Lồng ghép trực tiếp `Control Subgraph` của v3.0 (AST, RBAC, Cost, HITL, DB Executor, Diagnostic Agent) vào từng vòng lặp truy vấn.
-  - **Phân rã chức năng Phân Tích & Trình Diễn**: Tách thành `DataAnalyzer` (chuyên tính toán số liệu và xác nhận giả thuyết) và `PresentationSynthesizer` (chuyên tạo `ChartSpec`, `TableSpec`).
-  - **Định Kiểu Mạnh Toàn Diện (Typed Artifact Contract)**: Bỏ hoàn toàn regex; API trao đổi trực tiếp qua Pydantic V2 Model `ArtifactBundle`.
+  - **Phân rã chức năng Phân Tích & Trình Diễn Linh Hoạt**: Tách thành `DataAnalyzer` (chuyên tính toán số liệu và xác nhận giả thuyết) và `ResponseSynthesizer` (One-Shot Spec Selection + Deterministic Data Hydration tạo tổ hợp linh hoạt: KPI, Chart, Table, Callout).
+  - **Định Kiểu Mạnh Toàn Diện (Typed Artifact Contract)**: Bỏ hoàn toàn regex; API trao đổi trực tiếp qua Pydantic V2 Model `ResponsePackage` (tương thích ngược với `ArtifactBundle`).
 
 ---
 
@@ -66,7 +65,7 @@ Tách biệt hoàn toàn hai ngân sách kiểm soát để ngăn ngừa vòng l
 2. **Per-Query Error Retry Budget**: `max_query_retries = 3` (Một truy vấn bị lỗi chỉ được phép sửa tối đa 3 lần thông qua `DiagnosticAgent`).
 
 ### 3.3. Hợp đồng định kiểu Pydantic (Zero-Regex Contract)
-- Toàn bộ kết quả từ Subgraph trả về cho API backend phải tuân thủ nghiêm ngặt mô hình `ArtifactBundle` (`src/models/artifacts.py`).
+- Toàn bộ kết quả từ Subgraph trả về cho API backend phải tuân thủ nghiêm ngặt mô hình `ResponsePackage` (`src/models/artifacts.py`).
 - Cấm tuyệt đối việc sử dụng `re.search` để bóc tách SQL hoặc chuỗi JSON từ tin nhắn văn bản trong `src/api/routes/query.py`.
 
 ### 3.4. Chiến lược Kho dữ liệu đa môi trường (Dual Warehouse Strategy)
@@ -80,7 +79,7 @@ Tách biệt hoàn toàn hai ngân sách kiểm soát để ngăn ngừa vòng l
 ### 4.1. Lợi ích đạt được (Positive Impacts)
 - **Nâng cao năng lực giải quyết bài toán**: Hệ thống có khả năng giải quyết các câu hỏi phân tích kinh doanh đa chiều mà kiến trúc v3.0 bất khả thi.
 - **Tăng độ ổn định của API**: Loại bỏ hoàn toàn lỗi crash giao diện do regex bóc tách thất bại.
-- **Biểu đồ trực quan chuẩn xác**: Tách biệt khâu phân tích số liệu giúp `PresentationSynthesizer` sinh cấu hình Recharts nhất quán, không bị hallucinate trường dữ liệu.
+- **Biểu đồ & đầu ra linh hoạt, chuẩn xác**: Cơ chế One-Shot Spec + Data Hydration giúp `ResponseSynthesizer` tự do kết hợp bất kỳ tổ hợp nào (Text, KPI, Chart, Table) mà không bị bùng nổ latency và 100% không hallucinate số liệu.
 - **Kế thừa 100% cơ chế an ninh**: Không phải viết lại khâu AST Sanitizer, RBAC và HITL.
 
 ### 4.2. Thách thức & Biện pháp giảm thiểu (Risks & Mitigations)

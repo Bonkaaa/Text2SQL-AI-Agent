@@ -10,6 +10,7 @@ from src.models.artifacts import (
     PreflightDecision,
     PreflightDecisionType,
     QueryArtifact,
+    ResponsePackage,
     SafetyCategory,
 )
 from src.models.rbac import UserContext
@@ -181,12 +182,15 @@ class SynthesizerResult(BaseModel):
     )
 
 
-class ControlPipelineInput(TypedDict):
+class ControlPipelineInput(TypedDict, total=False):
     """Input đầu vào cho LangGraph Control Pipeline."""
 
     sql: str
     user_context: UserContext
     session_id: str
+    question: str | None
+    hitl_required: bool
+    hitl_approved: bool | None
 
 
 class ControlPipelineOutput(TypedDict):
@@ -218,6 +222,7 @@ class ControlState(TypedDict, total=False):
     """Trạng thái nội bộ của Subgraph LangGraph Control Pipeline."""
 
     sql: str
+    question: str | None
     user_context: UserContext
     session_id: str
     schema_context: str | None
@@ -240,6 +245,7 @@ class ControlState(TypedDict, total=False):
     ast_valid: bool
     tables_used: list[str]
     columns_used: list[str]
+    has_star: bool
 
     # Kết quả kiểm duyệt RBAC
     rbac_valid: bool
@@ -295,6 +301,7 @@ class AgentState(TypedDict, total=False):
     response_insight: str | None
     visualization_config: dict[str, Any] | None
     artifact_bundle: ArtifactBundle | None
+    response_package: ResponsePackage | None
 
 
 class AnalyticsState(TypedDict, total=False):
@@ -308,6 +315,7 @@ class AnalyticsState(TypedDict, total=False):
     current_evaluation: EvidenceEvaluation | None
     insight: str | None
     visualization: dict[str, Any] | None
+    response_package: ResponsePackage | None
     status: Literal["COMPLETED", "PARTIAL", "FAILED"]
     error_message: str | None
 

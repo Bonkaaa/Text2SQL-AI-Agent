@@ -90,10 +90,11 @@ async def generate_analysis_plan(
 
         plan.max_tasks = configured_max_tasks
 
-        # Chuẩn hóa task_id nếu cần
+        # Chuẩn hóa task_id nếu cần và gắn plan_id để cô lập ngữ cảnh
         for idx, task in enumerate(plan.tasks):
             if not task.task_id or not task.task_id.startswith("task_"):
                 task.task_id = f"task_{idx + 1}"
+            task.plan_id = plan.plan_id
 
         return plan
 

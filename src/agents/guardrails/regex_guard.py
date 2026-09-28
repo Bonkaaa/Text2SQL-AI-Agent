@@ -42,16 +42,14 @@ class RegexGuardResult(BaseModel):
         description="True nếu không phát hiện mẫu độc hại nào; False nếu bị chặn an ninh"
     )
     violation_type: RegexViolationType | None = Field(
-        default=None,
-        description="Loại vi phạm an ninh nếu is_safe là False"
+        default=None, description="Loại vi phạm an ninh nếu is_safe là False"
     )
     matched_pattern: str | None = Field(
         default=None,
-        description="Đoạn văn bản hoặc regex pattern đã kích hoạt cảnh báo"
+        description="Đoạn văn bản hoặc regex pattern đã kích hoạt cảnh báo",
     )
     refusal_message: str | None = Field(
-        default=None,
-        description="Thông báo từ chối tĩnh chuẩn hóa gửi cho người dùng"
+        default=None, description="Thông báo từ chối tĩnh chuẩn hóa gửi cho người dùng"
     )
 
 
@@ -93,7 +91,9 @@ _DDL_DML_PATTERNS: Final[list[re.Pattern[str]]] = [
     re.compile(r"\brevoke\s+.+\s+from\s+\w+\b", re.IGNORECASE),
     # Batch injection & Comment tricks
     re.compile(r";\s*--", re.IGNORECASE),
-    re.compile(r";\s*(drop|delete|insert|update|alter|truncate|create)\b", re.IGNORECASE),
+    re.compile(
+        r";\s*(drop|delete|insert|update|alter|truncate|create)\b", re.IGNORECASE
+    ),
     # UNION injection
     re.compile(r"\bunion\s+(all\s+)?select\b", re.IGNORECASE),
     # System probing & backdoors
@@ -104,13 +104,28 @@ _DDL_DML_PATTERNS: Final[list[re.Pattern[str]]] = [
 # Nhóm 2: Prompt Injection & System Prompt Exfiltration
 _PROMPT_INJECTION_PATTERNS: Final[list[re.Pattern[str]]] = [
     # Override instructions (Tiếng Anh & Tiếng Việt)
-    re.compile(r"\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+instructions\b", re.IGNORECASE),
-    re.compile(r"\b(bỏ qua|quên|xóa)\s+(mọi\s+)?(hướng dẫn|chỉ dẫn|quy tắc|câu lệnh trước)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+instructions\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(bỏ qua|quên|xóa)\s+(mọi\s+)?(hướng dẫn|chỉ dẫn|quy tắc|câu lệnh trước)\b",
+        re.IGNORECASE,
+    ),
     # System prompt exfiltration (Tiếng Anh & Tiếng Việt)
-    re.compile(r"\b(what is your|reveal|show(\s+me)?|print|display)\s+(your\s+)?(system\s+)?(prompt|instructions)\b", re.IGNORECASE),
-    re.compile(r"\b(cho tôi xem|hiển thị|in ra)\s+(hướng dẫn hệ thống|chỉ dẫn hệ thống|(system\s+)?prompt)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(what is your|reveal|show(\s+me)?|print|display)\s+(your\s+)?(system\s+)?(prompt|instructions)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(cho tôi xem|hiển thị|in ra)\s+(hướng dẫn hệ thống|chỉ dẫn hệ thống|(system\s+)?prompt)\b",
+        re.IGNORECASE,
+    ),
     # Jailbreak personas
-    re.compile(r"\b(dan\s+mode|jailbreak|developer\s+mode|evil\s+mode|do anything now)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(dan\s+mode|jailbreak|developer\s+mode|evil\s+mode|do anything now)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 # Nhóm 3: Script & Shell Injection
@@ -152,7 +167,9 @@ def evaluate_regex_guardrails(question: str) -> RegexGuardResult:
                 is_safe=False,
                 violation_type=RegexViolationType.DDL_DML_INJECTION,
                 matched_pattern=matched_str,
-                refusal_message=HARDCODED_REFUSAL_MESSAGES[RegexViolationType.DDL_DML_INJECTION],
+                refusal_message=HARDCODED_REFUSAL_MESSAGES[
+                    RegexViolationType.DDL_DML_INJECTION
+                ],
             )
 
     # 2. Kiểm tra Prompt Injection & Jailbreak
@@ -167,7 +184,9 @@ def evaluate_regex_guardrails(question: str) -> RegexGuardResult:
                 is_safe=False,
                 violation_type=RegexViolationType.PROMPT_INJECTION,
                 matched_pattern=matched_str,
-                refusal_message=HARDCODED_REFUSAL_MESSAGES[RegexViolationType.PROMPT_INJECTION],
+                refusal_message=HARDCODED_REFUSAL_MESSAGES[
+                    RegexViolationType.PROMPT_INJECTION
+                ],
             )
 
     # 3. Kiểm tra Script / Shell Injection
@@ -182,7 +201,9 @@ def evaluate_regex_guardrails(question: str) -> RegexGuardResult:
                 is_safe=False,
                 violation_type=RegexViolationType.SCRIPT_INJECTION,
                 matched_pattern=matched_str,
-                refusal_message=HARDCODED_REFUSAL_MESSAGES[RegexViolationType.SCRIPT_INJECTION],
+                refusal_message=HARDCODED_REFUSAL_MESSAGES[
+                    RegexViolationType.SCRIPT_INJECTION
+                ],
             )
 
     return RegexGuardResult(

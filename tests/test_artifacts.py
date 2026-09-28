@@ -11,9 +11,15 @@ from src.models.artifacts import (
     AnalysisPlan,
     AnalysisTask,
     ArtifactBundle,
+    CalloutArtifact,
+    ChartArtifact,
     ChartSpec,
     EvidenceStore,
+    FileArtifact,
+    KpiArtifact,
     QueryArtifact,
+    ResponsePackage,
+    TableArtifact,
     TableSpec,
 )
 
@@ -242,3 +248,61 @@ def test_query_response_with_artifacts():
     assert dump["session_id"] == "session_test"
     assert len(dump["artifacts"]) == 1
     assert dump["artifacts"][0]["status"] == "SUCCESS"
+
+
+def test_response_package_serialization_and_polymorphism():
+    """Kiểm tra tuần tự hóa ResponsePackage với Discriminated Union ArtifactItem đa hình."""
+    kpi = KpiArtifact(
+        title="Tổng doanh thu",
+        value=142350.5,
+        unit="USD",
+        delta=12.5,
+        delta_type="increase",
+    )
+    chart = ChartArtifact(
+        chart_type="line",
+        title="Biểu đồ xu hướng",
+        x_key="month",
+        y_keys=["val"],
+        data=[{"month": "T1", "val": 100}, {"month": "T2", "val": 150}],
+    )
+    table = TableArtifact(
+        title="Bảng số liệu",
+        columns=["month", "val"],
+        rows=[{"month": "T1", "val": 100}],
+        total_row_count=1,
+    )
+    callout = CalloutArtifact(variant="info", message="Dữ liệu đã được kiểm toán.")
+    file_art = FileArtifact(
+        file_name="report.csv", file_type="csv", download_url="/download/report.csv"
+    )
+
+    package = ResponsePackage(
+        session_id="sess_poly_123",
+        direct_answer="Doanh thu tăng trưởng khả quan.",
+        detailed_insight=["Tăng trưởng 12.5% so với cùng kỳ."],
+        layout="dashboard_grid",
+        artifacts=[kpi, chart, table, callout, file_art],
+        executed_queries=[{"task_id": "t1", "sql": "SELECT 1"}],
+        total_execution_time_ms=55.4,
+    )
+
+    dump = package.model_dump()
+    assert dump["session_id"] == "sess_poly_123"
+    assert dump["layout"] == "dashboard_grid"
+    assert len(dump["artifacts"]) == 5
+    assert dump["artifacts"][0]["type"] == "kpi"
+    assert dump["artifacts"][1]["type"] == "chart"
+    assert dump["artifacts"][2]["type"] == "table"
+    assert dump["artifacts"][3]["type"] == "callout"
+    assert dump["artifacts"][4]["type"] == "file"
+
+    # Kiểm tra round-trip validation từ dict ngược lại ResponsePackage
+    reloaded = ResponsePackage.model_validate(dump)
+    assert len(reloaded.artifacts) == 5
+    assert isinstance(reloaded.artifacts[0], KpiArtifact)
+    assert isinstance(reloaded.artifacts[1], ChartArtifact)
+    assert isinstance(reloaded.artifacts[2], TableArtifact)
+    assert isinstance(reloaded.artifacts[3], CalloutArtifact)
+    assert isinstance(reloaded.artifacts[4], FileArtifact)
+    assert reloaded.artifacts[0].value == 142350.5

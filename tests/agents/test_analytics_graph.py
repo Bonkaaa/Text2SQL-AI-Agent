@@ -31,6 +31,52 @@ def mock_user_context() -> UserContext:
     )
 
 
+@pytest.fixture(autouse=True)
+def mock_response_synthesizer():
+    """Mock ResponseSynthesizer trong test graph để tránh gọi LLM mạng thật."""
+    with patch(
+        "src.agents.analytics.nodes.ResponseSynthesizer.synthesize",
+        new_callable=AsyncMock,
+    ) as mock_syn:
+
+        async def _mock_synthesize(
+            question, artifacts, analysis_goal=None, session_id="default"
+        ):
+            from src.models.artifacts import (
+                CalloutArtifact,
+                ResponsePackage,
+                TableArtifact,
+            )
+
+            has_success = any(a.status == "SUCCESS" for a in artifacts)
+            if has_success:
+                return ResponsePackage(
+                    session_id=session_id,
+                    direct_answer=f"Đã hoàn thành phân tích cho: {question}",
+                    detailed_insight=["Nhận định mẫu."],
+                    artifacts=[
+                        TableArtifact(
+                            title="Kết quả",
+                            columns=["c"],
+                            rows=[{"c": 1}],
+                            total_row_count=1,
+                        )
+                    ],
+                )
+            else:
+                return ResponsePackage(
+                    session_id=session_id,
+                    direct_answer=f"Quá trình phân tích cho câu hỏi '{question}' thất bại do các truy vấn dữ liệu đều không thành công.",
+                    detailed_insight=[],
+                    artifacts=[
+                        CalloutArtifact(variant="error", message="Lỗi truy vấn")
+                    ],
+                )
+
+        mock_syn.side_effect = _mock_synthesize
+        yield mock_syn
+
+
 @pytest.mark.asyncio
 async def test_analytics_graph_single_query_flow(mock_user_context):
     """Kiểm tra câu hỏi đơn: Planner sinh 1 task -> Thực thi -> Đủ bằng chứng -> Presentation."""

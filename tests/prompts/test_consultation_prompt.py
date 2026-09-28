@@ -12,7 +12,11 @@ def test_consultation_prompt_structure():
     prompt_lower = prompt.lower()
 
     # 1. Kiểm tra vai trò
-    assert "consultation" in prompt_lower or "tư vấn" in prompt_lower or "giải đáp" in prompt_lower
+    assert (
+        "consultation" in prompt_lower
+        or "tư vấn" in prompt_lower
+        or "giải đáp" in prompt_lower
+    )
     assert "tpc-h" in prompt_lower
 
     # 2. Kiểm tra phân loại 2 hành vi chính: Chào hỏi vs Tra cứu Schema/Catalog

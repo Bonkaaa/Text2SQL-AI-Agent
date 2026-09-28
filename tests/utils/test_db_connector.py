@@ -97,3 +97,28 @@ def test_execute_query_timeout(memory_db_connector: DuckDBConnector):
     assert result.success is False
     assert result.error_message is not None
     assert "thời gian tối đa" in result.error_message
+
+
+def test_estimate_query_cost_fail_closed_on_error(memory_db_connector: DuckDBConnector):
+    """Kiểm tra nguyên lý Fail-Closed: Khi EXPLAIN thất bại, truy vấn phải bị đánh dấu is_within_budget=False."""
+    # Câu SQL chứa bảng hoặc cú pháp sai khiến EXPLAIN không thể sinh plan
+    invalid_sql = "SELECT * FROM non_existent_table_xyz"
+    estimate = memory_db_connector.estimate_query_cost(
+        invalid_sql, max_budget_bytes=1000000
+    )
+
+    assert estimate.is_within_budget is False
+    assert estimate.estimated_bytes > estimate.max_budget_bytes
+    assert "Fail-Closed" in estimate.explanation
+
+
+def test_bigquery_estimate_query_cost_fail_closed_missing_lib():
+    """Kiểm tra nguyên lý Fail-Closed: BigQuery connector phải từ chối khi thiếu thư viện google-cloud-bigquery."""
+    from src.utils.db_connector import BigQueryConnector
+
+    bq_connector = BigQueryConnector(project_id="test_proj", dataset_id="test_ds")
+    estimate = bq_connector.estimate_query_cost("SELECT 1", max_budget_bytes=1000)
+
+    assert estimate.is_within_budget is False
+    assert estimate.estimated_bytes > estimate.max_budget_bytes
+    assert "Fail-Closed" in estimate.explanation

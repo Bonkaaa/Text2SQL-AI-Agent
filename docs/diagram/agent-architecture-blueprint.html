@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text2SQL AI Agent - Architecture Blueprint</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    .arch-cs { background: #f8fafc; padding: 24px; color: #1f2937; border: 1px solid #cbd5e1; border-radius: 8px; width: 100%; max-width: 1140px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box; }
+    .arch-cs-title { margin: 0 0 6px; text-align: center; font-size: 24px; font-weight: 700; color: #0f172a; }
+    .arch-cs-sub { margin: 0 0 16px; text-align: center; font-size: 13px; color: #475569; }
+    .arch-cs-body { display: grid; grid-template-columns: 210px 1fr 210px; gap: 12px; align-items: stretch; }
+    .arch-cs-wing { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 6px; background: #f1f5f9; border: 2px solid #334155; }
+    .arch-cs-wing-head { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-align: center; padding-bottom: 6px; border-bottom: 1px solid #94a3b8; color: #0f172a; }
+    .arch-cs-group { padding: 7px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; }
+    .arch-cs-group-title { font-size: 11px; font-weight: 700; text-align: center; margin-bottom: 5px; color: #1e293b; }
+    .arch-cs-group-items { display: grid; gap: 4px; }
+    .arch-cs-group-item { padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3px; font-size: 10px; line-height: 1.25; text-align: center; color: #334155; font-weight: 500; }
+    .arch-cs-core { display: grid; gap: 8px; align-content: stretch; }
+    .arch-cs-layer { padding: 8px 10px; border-radius: 5px; border: 1px solid #94a3b8; }
+    .arch-cs-layer.api { background: #e0e7ff; border-color: #6366f1; }
+    .arch-cs-layer.preflight { background: #fee2e2; border-color: #ef4444; }
+    .arch-cs-layer.supervisor { background: #dbeafe; border-color: #3b82f6; }
+    .arch-cs-layer.analytics { background: #fef3c7; border-color: #f59e0b; }
+    .arch-cs-layer.control { background: #ccfbf1; border-color: #14b8a6; }
+    .arch-cs-layer.warehouse { background: #f3e8ff; border-color: #a855f7; }
+    .arch-cs-layer-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+    .arch-cs-layer-name { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0f172a; }
+    .arch-cs-layer-note { font-size: 10px; color: #475569; }
+    .arch-cs-items { display: grid; gap: 6px; }
+    .arch-cs-items.c2 { grid-template-columns: repeat(2, 1fr); }
+    .arch-cs-items.c3 { grid-template-columns: repeat(3, 1fr); }
+    .arch-cs-items.c4 { grid-template-columns: repeat(4, 1fr); }
+    .arch-cs-items.c5 { grid-template-columns: repeat(5, 1fr); }
+    .arch-cs-box { padding: 6px 6px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 600; line-height: 1.25; text-align: center; color: #0f172a; }
+    .arch-cs-box small { display: block; font-size: 9px; font-weight: 400; color: #64748b; margin-top: 2px; }
+    .arch-cs-box.entry { border: 2px solid #2563eb; }
+    .arch-cs-box.highlight { border: 2px solid #d97706; background: #fffbeb; }
+    .arch-cs-box.danger { border: 2px solid #dc2626; background: #fef2f2; }
+    .arch-cs-box.secure { border: 2px solid #059669; background: #ecfdf5; }
+    .arch-cs-foot { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #cbd5e1; font-size: 11px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <section class="arch-cs">
+    <h1 class="arch-cs-title">Text2SQL AI Agent: Hệ Thống Kiến Trúc Thực Tế (v4.0)</h1>
+    <p class="arch-cs-sub">Kiến trúc đa tầng kết hợp suy luận tác tử (DeepAgents) và đường ống kiểm soát tất định (LangGraph)</p>
+    <div class="arch-cs-body">
+      <aside class="arch-cs-wing">
+        <div class="arch-cs-wing-head">An ninh &amp; Vận hành<br>(Cross-Cutting)</div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Ngữ cảnh &amp; Quyền hạn</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">UserContext (RBAC)</div>
+            <div class="arch-cs-group-item">Thread / Session ID</div>
+          </div>
+        </div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Bộ nhớ &amp; Trạng thái</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">MemorySaver Checkpointer</div>
+            <div class="arch-cs-group-item">StateBackend Virtual FS</div>
+          </div>
+        </div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Quan sát &amp; Ghi vết</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">SessionTracer (Artifacts)</div>
+            <div class="arch-cs-group-item">AuditLogger (JSON Logs)</div>
+          </div>
+        </div>
+      </aside>
+      <div class="arch-cs-core">
+        <div class="arch-cs-layer api">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 1: Interface &amp; API Layer</span>
+            <span class="arch-cs-layer-note">Cổng giao tiếp FastAPI &amp; Frontend</span>
+          </div>
+          <div class="arch-cs-items c3">
+            <div class="arch-cs-box entry">POST /api/v1/query/ask<small>Tiếp nhận truy vấn tự nhiên</small></div>
+            <div class="arch-cs-box">POST /api/v1/query/approve<small>Phê duyệt HITL (Command Resume)</small></div>
+            <div class="arch-cs-box">GET /api/v1/query/history<small>Tra cứu Session Trace &amp; Artifacts</small></div>
+          </div>
+        </div>
+        <div class="arch-cs-layer preflight">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 2: Pre-Flight Gatekeeper Engine</span>
+            <span class="arch-cs-layer-note">Chốt chặn an toàn 2 tầng &amp; Fast-Path Clarification</span>
+          </div>
+          <div class="arch-cs-items c3">
+            <div class="arch-cs-box danger">Tier 1: Regex Guardrails<small>&lt;0.1ms, chặn DDL/DML &amp; Injection</small></div>
+            <div class="arch-cs-box highlight">Tier 2: Unified LLM Guard<small>Đánh giá mơ hồ &amp; ngoài miền TPC-H</small></div>
+            <div class="arch-cs-box secure">Decision Router<small>ALLOWED | CLARIFICATION | BLOCKED</small></div>
+          </div>
+        </div>
+        <div class="arch-cs-layer supervisor">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 3: Master Deep Agent Supervisor</span>
+            <span class="arch-cs-layer-note">Điều phối tối cao (Pure Orchestration via deepagents)</span>
+          </div>
+          <div class="arch-cs-items c3">
+            <div class="arch-cs-box">Tier 1 Reasoning LLM<small>OpenAI / Gemini 2.5 Pro</small></div>
+            <div class="arch-cs-box">TodoListMiddleware<small>Lập kế hoạch động (write_todos)</small></div>
+            <div class="arch-cs-box">Context &amp; Loop Guard<small>ToolCallLimit &amp; Summarization</small></div>
+          </div>
+          <div class="arch-cs-items c2" style="margin-top: 6px;">
+            <div class="arch-cs-box">Subagent: consultation-agent<small>Giao tiếp xã giao &amp; tra cứu danh mục TPC-H (No SQL)</small></div>
+            <div class="arch-cs-box entry">Subagent: analytics-subagent<small>CompiledSubAgent đóng gói Analytics LangGraph Subgraph</small></div>
+          </div>
+        </div>
+        <div class="arch-cs-layer analytics">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 4: Analytics LangGraph Subgraph (v4.0)</span>
+            <span class="arch-cs-layer-note">Quy trình phân tích dữ liệu đa nhiệm &amp; Đóng gói phản hồi</span>
+          </div>
+          <div class="arch-cs-items c4">
+            <div class="arch-cs-box">planner_node<small>Sinh AnalysisPlan (1-3 tasks)</small></div>
+            <div class="arch-cs-box highlight">executor_node<small>Schema + SQLGen + Control Pipeline</small></div>
+            <div class="arch-cs-box">evidence_node<small>Evidence Analyzer &amp; Drill-down</small></div>
+            <div class="arch-cs-box secure">presentation_node<small>ResponseSynthesizer + Data Hydration</small></div>
+          </div>
+        </div>
+        <div class="arch-cs-layer control">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 5: Deterministic Control Pipeline Subgraph</span>
+            <span class="arch-cs-layer-note">Hàng rào an ninh tất định &amp; Tự chẩn đoán lỗi</span>
+          </div>
+          <div class="arch-cs-items c5">
+            <div class="arch-cs-box secure">ast_check<small>sqlglot SELECT only</small></div>
+            <div class="arch-cs-box secure">rbac_check<small>Bảo vệ cột nhạy cảm</small></div>
+            <div class="arch-cs-box highlight">cost_guard<small>Dry-run &amp; Quét dung lượng</small></div>
+            <div class="arch-cs-box danger">hitl_gate<small>interrupt() chờ duyệt</small></div>
+            <div class="arch-cs-box">execute<small>Warehouse limit/timeout</small></div>
+          </div>
+          <div class="arch-cs-items c2" style="margin-top: 6px;">
+            <div class="arch-cs-box danger">err_node &amp; diagnostic<small>LLM phân tích nguyên nhân lỗi &amp; gợi ý sửa</small></div>
+            <div class="arch-cs-box secure">audit_node<small>Ghi log kiểm toán toàn diện trước khi END</small></div>
+          </div>
+        </div>
+        <div class="arch-cs-layer warehouse">
+          <div class="arch-cs-layer-head">
+            <span class="arch-cs-layer-name">Tầng 6: Data &amp; Warehouse Layer</span>
+            <span class="arch-cs-layer-note">Cơ sở dữ liệu TPC-H Benchmark</span>
+          </div>
+          <div class="arch-cs-items c4">
+            <div class="arch-cs-box">DuckDB Engine<small>OLAP In-Memory / Local DB</small></div>
+            <div class="arch-cs-box">8 Bảng TPC-H<small>CUSTOMER, ORDERS, LINEITEM...</small></div>
+            <div class="arch-cs-box">dbt Semantic Layer<small>Công thức Metrics chuẩn</small></div>
+            <div class="arch-cs-box">Vector/Keyword Index<small>Tra cứu Categorical Values</small></div>
+          </div>
+        </div>
+      </div>
+      <aside class="arch-cs-wing">
+        <div class="arch-cs-wing-head">Kỹ Năng &amp; Tri Thức<br>(Domain Knowledge)</div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Kỹ năng DeepAgents</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">skills/tpch-analytics</div>
+            <div class="arch-cs-group-item">skills/duckdb-sql</div>
+            <div class="arch-cs-group-item">skills/analytics-orchestrator</div>
+          </div>
+        </div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Quy chuẩn Vận hành</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">AGENTS.md Memory</div>
+            <div class="arch-cs-group-item">DuckDB Dialect Rules</div>
+          </div>
+        </div>
+        <div class="arch-cs-group">
+          <div class="arch-cs-group-title">Metadata Tools</div>
+          <div class="arch-cs-group-items">
+            <div class="arch-cs-group-item">search_tables_and_columns</div>
+            <div class="arch-cs-group-item">get_column_samples_and_values</div>
+            <div class="arch-cs-group-item">find_join_path (BFS)</div>
+            <div class="arch-cs-group-item">search_business_definition</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <p class="arch-cs-foot">Cấu trúc thực tế bóc tách từ mã nguồn: Hai cánh hỗ trợ kéo dài bao bọc toàn bộ chu trình xử lý của tác tử.</p>
+  </section>
+</body>
+</html>

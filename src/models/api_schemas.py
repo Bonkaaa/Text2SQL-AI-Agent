@@ -44,31 +44,26 @@ class AskQueryRequest(BaseModel):
         description="Vai trò người dùng trong hệ thống (ANALYST / ADMIN / BUSINESS_USER)",
         examples=[UserRole.ANALYST],
     )
+    session_token: str | None = Field(
+        default=None,
+        description="Mã bí mật xác thực quyền sở hữu phiên làm việc (Session Secret Token)",
+        examples=["k9e3_abc123..."],
+    )
 
 
 class QueryResponse(BaseModel):
-    """Schema phản hồi kết quả truy vấn phân tích."""
+    """Schema phản hồi kết quả truy vấn phân tích (Kiến trúc v4.0 Evolution)."""
 
     session_id: str = Field(description="Mã phiên làm việc")
     status: Literal[
         "COMPLETED",
+        "SUCCESS",
         "CLARIFICATION_REQUIRED",
+        "SECURITY_BLOCKED",
         "PENDING_APPROVAL",
         "ERROR",
     ] = Field(description="Trạng thái kết quả xử lý")
     question: str = Field(description="Câu hỏi gốc của người dùng")
-    is_ambiguous: bool = Field(
-        default=False,
-        description="Đánh dấu câu hỏi có bị mơ hồ hay không",
-    )
-    clarification_question: str | None = Field(
-        default=None,
-        description="Câu hỏi làm rõ nếu status là CLARIFICATION_REQUIRED",
-    )
-    suggested_options: list[str] = Field(
-        default_factory=list,
-        description="Danh sách các phương án gợi ý A, B, C khi câu hỏi mơ hồ",
-    )
     final_answer: str | None = Field(
         default=None,
         description="Câu trả lời tóm tắt cuối cùng từ Agent",
@@ -89,6 +84,72 @@ class QueryResponse(BaseModel):
         default=None,
         description="Cấu hình biểu đồ Recharts JSON để vẽ chart ở frontend",
     )
+
+    # Pre-Flight Security & Clarification Fields (v4 - Phase 2.5)
+    is_safe: bool = Field(
+        default=True,
+        description="Đánh dấu câu hỏi an toàn (True) hay vi phạm an ninh/ngoài miền (False)",
+    )
+    safety_category: str | None = Field(
+        default=None,
+        description="Phân loại an toàn nếu bị chặn (UNSAFE_PROMPT_INJECTION, UNSUPPORTED_OUT_OF_DOMAIN,...)",
+    )
+    refusal_reason: str | None = Field(
+        default=None,
+        description="Lý do từ chối cứng theo tiêu chuẩn Hardcoded Refusal",
+    )
+    is_ambiguous: bool = Field(
+        default=False,
+        description="Đánh dấu câu hỏi có bị mơ hồ hay không",
+    )
+    clarification_question: str | None = Field(
+        default=None,
+        description="Câu hỏi làm rõ nếu status là CLARIFICATION_REQUIRED",
+    )
+    suggested_options: list[str] = Field(
+        default_factory=list,
+        description="Danh sách các phương án gợi ý A, B, C khi câu hỏi mơ hồ",
+    )
+
+    # Analytics & Multi-Query Fields (v4 - Phase 2 & 3)
+    intent: Literal["CONVERSATION", "ANALYTICS"] | None = Field(
+        default=None,
+        description="Phân luồng ý định người dùng (CONVERSATION / METADATA vs ANALYTICS)",
+    )
+    tasks: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Danh sách tóm tắt các tác vụ trong AnalysisPlan",
+    )
+    artifacts: list[dict[str, Any]] | list[QueryArtifact] | None = Field(
+        default=None,
+        description="Danh sách bằng chứng truy vấn đã thực thi (QueryArtifacts)",
+    )
+    response_package: dict[str, Any] | None = Field(
+        default=None,
+        description="Gói phản hồi đa chiều hoàn chỉnh (ResponsePackage Phase 3)",
+    )
+    output_artifacts: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Danh sách các ArtifactItem (KPI, Chart, Table, Callout) cho Frontend Component Registry",
+    )
+    insight: dict[str, Any] | str | None = Field(
+        default=None,
+        description="Tóm tắt insight phân tích kinh doanh",
+    )
+    visualization: dict[str, Any] | None = Field(
+        default=None,
+        description="Cấu hình trực quan hóa chính (Primary chart)",
+    )
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Thông tin metadata thực thi (query_count, execution_time_ms,...)",
+    )
+    artifact_bundle: ArtifactBundle | None = Field(
+        default=None,
+        description="Gói kết quả tương thích ngược",
+    )
+
+    # Runtime & Governance Fields
     requires_hitl: bool = Field(
         default=False,
         description="Đánh dấu câu truy vấn có đang dừng chờ phê duyệt HITL hay không",
@@ -105,15 +166,10 @@ class QueryResponse(BaseModel):
         default=None,
         description="Thông báo lỗi chi tiết nếu status là ERROR",
     )
-    artifacts: list[QueryArtifact] | None = Field(
+    session_token: str | None = Field(
         default=None,
-        description="Danh sách bằng chứng truy vấn đã thực thi (QueryArtifacts)",
+        description="Token bí mật xác thực phiên làm việc (dùng cho các request tiếp theo)",
     )
-    artifact_bundle: ArtifactBundle | None = Field(
-        default=None,
-        description="Gói kết quả phân tích dữ liệu hoàn chỉnh",
-    )
-
 
 
 # ==============================================================================
@@ -127,6 +183,18 @@ class ApprovalRequest(BaseModel):
     session_id: str = Field(
         ...,
         description="Mã phiên đang tạm dừng tại chốt chặn interrupt()",
+    )
+    task_id: str | None = Field(
+        default=None,
+        description="Mã nhiệm vụ phân tích cụ thể (tùy chọn)",
+    )
+    approval_id: str | None = Field(
+        default=None,
+        description="Mã phê duyệt duy nhất (tùy chọn)",
+    )
+    session_token: str | None = Field(
+        default=None,
+        description="Token bí mật xác thực phiên làm việc (tùy chọn nếu đã dùng header)",
     )
     approved: bool = Field(
         ...,
@@ -142,9 +210,14 @@ class ApprovalResponse(BaseModel):
     """Schema phản hồi kết quả sau khi gửi quyết định duyệt."""
 
     session_id: str = Field(description="Mã phiên làm việc")
+    approval_id: str | None = Field(default=None, description="Mã phê duyệt duy nhất")
     approved: bool = Field(description="Quyết định đã được tiếp nhận")
     status: str = Field(description="Trạng thái thực thi sau phê duyệt")
     message: str = Field(description="Thông báo chi tiết")
+    session_token: str | None = Field(
+        default=None,
+        description="Token bí mật xác thực phiên làm việc",
+    )
     data: list[dict[str, Any]] | None = Field(
         default=None,
         description="Dữ liệu truy vấn trả về nếu được duyệt thành công",
@@ -164,7 +237,9 @@ class QueryHistoryItem(BaseModel):
     """Chi tiết một mục lịch sử truy vấn trong phiên."""
 
     session_id: str = Field(description="Mã phiên")
-    timestamp: str | None = Field(default=None, description="Thời gian thực hiện (ISO 8601)")
+    timestamp: str | None = Field(
+        default=None, description="Thời gian thực hiện (ISO 8601)"
+    )
     status: str | None = Field(default=None, description="Trạng thái hoàn thành")
     question: str | None = Field(default=None, description="Câu hỏi người dùng")
     artifacts: list[str] = Field(

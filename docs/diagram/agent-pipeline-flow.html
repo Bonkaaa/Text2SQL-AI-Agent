@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text2SQL AI Agent - End-to-End Pipeline Flow</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    .arch-pipe { background: #f8fafc; padding: 24px; color: #1f2937; border: 1px solid #cbd5e1; border-radius: 8px; width: 100%; max-width: 1140px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box; }
+    .arch-pipe-title { margin: 0 0 6px; text-align: center; font-size: 24px; font-weight: 700; color: #0f172a; }
+    .arch-pipe-sub { margin: 0 0 16px; text-align: center; font-size: 13px; color: #475569; }
+    .arch-pipe-io { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .arch-pipe-source { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; background: #ffffff; border: 1px dashed #64748b; border-radius: 4px; color: #1e293b; }
+    .arch-pipe-row { display: flex; align-items: stretch; gap: 0; }
+    .arch-pipe-stage { flex: 1; padding: 10px; border-radius: 6px; background: #f1f5f9; border: 1px solid #94a3b8; }
+    .arch-pipe-stage.landing { background: #fee2e2; border-color: #ef4444; }
+    .arch-pipe-stage.orchestrate { background: #dbeafe; border-color: #3b82f6; }
+    .arch-pipe-stage.analyze { background: #fef3c7; border-color: #f59e0b; }
+    .arch-pipe-stage.control { background: #ccfbf1; border-color: #14b8a6; }
+    .arch-pipe-stage.serve { background: #ede9fe; border-color: #8b5cf6; }
+    .arch-pipe-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #1e293b; color: #ffffff; font-size: 10px; font-weight: 700; margin-right: 6px; }
+    .arch-pipe-head { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0f172a; margin-bottom: 8px; }
+    .arch-pipe-item { padding: 6px 8px; margin-bottom: 6px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 11px; line-height: 1.3; color: #1e293b; font-weight: 500; }
+    .arch-pipe-item:last-child { margin-bottom: 0; }
+    .arch-pipe-item small { display: block; font-size: 9px; color: #64748b; margin-top: 2px; }
+    .arch-pipe-item.dead { border-style: dashed; color: #dc2626; border-color: #f87171; background: #fef2f2; }
+    .arch-pipe-arrow { display: flex; align-items: center; justify-content: center; width: 28px; flex-shrink: 0; font-size: 18px; color: #64748b; }
+    .arch-pipe-sla { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+    .arch-pipe-kpi { padding: 8px; text-align: center; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; }
+    .arch-pipe-kpi b { display: block; font-size: 16px; font-weight: 700; color: #0f172a; }
+    .arch-pipe-kpi span { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; }
+    .arch-pipe-note { margin-top: 10px; font-size: 11px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <section class="arch-pipe">
+    <h1 class="arch-pipe-title">Luồng Hoạt Động Xử Lý Truy Vấn End-to-End</h1>
+    <p class="arch-pipe-sub">Tiến trình 5 giai đoạn từ lúc gửi câu hỏi đến khi nhận bảng dữ liệu và biểu đồ trực quan</p>
+    <div class="arch-pipe-io">
+      <div class="arch-pipe-source">Đầu vào 1: Câu hỏi phân tích (NL Question)</div>
+      <div class="arch-pipe-source">Đầu vào 2: User Context (ID, Role, Session ID)</div>
+      <div class="arch-pipe-source">Đầu vào 3: HITL Decision (Approved / Rejected)</div>
+    </div>
+    <div class="arch-pipe-row">
+      <div class="arch-pipe-stage landing">
+        <div class="arch-pipe-head"><span class="arch-pipe-num">1</span>Pre-Flight</div>
+        <div class="arch-pipe-item">Tier 1 Regex Guard<small>&lt;0.1ms, chặn DDL/DML</small></div>
+        <div class="arch-pipe-item">Tier 2 LLM Guard<small>Kiểm tra mơ hồ / ngoài miền</small></div>
+        <div class="arch-pipe-item dead">Chặn vi phạm<small>SECURITY_BLOCKED</small></div>
+        <div class="arch-pipe-item dead">Fast-Path làm rõ<small>CLARIFICATION_REQUIRED</small></div>
+      </div>
+      <div class="arch-pipe-arrow">→</div>
+      <div class="arch-pipe-stage orchestrate">
+        <div class="arch-pipe-head"><span class="arch-pipe-num">2</span>Supervisor</div>
+        <div class="arch-pipe-item">Context Isolation<small>Tracer &amp; StateBackend</small></div>
+        <div class="arch-pipe-item">TodoList Planning<small>Phân bổ tác vụ động</small></div>
+        <div class="arch-pipe-item">Consultation Agent<small>Xã giao / tra cứu metadata</small></div>
+        <div class="arch-pipe-item">Delegate Analytics<small>Gọi analytics-subagent</small></div>
+      </div>
+      <div class="arch-pipe-arrow">→</div>
+      <div class="arch-pipe-stage analyze">
+        <div class="arch-pipe-head"><span class="arch-pipe-num">3</span>Analytics Subgraph</div>
+        <div class="arch-pipe-item">Planner Node<small>Sinh AnalysisPlan (1-3 tasks)</small></div>
+        <div class="arch-pipe-item">Schema &amp; Categorical<small>Top-k tables &amp; values</small></div>
+        <div class="arch-pipe-item">SQL Generator<small>DuckDB dialect + 4 tools</small></div>
+        <div class="arch-pipe-item">Self-Correction<small>Vòng lặp sửa lỗi ≤ 3 lần</small></div>
+      </div>
+      <div class="arch-pipe-arrow">→</div>
+      <div class="arch-pipe-stage control">
+        <div class="arch-pipe-head"><span class="arch-pipe-num">4</span>Control Pipeline</div>
+        <div class="arch-pipe-item">AST Sanitizer<small>sqlglot SELECT only</small></div>
+        <div class="arch-pipe-item">RBAC Policy<small>Kiểm soát quyền truy cập</small></div>
+        <div class="arch-pipe-item">Cost &amp; Risk Guard<small>Dry-run &amp; Cartesian check</small></div>
+        <div class="arch-pipe-item dead">HITL Gatekeeper<small>interrupt() PENDING_APPROVAL</small></div>
+        <div class="arch-pipe-item">Warehouse Executor<small>Timeout 30s &amp; Limit 5000</small></div>
+      </div>
+      <div class="arch-pipe-arrow">→</div>
+      <div class="arch-pipe-stage serve">
+        <div class="arch-pipe-head"><span class="arch-pipe-num">5</span>Synthesis &amp; Serve</div>
+        <div class="arch-pipe-item">Evidence Analyzer<small>Đánh giá đủ dữ liệu / Drill-down</small></div>
+        <div class="arch-pipe-item">Response Synthesizer<small>Nhịp 1: Direct answer &amp; Specs</small></div>
+        <div class="arch-pipe-item">Data Hydrator<small>Nhịp 2: Rót data thật 100%</small></div>
+        <div class="arch-pipe-item">Final Response<small>KPI, Recharts, Data Table, SQL</small></div>
+      </div>
+    </div>
+    <div class="arch-pipe-sla">
+      <div class="arch-pipe-kpi"><b>&lt; 0.1 ms</b><span>Tier 1 Regex Latency</span></div>
+      <div class="arch-pipe-kpi"><b>Tối đa 3 lần</b><span>Self-Correction Retry</span></div>
+      <div class="arch-pipe-kpi"><b>100% Thực tế</b><span>Data Hydration Accuracy</span></div>
+      <div class="arch-pipe-kpi"><b>SELECT Only</b><span>Cấm tuyệt đối DDL/DML</span></div>
+    </div>
+    <p class="arch-pipe-note">Các ô nét đứt màu đỏ là các lối thoát rẽ nhánh an toàn (Chặn an ninh, Fast-Path yêu cầu làm rõ, hoặc Tạm dừng chờ duyệt HITL).</p>
+  </section>
+</body>
+</html>

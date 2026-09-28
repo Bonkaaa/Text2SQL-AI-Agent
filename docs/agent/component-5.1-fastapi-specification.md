@@ -27,10 +27,14 @@ Component 5.1 xây dựng tầng API Gateway của hệ thống **Text-to-SQL Se
 - **Request Body (`AskQueryRequest`)**:
   ```python
   class AskQueryRequest(BaseModel):
-      question: str = Field(..., min_length=1, description="Câu hỏi tự nhiên của người dùng")
+      question: str = Field(
+          ..., min_length=1, description="Câu hỏi tự nhiên của người dùng"
+      )
       session_id: str | None = Field(default=None, description="Mã phiên làm việc")
       user_id: str = Field(default="default_user", description="Định danh người dùng")
-      role: UserRole = Field(default=UserRole.ANALYST, description="Vai trò người dùng (ANALYST, ADMIN)")
+      role: UserRole = Field(
+          default=UserRole.ANALYST, description="Vai trò người dùng (ANALYST, ADMIN)"
+      )
   ```
 - **Xử lý**:
   - Tạo `UserContext(user_id=..., session_id=..., role=...)`.
@@ -62,8 +66,12 @@ Component 5.1 xây dựng tầng API Gateway của hệ thống **Text-to-SQL Se
   ```python
   class ApprovalRequest(BaseModel):
       session_id: str = Field(..., description="Mã phiên đang tạm dừng chờ duyệt")
-      approved: bool = Field(..., description="Quyết định duyệt: True (chấp thuận) hoặc False (từ chối)")
-      rejection_reason: str | None = Field(default=None, description="Lý do từ chối nếu approved=False")
+      approved: bool = Field(
+          ..., description="Quyết định duyệt: True (chấp thuận) hoặc False (từ chối)"
+      )
+      rejection_reason: str | None = Field(
+          default=None, description="Lý do từ chối nếu approved=False"
+      )
   ```
 - **Xử lý**:
   - Resume đồ thị StateGraph từ chốt chặn `interrupt()` của LangGraph qua `Command(resume={"approved": approved, ...})`.

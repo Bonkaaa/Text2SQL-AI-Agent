@@ -15,7 +15,9 @@ def test_has_time_filter_in_where_positive():
     sql1 = "SELECT * FROM lineitem WHERE l_shipdate >= DATE '1995-01-01'"
     assert has_time_filter_in_where(sql1, time_cols) is True
 
-    sql2 = "SELECT * FROM orders WHERE o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'"
+    sql2 = (
+        "SELECT * FROM orders WHERE o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'"
+    )
     assert has_time_filter_in_where(sql2, time_cols) is True
 
     sql3 = "SELECT * FROM orders WHERE EXTRACT(year FROM o_orderdate) = 1995"

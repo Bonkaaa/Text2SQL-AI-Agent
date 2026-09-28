@@ -8,12 +8,22 @@ import pytest
 from src.models.rbac import UserContext, UserRole
 from src.utils.audit_logger import AuditLogger
 from src.utils.db_connector import DuckDBConnector
+from src.utils.tpcds_seeder import seed_tpcds_data
 from src.utils.tpch_seeder import seed_tpch_data
 
 
 @pytest.fixture(scope="session")
+def shared_tpcds_connector() -> Generator[DuckDBConnector]:
+    """Fixture DuckDB in-memory với 24 bảng TPC-DS dùng chung."""
+    conn = seed_tpcds_data(db_path=":memory:", scale_factor=0.01)
+    connector = DuckDBConnector(connection=conn)
+    yield connector
+    conn.close()
+
+
+@pytest.fixture(scope="session")
 def shared_tpch_connector() -> Generator[DuckDBConnector]:
-    """Fixture DuckDB in-memory với 8 bảng TPC-H dùng chung."""
+    """Fixture DuckDB in-memory với 8 bảng TPC-H dùng chung (cho các test chưa chuyển đổi)."""
     conn = seed_tpch_data(db_path=":memory:", scale_factor=0.01)
     connector = DuckDBConnector(connection=conn)
     yield connector

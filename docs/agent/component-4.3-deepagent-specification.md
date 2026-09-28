@@ -104,6 +104,7 @@ Theo tài liệu chính thức của LangChain ([LangChain DeepAgents Reference]
   from deepagents import CompiledSubAgent
   from src.agents.control_pipeline.builder import build_control_pipeline_graph
 
+
   def get_control_pipeline_subagent(graph=None) -> CompiledSubAgent:
       active_graph = graph or build_control_pipeline_graph()
       return CompiledSubAgent(
@@ -127,6 +128,7 @@ Theo tài liệu chính thức của LangChain ([LangChain DeepAgents Reference]
 
   from src.agents.prompts import SUPERVISOR_SYSTEM_PROMPT
   from src.models.rbac import UserContext
+
 
   def create_text2sql_supervisor(
       model=None,

@@ -74,17 +74,13 @@ def format_table(columns: list[str], rows: list[dict], max_rows: int = 10) -> st
             col_widths[c] = max(col_widths[c], min(len(val_str), 30))
 
     sep_line = "+" + "+".join("-" * (col_widths[c] + 2) for c in columns) + "+"
-    header_line = (
-        "| " + " | ".join(f"{c:<{col_widths[c]}}" for c in columns) + " |"
-    )
+    header_line = "| " + " | ".join(f"{c:<{col_widths[c]}}" for c in columns) + " |"
 
     lines = [sep_line, header_line, sep_line]
     for r in display_rows:
         row_str = (
             "| "
-            + " | ".join(
-                f"{str(r.get(c, ''))[:30]:<{col_widths[c]}}" for c in columns
-            )
+            + " | ".join(f"{str(r.get(c, ''))[:30]:<{col_widths[c]}}" for c in columns)
             + " |"
         )
         lines.append(row_str)
@@ -132,7 +128,7 @@ def execute_test(
     print("\n" + "=" * 70)
     print("           KIỂM THỬ DEEP AGENT SUPERVISOR (TEXT-TO-SQL)")
     print("=" * 70)
-    print(f"[*] Câu hỏi       : \"{question}\"")
+    print(f'[*] Câu hỏi       : "{question}"')
     print(f"[*] Vai trò người : {user_role.value.upper()}")
     print(f"[*] LLM Provider  : {active_provider.upper()}")
     print(f"[*] Tier 1 Model  : {settings.tier1_model}")
@@ -214,7 +210,9 @@ def execute_test(
         raw_c = getattr(msg, "content", str(msg))
         entry = {
             "type": msg_type,
-            "content": extract_message_text(raw_c) if isinstance(raw_c, list) else raw_c,
+            "content": extract_message_text(raw_c)
+            if isinstance(raw_c, list)
+            else raw_c,
         }
         if hasattr(msg, "tool_calls") and msg.tool_calls:
             entry["tool_calls"] = msg.tool_calls
@@ -326,7 +324,7 @@ def interactive_menu(provider: str | None, role: str) -> None:
         print("=" * 60)
         for item in SAMPLE_QUESTIONS:
             print(f"  [{item['id']}] ({item['category']})")
-            print(f"      \"{item['question']}\"")
+            print(f'      "{item["question"]}"')
         print("  [7] Nhập câu hỏi đơn lẻ tùy ý")
         print("  [8] Bắt đầu phiên chat tương tác nhiều lượt (Multi-turn Chat)")
         print("  [0] Thoát chương trình")
@@ -442,7 +440,9 @@ def main() -> None:
         and current_settings.gemini_api_key
         and not current_settings.gemini_api_key.startswith("your-gemini")
     ):
-        print("[*] Phát hiện GEMINI_API_KEY đã được cấu hình trong khi OPENAI_API_KEY để trống.")
+        print(
+            "[*] Phát hiện GEMINI_API_KEY đã được cấu hình trong khi OPENAI_API_KEY để trống."
+        )
         print("[*] Tự động chuyển provider mặc định sang GEMINI cho phiên chạy này.")
         os.environ["LLM_PROVIDER"] = "gemini"
         get_settings.cache_clear()
@@ -507,7 +507,9 @@ def main() -> None:
             print(f"{'ID':<4} | {'Trạng thái':<22} | {'Thời gian':<10} | {'Câu hỏi'}")
             print("-" * 70)
             for idx, s in enumerate(summaries, 1):
-                q_short = s["question"][:32] + ("..." if len(s["question"]) > 32 else "")
+                q_short = s["question"][:32] + (
+                    "..." if len(s["question"]) > 32 else ""
+                )
                 print(f"{idx:<4} | {s['status']:<22} | {s['elapsed']}s | {q_short}")
             print("=" * 70 + "\n")
     else:

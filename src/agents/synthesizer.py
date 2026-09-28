@@ -1,15 +1,21 @@
-"""Subagent: Response Synthesizer & Đề Xuất Biểu Đồ (Component 4.2).
+"""Subagent: Response Synthesizer & Đề Xuất Biểu Đồ (Component 4.2 - DEPRECATED).
 
-Đóng gói theo chuẩn DeepAgents SubAgent dictionary (name="response-synthesizer"):
-- Chế độ mode: "isolated" (Context Quarantine: chỉ nhận câu hỏi và dữ liệu bảng).
-- Mô hình Tier 2 (gpt-4o-mini / gemini-2.5-flash / claude-3-5-haiku) tối ưu độ trễ & chi phí.
-- Công cụ tools: [] (Zero-tool agent: tập trung reasoning dữ liệu và sinh schema).
-- Đầu ra có cấu trúc: SynthesizerResult (Pydantic Model) gồm chart_type, recharts_config, business_insight, summary_metrics.
-- Hàm thực thi: synthesize_response(question, data, columns=..., llm=...) kèm Fast-path dữ liệu rỗng và Fail-Safe fallback.
+.. deprecated:: Architecture v4.0 (Phase 3)
+    Module này được giữ lại nhằm bảo đảm tính tương thích ngược cho các route cũ.
+    Hãy sử dụng `src.agents.analytics.response_synthesizer.ResponseSynthesizer`
+    với mô hình Composable ResponsePackage.
 """
 
 import logging
+import warnings
 from typing import Any, Final
+
+warnings.warn(
+    "src.agents.synthesizer is deprecated as part of Architecture v4.0 Phase 3. "
+    "Use src.agents.analytics.response_synthesizer.ResponseSynthesizer instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from langchain_core.language_models.chat_models import BaseChatModel
 

@@ -14,8 +14,13 @@ from typing import Any
 
 from src.agents.analytics.evidence_analyzer import analyze_collected_evidence
 from src.agents.analytics.planner import generate_analysis_plan
+from src.agents.analytics.response_synthesizer import ResponseSynthesizer
 from src.agents.analytics.task_executor import aexecute_analysis_task
-from src.models.artifacts import AnalysisPlan, QueryArtifact
+from src.models.artifacts import (
+    AnalysisPlan,
+    ChartArtifact,
+    QueryArtifact,
+)
 from src.models.state import AnalyticsState
 
 logger = logging.getLogger(__name__)
@@ -118,49 +123,43 @@ async def evidence_node(state: AnalyticsState) -> dict[str, Any]:
 
 
 async def presentation_node(state: AnalyticsState) -> dict[str, Any]:
-    """Node tổng hợp phản hồi phân tích kinh doanh cuối cùng."""
+    """Node tổng hợp phản hồi phân tích kinh doanh cuối cùng (Response Synthesizer - Phase 3)."""
     artifacts = state.get("artifacts", []) or []
-    evaluation = state.get("current_evaluation")
     question = state.get("question", "")
+    session_id = state.get("session_id", "default")
+    plan = state.get("plan")
+    analysis_goal = plan.goal if plan else question
 
-    # Kiểm tra tỷ lệ thành công của các truy vấn
+    logger.info("Khởi chạy Presentation Node (ResponseSynthesizer) cho: %s", question)
+    synthesizer = ResponseSynthesizer()
+    response_package = await synthesizer.synthesize(
+        question=question,
+        artifacts=artifacts,
+        analysis_goal=analysis_goal,
+        session_id=session_id,
+    )
+
+    # Trích xuất primary chart nếu có để giữ tương thích ngược với state.get("visualization")
+    primary_viz = None
+    for art in response_package.artifacts:
+        if isinstance(art, ChartArtifact):
+            primary_viz = {
+                "chart_type": art.chart_type,
+                "title": art.title,
+                "x_key": art.x_key,
+                "y_keys": art.y_keys,
+                "series_labels": art.series_labels,
+                "data": art.data,
+            }
+            break
+
     has_success = any(a.status == "SUCCESS" for a in artifacts)
-
-    if not has_success:
-        logger.warning("Toàn bộ các truy vấn phân tích đều thất bại.")
-        error_details = []
-        for art in artifacts:
-            if art.error_message:
-                error_details.append(f"- Task {art.task_id}: {art.error_message}")
-        error_summary = (
-            "\n".join(error_details)
-            if error_details
-            else "Không thể kết nối hoặc truy vấn dữ liệu."
-        )
-        failure_insight = (
-            f"Rất tiếc, quá trình phân tích cho câu hỏi '{question}' không thành công do các truy vấn dữ liệu đều thất bại:\n"
-            f"{error_summary}"
-        )
-        return {
-            "status": "FAILED",
-            "insight": failure_insight,
-            "error_message": error_summary,
-            "visualization": None,
-        }
-
-    # Trường hợp thành công
-    status = "COMPLETED"
-    if evaluation and evaluation.findings_summary:
-        insight = evaluation.findings_summary
-    else:
-        success_count = sum(1 for a in artifacts if a.status == "SUCCESS")
-        insight = (
-            f"Đã hoàn thành phân tích với {success_count} truy vấn dữ liệu thành công."
-        )
+    status = "COMPLETED" if has_success else "FAILED"
 
     return {
         "status": status,
-        "insight": insight,
-        "visualization": state.get("visualization"),
-        "error_message": None,
+        "insight": response_package.direct_answer,
+        "visualization": primary_viz or state.get("visualization"),
+        "response_package": response_package,
+        "error_message": None if has_success else response_package.direct_answer,
     }

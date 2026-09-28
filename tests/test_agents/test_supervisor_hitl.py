@@ -32,7 +32,10 @@ def test_check_hitl_pending_positive():
     is_hitl, reason, sql, est_bytes = check_hitl_pending(messages)
 
     assert is_hitl is True
-    assert sql == "SELECT l_orderkey, SUM(l_extendedprice) FROM lineitem GROUP BY l_orderkey"
+    assert (
+        sql
+        == "SELECT l_orderkey, SUM(l_extendedprice) FROM lineitem GROUP BY l_orderkey"
+    )
     assert est_bytes == 181969200
     assert "Khối lượng quét lớn" in reason
     assert "lineitem" in reason
@@ -146,11 +149,15 @@ async def test_arun_supervisor_pending_approval_flow():
 @pytest.mark.asyncio
 async def test_ask_query_api_returns_pending_approval(monkeypatch):
     """Kiểm tra endpoint POST /api/v1/query/ask trả về status PENDING_APPROVAL và requires_hitl=True."""
+    import uuid
+
+    sess_id = f"sess_api_hitl_{uuid.uuid4().hex[:8]}"
+
     async def mock_arun(*args, **kwargs):
         return {
             "status": "PENDING_APPROVAL",
             "question": "Thống kê chi tiết lineitem",
-            "session_id": "sess_api_hitl_01",
+            "session_id": sess_id,
             "is_ambiguous": False,
             "requires_hitl": True,
             "hitl_reason": "Dung lượng quét lớn trên bảng lineitem",
@@ -170,7 +177,7 @@ async def test_ask_query_api_returns_pending_approval(monkeypatch):
             "/api/v1/query/ask",
             json={
                 "question": "Thống kê chi tiết lineitem",
-                "session_id": "sess_api_hitl_01",
+                "session_id": sess_id,
             },
         )
         assert response.status_code == 200

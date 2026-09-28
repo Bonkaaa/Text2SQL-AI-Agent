@@ -129,3 +129,17 @@ def test_empty_query_handling():
 
     assert result.is_valid is False
     assert result.error_type == "EMPTY_QUERY"
+
+
+def test_wildcard_select_star_expansion_and_flag():
+    """Kiểm tra câu lệnh SELECT * được phát hiện has_star=True và tự động expand cột theo schema."""
+    sql = "SELECT * FROM customer"
+    result = sanitize_and_validate_sql(sql)
+
+    assert result.is_valid is True
+    assert result.has_star is True
+    assert "customer" in result.tables_used
+    # Kiểm tra cột đã được mở rộng để phục vụ RBAC
+    assert "c_custkey" in result.columns_used
+    assert "c_phone" in result.columns_used
+    assert "c_acctbal" in result.columns_used

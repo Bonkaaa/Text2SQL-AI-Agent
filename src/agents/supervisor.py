@@ -22,6 +22,7 @@ Kiến trúc lai (Hybrid Architecture) kết hợp:
    - Tích hợp check_clarification_needed (Component 4.1) xử lý Fast-path khi câu hỏi mơ hồ.
 """
 
+import asyncio
 import logging
 import re
 import uuid
@@ -58,6 +59,8 @@ def reset_default_checkpointer() -> None:
     global _shared_supervisor_checkpointer
     _shared_supervisor_checkpointer = MemorySaver()
 
+
+from src.agents.analytics import get_analytics_subagent
 from src.agents.consultation import get_consultation_subagent
 from src.agents.control_pipeline import get_control_pipeline_subagent
 from src.agents.preflight_gatekeeper import (
@@ -67,7 +70,6 @@ from src.agents.preflight_gatekeeper import (
 from src.agents.prompts import SUPERVISOR_SYSTEM_PROMPT
 from src.agents.schema_retriever import get_schema_retriever_subagent
 from src.agents.sql_generator import get_sql_generator_subagent
-from src.agents.synthesizer import get_synthesizer_subagent
 from src.config import get_settings
 from src.models.artifacts import PreflightDecision, PreflightDecisionType
 from src.models.rbac import UserContext, UserRole
@@ -80,6 +82,7 @@ logger = logging.getLogger(__name__)
 # Danh sách kỹ năng nghiệp vụ mặc định nạp cho Deep Agent Supervisor
 DEFAULT_SUPERVISOR_SKILLS: Final[list[str]] = [
     "skills/analytics-orchestrator",
+    "skills/tpcds-analytics",
     "skills/tpch-analytics",
     "skills/duckdb-sql",
 ]
@@ -99,34 +102,52 @@ def get_supervisor_subagents(
     tier1_model: str | BaseChatModel | None = None,
     tier2_model: str | BaseChatModel | None = None,
     control_graph: CompiledStateGraph | None = None,
+    analytics_graph: CompiledStateGraph | None = None,
+    include_legacy_subagents: bool = False,
 ) -> list[SubAgent | CompiledSubAgent]:
-    """Tạo và cấu hình danh sách 4 Subagents cốt lõi cho Deep Agent Supervisor.
+    """Tạo và cấu hình danh sách Subagents chuyên biệt cho Deep Agent Supervisor (Pure Orchestrator).
 
-    Bao gồm 3 Declarative Subagents (Context Quarantine) và 1 CompiledSubAgent (Deterministic Control):
-    1. schema-retriever: Tra cứu DDL bảng, cột, quan hệ JOIN và giá trị phân loại.
-    2. sql-generator: Sinh câu truy vấn SQL tối ưu theo dialect DuckDB.
-    3. control-pipeline: Hàng rào kiểm duyệt AST, RBAC, Cost, HITL và thực thi Data Warehouse.
-    4. response-synthesizer: Trực quan hóa dữ liệu (Recharts) và giải thích insight tiếng Việt.
+    Kiến trúc v4.0 Pure Orchestrator:
+    Chỉ duy trì 2 Subagents chính cho 2 nhánh ý định (Intent Routes):
+    1. consultation-agent: Tiếp nhận câu hỏi xã giao và tra cứu metadata TPC-H 8 bảng (CONVERSATION/METADATA).
+    2. analytics-subagent: Đóng gói toàn bộ quy trình phân tích dữ liệu đa nhiệm qua LangGraph (ANALYTICS).
+
+    Các subagent cũ (schema-retriever, sql-generator, control-pipeline, response-synthesizer)
+    đã được đóng gói hoàn toàn bên trong analytics-subagent và không còn trực tiếp gắn vào Supervisor
+    để đảm bảo nguyên tắc Context Quarantine và Pure Orchestration.
 
     Args:
-        tier1_model: Model chỉ định cho SQL Generator (mặc định lấy tier1_model từ Settings).
-        tier2_model: Model chỉ định cho Schema Retriever & Synthesizer (mặc định tier2_model).
-        control_graph: LangGraph CompiledStateGraph tùy chọn cho Control Pipeline.
+        tier1_model: Model chỉ định cho SQL Generator (khi include_legacy_subagents=True).
+        tier2_model: Model chỉ định cho Consultation Agent & Analytics Subagent.
+        control_graph: LangGraph CompiledStateGraph tùy chọn cho Control Pipeline cũ.
+        analytics_graph: LangGraph CompiledStateGraph tùy chọn cho Analytics Subgraph.
+        include_legacy_subagents: Cờ cho phép nạp 4 subagents cũ phục vụ kiểm thử tương thích ngược.
 
     Returns:
-        Danh sách 4 subagent specifications theo đúng chuẩn deepagents.
+        Danh sách subagent specifications theo đúng chuẩn deepagents (mặc định 2 subagents).
     """
     settings = get_settings()
-    active_tier1 = tier1_model or settings.tier1_model
     active_tier2 = tier2_model or settings.tier2_model
 
-    return [
+    subagents: list[SubAgent | CompiledSubAgent] = [
         get_consultation_subagent(model=active_tier2),
-        get_schema_retriever_subagent(model=active_tier2),
-        get_sql_generator_subagent(model=active_tier1),
-        get_control_pipeline_subagent(graph=control_graph),
-        get_synthesizer_subagent(model=active_tier2),
+        get_analytics_subagent(graph=analytics_graph),
     ]
+
+    if include_legacy_subagents:
+        from src.agents.synthesizer import get_synthesizer_subagent
+
+        active_tier1 = tier1_model or settings.tier1_model
+        subagents.extend(
+            [
+                get_schema_retriever_subagent(model=active_tier2),
+                get_sql_generator_subagent(model=active_tier1),
+                get_control_pipeline_subagent(graph=control_graph),
+                get_synthesizer_subagent(model=active_tier2),
+            ]
+        )
+
+    return subagents
 
 
 # ==============================================================================
@@ -186,7 +207,9 @@ def create_text2sql_supervisor(
     else:
         # Thử lấy instance ChatModel từ service, nếu chưa cấu hình thì dùng model name string
         resolved_llm = get_chat_model(tier="tier1")
-        active_model = resolved_llm if resolved_llm is not None else settings.tier1_model
+        active_model = (
+            resolved_llm if resolved_llm is not None else settings.tier1_model
+        )
 
     # 2. Xác định Middleware Stack (Bắt buộc có TodoList, ToolCallLimit, ModelCallLimit)
     active_middleware: list[AgentMiddleware[Any, Any, Any]] = [
@@ -237,7 +260,9 @@ def create_text2sql_supervisor(
     else:
         active_subagents = get_supervisor_subagents(
             tier1_model=active_model,
-            tier2_model=active_model if isinstance(active_model, BaseChatModel) else None,
+            tier2_model=active_model
+            if isinstance(active_model, BaseChatModel)
+            else None,
         )
 
     # 4. Xác định Skills & Memory (Cho phép truyền [] để tắt hoàn toàn)
@@ -294,12 +319,10 @@ def format_failed_query_fallback_response(
 ) -> str:
     """Tạo thông báo phản hồi chuẩn mực (Deterministic Fallback) khi truy vấn SQL thất bại."""
     err_detail = (
-        f"\n- **Chi tiết kỹ thuật**: {last_error_message}"
-        if last_error_message
-        else ""
+        f"\n- **Chi tiết kỹ thuật**: {last_error_message}" if last_error_message else ""
     )
     return (
-        f"Rất tiếc, hệ thống không thể thực thi thành công câu truy vấn dữ liệu cho câu hỏi: *\"{question}\"*.\n\n"
+        f'Rất tiếc, hệ thống không thể thực thi thành công câu truy vấn dữ liệu cho câu hỏi: *"{question}"*.\n\n'
         f"### ⚠️ Thông báo an toàn dữ liệu\n"
         f"Câu lệnh SQL đã không vượt qua được hàng rào kiểm duyệt hoặc gặp lỗi thực thi trong cơ sở dữ liệu. "
         f"Để đảm bảo tính chính xác tuyệt đối và tránh giả lập số liệu không có thực (Zero Hallucination), "
@@ -352,8 +375,14 @@ def check_hitl_pending(
     """
     for msg in reversed(messages):
         content = extract_message_text(getattr(msg, "content", msg))
-        if "BLOCKED_HITL" in content or "HITL Required" in content or "TẠM DỪNG CHỜ PHÊ DUYỆT" in content:
-            sql_m = re.search(r"-\s*Câu lệnh:\s*(SELECT[\s\S]+?)(?:\n-|\Z)", content, re.IGNORECASE)
+        if (
+            "BLOCKED_HITL" in content
+            or "HITL Required" in content
+            or "TẠM DỪNG CHỜ PHÊ DUYỆT" in content
+        ):
+            sql_m = re.search(
+                r"-\s*Câu lệnh:\s*(SELECT[\s\S]+?)(?:\n-|\Z)", content, re.IGNORECASE
+            )
             sql = sql_m.group(1).strip() if sql_m else None
 
             bytes_m = re.search(r"Dung lượng quét ước tính:\s*(\d+)", content)
@@ -423,14 +452,18 @@ def run_supervisor(
         {
             "question": question,
             "user_id": active_user_context.user_id,
-            "role": active_user_context.role.value if hasattr(active_user_context.role, "value") else str(active_user_context.role),
+            "role": active_user_context.role.value
+            if hasattr(active_user_context.role, "value")
+            else str(active_user_context.role),
         },
     )
 
     # 2. Stage 1: Pre-flight Decision Gatekeeper (Bảo mật & Làm rõ câu hỏi)
     if not skip_clarification:
         if hasattr(check_clarification_needed, "assert_called"):
-            legacy_res = check_clarification_needed(question=question, llm=clarification_llm)
+            legacy_res = check_clarification_needed(
+                question=question, llm=clarification_llm
+            )
             if isinstance(legacy_res, ClarificationResult) and legacy_res.is_ambiguous:
                 preflight = PreflightDecision(
                     decision=PreflightDecisionType.CLARIFICATION_REQUIRED,
@@ -629,6 +662,14 @@ def run_supervisor(
             "final_answer": final_answer,
             "files": files,
             "tracer": active_tracer,
+            "response_package": output_state.get("response_package"),
+            "output_artifacts": output_state.get("output_artifacts"),
+            "artifacts": output_state.get("artifacts"),
+            "plan": output_state.get("plan"),
+            "sql": output_state.get("sql"),
+            "data": output_state.get("data"),
+            "columns": output_state.get("columns"),
+            "visualization": output_state.get("visualization"),
         }
 
     except Exception as exc:
@@ -644,7 +685,9 @@ def run_supervisor(
             "session_id": active_session_id,
             "is_ambiguous": False,
             "error": str(exc),
-            "messages": [AIMessage(content=f"Đã xảy ra lỗi trong quá trình xử lý: {exc}")],
+            "messages": [
+                AIMessage(content=f"Đã xảy ra lỗi trong quá trình xử lý: {exc}")
+            ],
             "tracer": active_tracer,
         }
 
@@ -681,14 +724,18 @@ async def arun_supervisor(
         {
             "question": question,
             "user_id": active_user_context.user_id,
-            "role": active_user_context.role.value if hasattr(active_user_context.role, "value") else str(active_user_context.role),
+            "role": active_user_context.role.value
+            if hasattr(active_user_context.role, "value")
+            else str(active_user_context.role),
         },
     )
 
     # 1. Pre-flight Gatekeeper (Bảo mật & Làm rõ câu hỏi)
     if not skip_clarification:
         if hasattr(check_clarification_needed, "assert_called"):
-            legacy_res = check_clarification_needed(question=question, llm=clarification_llm)
+            legacy_res = check_clarification_needed(
+                question=question, llm=clarification_llm
+            )
             if isinstance(legacy_res, ClarificationResult) and legacy_res.is_ambiguous:
                 preflight = PreflightDecision(
                     decision=PreflightDecisionType.CLARIFICATION_REQUIRED,
@@ -706,7 +753,8 @@ async def arun_supervisor(
                     tier="tier2_llm",
                 )
         else:
-            preflight = evaluate_input_preflight(
+            preflight = await asyncio.to_thread(
+                evaluate_input_preflight,
                 question=question,
                 llm=clarification_llm,
             )
@@ -886,6 +934,14 @@ async def arun_supervisor(
             "final_answer": final_answer,
             "files": files,
             "tracer": active_tracer,
+            "response_package": output_state.get("response_package"),
+            "output_artifacts": output_state.get("output_artifacts"),
+            "artifacts": output_state.get("artifacts"),
+            "plan": output_state.get("plan"),
+            "sql": output_state.get("sql"),
+            "data": output_state.get("data"),
+            "columns": output_state.get("columns"),
+            "visualization": output_state.get("visualization"),
         }
 
     except Exception as exc:
@@ -901,7 +957,9 @@ async def arun_supervisor(
             "session_id": active_session_id,
             "is_ambiguous": False,
             "error": str(exc),
-            "messages": [AIMessage(content=f"Đã xảy ra lỗi trong quá trình xử lý: {exc}")],
+            "messages": [
+                AIMessage(content=f"Đã xảy ra lỗi trong quá trình xử lý: {exc}")
+            ],
             "tracer": active_tracer,
         }
 

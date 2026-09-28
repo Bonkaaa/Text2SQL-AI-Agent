@@ -38,6 +38,7 @@ def ast_check_node(state: ControlState) -> dict[str, Any]:
         "sql": result.sanitized_sql,
         "tables_used": result.tables_used,
         "columns_used": result.columns_used,
+        "has_star": result.has_star,
     }
 
 
@@ -46,6 +47,7 @@ def rbac_check_node(state: ControlState) -> dict[str, Any]:
     tables_used = state.get("tables_used", [])
     columns_used = state.get("columns_used", [])
     user_context = state.get("user_context")
+    has_star = state.get("has_star", False)
 
     if not user_context:
         return {
@@ -59,6 +61,7 @@ def rbac_check_node(state: ControlState) -> dict[str, Any]:
         tables_used=tables_used,
         columns_used=columns_used,
         user_context=user_context,
+        has_star=has_star,
     )
 
     if not result.is_allowed:
@@ -88,6 +91,15 @@ def cost_guard_node(
     )
 
     estimate = connector.estimate_query_cost(sql=sql, max_budget_bytes=max_budget)
+
+    # Nếu phát hiện lỗi cú pháp hoặc schema (binder/catalog error) khi DB chuẩn bị kế hoạch
+    if estimate.syntax_or_schema_error:
+        return {
+            "cost_valid": False,
+            "status": "DB_ERROR",
+            "error_type": "RUNTIME_ERROR",
+            "error_message": estimate.syntax_or_schema_error,
+        }
 
     if not estimate.is_within_budget:
         return {
@@ -232,7 +244,13 @@ def err_node(state: ControlState) -> dict[str, Any]:
 
     status_val = state.get("status")
     error_type = state.get("error_type", "")
-    if status_val in ("BLOCKED_AST", "BLOCKED_RBAC", "BLOCKED_COST", "BLOCKED_HITL", "TIMEOUT"):
+    if status_val in (
+        "BLOCKED_AST",
+        "BLOCKED_RBAC",
+        "BLOCKED_COST",
+        "BLOCKED_HITL",
+        "TIMEOUT",
+    ):
         art_status = status_val
     elif "AST" in error_type:
         art_status = "BLOCKED_AST"
@@ -264,7 +282,6 @@ def err_node(state: ControlState) -> dict[str, Any]:
     }
 
 
-
 def audit_node(
     state: ControlState,
     audit_logger: AuditLogger | None = None,
@@ -282,7 +299,7 @@ def audit_node(
         session_id=state.get("session_id", "anonymous"),
         user_id=user_context.user_id if user_context else "unknown",
         role=user_context.role.value if user_context else "Analyst",
-        question=state.get("sql", ""),
+        question=state.get("question") or state.get("sql", ""),
         sql=state.get("sql", ""),
         status=status,
         bytes_scanned=result.get("bytes_scanned", 0) if result else 0,

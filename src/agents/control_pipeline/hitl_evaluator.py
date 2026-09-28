@@ -51,7 +51,9 @@ def has_time_filter_in_where(sql: str, time_columns: set[str]) -> bool:
         return False
 
     except (SqlglotError, ValueError, TypeError, AttributeError) as exc:
-        logger.debug("Lỗi khi parse AST kiểm tra time filter, dùng regex fallback: %s", exc)
+        logger.debug(
+            "Lỗi khi parse AST kiểm tra time filter, dùng regex fallback: %s", exc
+        )
         lower_sql = sql.lower()
         where_idx = lower_sql.find("where")
         if where_idx == -1:
@@ -170,7 +172,9 @@ def evaluate_query_risk(
     # --------------------------------------------------------------------------
     if has_cartesian_join_risk(sql):
         risk_score += 40
-        risk_factors.append("Phát hiện nguy cơ tích đề-các (Cross Join không điều kiện)")
+        risk_factors.append(
+            "Phát hiện nguy cơ tích đề-các (Cross Join không điều kiện)"
+        )
 
     # --------------------------------------------------------------------------
     # 5. Quyết định kích hoạt HITL (Threshold: Điểm rủi ro >= 50)

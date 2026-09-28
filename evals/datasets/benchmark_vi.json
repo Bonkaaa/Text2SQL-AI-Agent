@@ -1,0 +1,402 @@
+[
+  {
+    "id": "q01",
+    "question": "Có bao nhiêu khách hàng trong cơ sở dữ liệu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["customer"],
+    "ground_truth_sql": "SELECT count(*) AS total_customers FROM customer;"
+  },
+  {
+    "id": "q02",
+    "question": "Tổng số đơn hàng đã được tạo trong hệ thống là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT count(*) AS total_orders FROM orders;"
+  },
+  {
+    "id": "q03",
+    "question": "Có bao nhiêu nhà cung cấp trong hệ thống?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["supplier"],
+    "ground_truth_sql": "SELECT count(*) AS total_suppliers FROM supplier;"
+  },
+  {
+    "id": "q04",
+    "question": "Tổng số linh kiện (part) có trong danh mục là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT count(*) AS total_parts FROM part;"
+  },
+  {
+    "id": "q05",
+    "question": "Giá bán lẻ trung bình của các linh kiện là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT avg(p_retailprice) AS avg_retail_price FROM part;"
+  },
+  {
+    "id": "q06",
+    "question": "Tổng giá trị đơn hàng (total price) của toàn bộ hệ thống là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT sum(o_totalprice) AS total_order_value FROM orders;"
+  },
+  {
+    "id": "q07",
+    "question": "Thống kê số lượng đơn hàng theo từng trạng thái đơn hàng (order status)?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT o_orderstatus, count(*) AS order_count FROM orders GROUP BY o_orderstatus ORDER BY order_count DESC;"
+  },
+  {
+    "id": "q08",
+    "question": "Số lượng khách hàng theo từng phân khúc thị trường (mktsegment)?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["customer"],
+    "ground_truth_sql": "SELECT c_mktsegment, count(*) AS customer_count FROM customer GROUP BY c_mktsegment ORDER BY customer_count DESC;"
+  },
+  {
+    "id": "q09",
+    "question": "Thống kê số lượng đơn hàng theo mức độ ưu tiên (order priority)?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT o_orderpriority, count(*) AS order_count FROM orders GROUP BY o_orderpriority ORDER BY order_count DESC;"
+  },
+  {
+    "id": "q10",
+    "question": "Danh sách 5 quốc gia có nhiều khách hàng nhất?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Top-N",
+    "tables": ["customer", "nation"],
+    "ground_truth_sql": "SELECT n.n_name, count(c.c_custkey) AS customer_count FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY customer_count DESC LIMIT 5;"
+  },
+  {
+    "id": "q11",
+    "question": "Top 5 khách hàng có tổng chi tiêu đơn hàng lớn nhất?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Top-N",
+    "tables": ["customer", "orders"],
+    "ground_truth_sql": "SELECT c.c_name, sum(o.o_totalprice) AS total_spent FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_name ORDER BY total_spent DESC LIMIT 5;"
+  },
+  {
+    "id": "q12",
+    "question": "Số lượng nhà cung cấp theo từng quốc gia?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Group By",
+    "tables": ["supplier", "nation"],
+    "ground_truth_sql": "SELECT n.n_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY supplier_count DESC;"
+  },
+  {
+    "id": "q13",
+    "question": "Top 5 nhà cung cấp có số dư tài khoản (acctbal) cao nhất?",
+    "difficulty": "EASY",
+    "category": "Top-N",
+    "tables": ["supplier"],
+    "ground_truth_sql": "SELECT s_name, s_acctbal FROM supplier ORDER BY s_acctbal DESC LIMIT 5;"
+  },
+  {
+    "id": "q14",
+    "question": "Tổng số lượng dòng mặt hàng (lineitem) theo từng phương thức vận chuyển (shipmode)?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT l_shipmode, count(*) AS item_count FROM lineitem GROUP BY l_shipmode ORDER BY item_count DESC;"
+  },
+  {
+    "id": "q15",
+    "question": "Top 5 đơn hàng có tổng giá trị lớn nhất trong năm 1995?",
+    "difficulty": "MEDIUM",
+    "category": "Filter & Top-N",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT o_orderkey, o_totalprice, o_orderdate FROM orders WHERE extract(year FROM o_orderdate) = 1995 ORDER BY o_totalprice DESC LIMIT 5;"
+  },
+  {
+    "id": "q16",
+    "question": "Số lượng khách hàng tại từng khu vực (region)?",
+    "difficulty": "MEDIUM",
+    "category": "Multi-Join",
+    "tables": ["customer", "nation", "region"],
+    "ground_truth_sql": "SELECT r.r_name, count(c.c_custkey) AS customer_count FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY customer_count DESC;"
+  },
+  {
+    "id": "q17",
+    "question": "Số lượng nhà cung cấp tại từng khu vực (region)?",
+    "difficulty": "MEDIUM",
+    "category": "Multi-Join",
+    "tables": ["supplier", "nation", "region"],
+    "ground_truth_sql": "SELECT r.r_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY supplier_count DESC;"
+  },
+  {
+    "id": "q18",
+    "question": "Tổng doanh thu bán hàng (totalprice) theo từng năm?",
+    "difficulty": "MEDIUM",
+    "category": "Date & Aggregation",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT extract(year FROM o_orderdate) AS order_year, sum(o_totalprice) AS total_revenue FROM orders GROUP BY extract(year FROM o_orderdate) ORDER BY order_year;"
+  },
+  {
+    "id": "q19",
+    "question": "Top 5 linh kiện có số lượng bán ra (quantity) nhiều nhất?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Top-N",
+    "tables": ["part", "lineitem"],
+    "ground_truth_sql": "SELECT p.p_name, sum(l.l_quantity) AS total_quantity FROM part p JOIN lineitem l ON p.p_partkey = l.l_partkey GROUP BY p.p_name ORDER BY total_quantity DESC, p.p_name ASC LIMIT 5;"
+  },
+  {
+    "id": "q20",
+    "question": "Tổng doanh thu bán hàng cho khách hàng thuộc phân khúc 'BUILDING'?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Filter",
+    "tables": ["customer", "orders"],
+    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS total_building_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey WHERE c.c_mktsegment = 'BUILDING';"
+  },
+  {
+    "id": "q21",
+    "question": "Số lượng khách hàng có số dư tài khoản âm (acctbal < 0)?",
+    "difficulty": "EASY",
+    "category": "Filter",
+    "tables": ["customer"],
+    "ground_truth_sql": "SELECT count(*) AS negative_balance_customers FROM customer WHERE c_acctbal < 0;"
+  },
+  {
+    "id": "q22",
+    "question": "Top 5 thương hiệu linh kiện (brand) có nhiều sản phẩm nhất?",
+    "difficulty": "EASY",
+    "category": "Group By & Top-N",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT p_brand, count(*) AS part_count FROM part GROUP BY p_brand ORDER BY part_count DESC LIMIT 5;"
+  },
+  {
+    "id": "q23",
+    "question": "Tổng doanh thu thuần (extendedprice * (1 - discount)) của toàn bộ hệ thống?",
+    "difficulty": "MEDIUM",
+    "category": "Business Metric",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS total_net_revenue FROM lineitem;"
+  },
+  {
+    "id": "q24",
+    "question": "Tổng doanh thu thuần trong năm 1995 là bao nhiêu?",
+    "difficulty": "MEDIUM",
+    "category": "Business Metric & Date",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS net_revenue_1995 FROM lineitem WHERE extract(year FROM l_shipdate) = 1995;"
+  },
+  {
+    "id": "q25",
+    "question": "Số lượng đơn hàng được đặt theo từng tháng trong năm 1995?",
+    "difficulty": "MEDIUM",
+    "category": "Date Aggregation",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT extract(month FROM o_orderdate) AS order_month, count(*) AS order_count FROM orders WHERE extract(year FROM o_orderdate) = 1995 GROUP BY extract(month FROM o_orderdate) ORDER BY order_month;"
+  },
+  {
+    "id": "q26",
+    "question": "Doanh thu bán hàng theo từng khu vực (region)?",
+    "difficulty": "HARD",
+    "category": "Multi-Join & Aggregation",
+    "tables": ["customer", "orders", "nation", "region"],
+    "ground_truth_sql": "SELECT r.r_name, sum(o.o_totalprice) AS total_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY total_revenue DESC;"
+  },
+  {
+    "id": "q27",
+    "question": "Top 5 quốc gia có tổng doanh thu mua hàng lớn nhất?",
+    "difficulty": "HARD",
+    "category": "Multi-Join & Top-N",
+    "tables": ["customer", "orders", "nation"],
+    "ground_truth_sql": "SELECT n.n_name, sum(o.o_totalprice) AS nation_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY nation_revenue DESC LIMIT 5;"
+  },
+  {
+    "id": "q28",
+    "question": "Số dòng mặt hàng bị hoàn trả (returnflag = 'R') là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Filter",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT count(*) AS returned_items FROM lineitem WHERE l_returnflag = 'R';"
+  },
+  {
+    "id": "q29",
+    "question": "Tổng số tiền chiết khấu (extendedprice * discount) của các dòng mặt hàng?",
+    "difficulty": "MEDIUM",
+    "category": "Business Metric",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * l_discount) AS total_discount_amount FROM lineitem;"
+  },
+  {
+    "id": "q30",
+    "question": "Số lượng đơn hàng bị trễ hạn giao (receiptdate > commitdate)?",
+    "difficulty": "MEDIUM",
+    "category": "Date Filter",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT count(DISTINCT l_orderkey) AS delayed_orders FROM lineitem WHERE l_receiptdate > l_commitdate;"
+  },
+  {
+    "id": "q31",
+    "question": "Giá bán lẻ trung bình của linh kiện theo từng nhà sản xuất (mfgr)?",
+    "difficulty": "MEDIUM",
+    "category": "Group By",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT p_mfgr, avg(p_retailprice) AS avg_price FROM part GROUP BY p_mfgr ORDER BY avg_price DESC;"
+  },
+  {
+    "id": "q32",
+    "question": "Top 5 nhân viên (clerk) lập nhiều đơn hàng nhất?",
+    "difficulty": "EASY",
+    "category": "Group By & Top-N",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT o_clerk, count(*) AS orders_handled FROM orders GROUP BY o_clerk ORDER BY orders_handled DESC LIMIT 5;"
+  },
+  {
+    "id": "q33",
+    "question": "Tổng số lượng linh kiện có sẵn (availqty) trong kho của tất cả nhà cung cấp?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["partsupp"],
+    "ground_truth_sql": "SELECT sum(ps_availqty) AS total_available_stock FROM partsupp;"
+  },
+  {
+    "id": "q34",
+    "question": "Top 5 nhà cung cấp có tổng giá trị hàng tồn kho (availqty * supplycost) lớn nhất?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Top-N",
+    "tables": ["supplier", "partsupp"],
+    "ground_truth_sql": "SELECT s.s_name, sum(ps.ps_availqty * ps.ps_supplycost) AS total_inventory_value FROM supplier s JOIN partsupp ps ON s.s_suppkey = ps.ps_suppkey GROUP BY s.s_name ORDER BY total_inventory_value DESC LIMIT 5;"
+  },
+  {
+    "id": "q35",
+    "question": "Số lượng linh kiện có kích thước (size) lớn hơn 40?",
+    "difficulty": "EASY",
+    "category": "Filter",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT count(*) AS large_parts FROM part WHERE p_size > 40;"
+  },
+  {
+    "id": "q36",
+    "question": "Tổng doanh thu bán hàng cho khách hàng tại khu vực 'ASIA'?",
+    "difficulty": "HARD",
+    "category": "Multi-Join & Filter",
+    "tables": ["customer", "orders", "nation", "region"],
+    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS asia_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey WHERE r.r_name = 'ASIA';"
+  },
+  {
+    "id": "q37",
+    "question": "Tổng doanh thu thuần của các đơn hàng có mức ưu tiên '1-URGENT'?",
+    "difficulty": "HARD",
+    "category": "Join & Filter",
+    "tables": ["orders", "lineitem"],
+    "ground_truth_sql": "SELECT sum(l.l_extendedprice * (1 - l.l_discount)) AS urgent_revenue FROM orders o JOIN lineitem l ON o.o_orderkey = l.l_orderkey WHERE o.o_orderpriority = '1-URGENT';"
+  },
+  {
+    "id": "q38",
+    "question": "Số lượng đơn hàng theo từng năm đặt hàng?",
+    "difficulty": "MEDIUM",
+    "category": "Date & Group By",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT extract(year FROM o_orderdate) AS order_year, count(*) AS order_count FROM orders GROUP BY extract(year FROM o_orderdate) ORDER BY order_year;"
+  },
+  {
+    "id": "q39",
+    "question": "Top 5 linh kiện có giá bán lẻ đắt nhất?",
+    "difficulty": "EASY",
+    "category": "Top-N",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT p_name, p_retailprice FROM part ORDER BY p_retailprice DESC LIMIT 5;"
+  },
+  {
+    "id": "q40",
+    "question": "Số lượng khách hàng ở quốc gia 'JAPAN'?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Filter",
+    "tables": ["customer", "nation"],
+    "ground_truth_sql": "SELECT count(*) AS japan_customers FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey WHERE n.n_name = 'JAPAN';"
+  },
+  {
+    "id": "q41",
+    "question": "Doanh thu bán hàng trung bình trên mỗi đơn hàng theo từng phân khúc thị trường?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Aggregation",
+    "tables": ["customer", "orders"],
+    "ground_truth_sql": "SELECT c.c_mktsegment, avg(o.o_totalprice) AS avg_order_value FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_mktsegment ORDER BY avg_order_value DESC;"
+  },
+  {
+    "id": "q42",
+    "question": "Tổng số tiền thuế (extendedprice * tax) đã thu từ các dòng đơn hàng?",
+    "difficulty": "MEDIUM",
+    "category": "Business Metric",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * l_tax) AS total_tax_amount FROM lineitem;"
+  },
+  {
+    "id": "q43",
+    "question": "Top 5 quốc gia có số lượng nhà cung cấp nhiều nhất ở khu vực 'EUROPE'?",
+    "difficulty": "HARD",
+    "category": "Multi-Join & Top-N",
+    "tables": ["supplier", "nation", "region"],
+    "ground_truth_sql": "SELECT n.n_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey WHERE r.r_name = 'EUROPE' GROUP BY n.n_name ORDER BY supplier_count DESC LIMIT 5;"
+  },
+  {
+    "id": "q44",
+    "question": "Số lượng đơn hàng có tổng giá trị lớn hơn 200,000?",
+    "difficulty": "EASY",
+    "category": "Filter",
+    "tables": ["orders"],
+    "ground_truth_sql": "SELECT count(*) AS high_value_orders FROM orders WHERE o_totalprice > 200000;"
+  },
+  {
+    "id": "q45",
+    "question": "Tổng số lượng mặt hàng (quantity) bán ra theo từng phương thức giao hàng?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT l_shipmode, sum(l_quantity) AS total_qty FROM lineitem GROUP BY l_shipmode ORDER BY total_qty DESC;"
+  },
+  {
+    "id": "q46",
+    "question": "Top 5 khách hàng đặt nhiều đơn hàng nhất?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Top-N",
+    "tables": ["customer", "orders"],
+    "ground_truth_sql": "SELECT c.c_name, count(o.o_orderkey) AS order_count FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_name ORDER BY order_count DESC LIMIT 5;"
+  },
+  {
+    "id": "q47",
+    "question": "Doanh thu thuần của các mặt hàng được giao bằng tàu (shipmode = 'SHIP')?",
+    "difficulty": "MEDIUM",
+    "category": "Filter & Aggregation",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS ship_revenue FROM lineitem WHERE l_shipmode = 'SHIP';"
+  },
+  {
+    "id": "q48",
+    "question": "Số lượng linh kiện theo từng loại bao bì (container)?",
+    "difficulty": "EASY",
+    "category": "Group By",
+    "tables": ["part"],
+    "ground_truth_sql": "SELECT p_container, count(*) AS container_count FROM part GROUP BY p_container ORDER BY container_count DESC LIMIT 10;"
+  },
+  {
+    "id": "q49",
+    "question": "Tổng doanh thu bán hàng của khách hàng tại quốc gia 'GERMANY'?",
+    "difficulty": "HARD",
+    "category": "Multi-Join & Filter",
+    "tables": ["customer", "orders", "nation"],
+    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS germany_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey WHERE n.n_name = 'GERMANY';"
+  },
+  {
+    "id": "q50",
+    "question": "Tổng doanh thu thuần của các đơn hàng trong quý 1 năm 1995 (tháng 1 đến tháng 3)?",
+    "difficulty": "MEDIUM",
+    "category": "Date Range & Aggregation",
+    "tables": ["lineitem"],
+    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS q1_1995_revenue FROM lineitem WHERE l_shipdate >= DATE '1995-01-01' AND l_shipdate <= DATE '1995-03-31';"
+  }
+]

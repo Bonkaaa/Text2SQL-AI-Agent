@@ -21,6 +21,10 @@ from src.utils.categorical_search import (
     format_categorical_context,
 )
 from src.utils.schema_context import (
+    TPCDS_JOIN_RELATIONSHIPS,
+    TPCDS_SEMANTIC_METRICS,
+    TPCDS_TABLE_NAMES,
+    TPCDS_TABLE_SCHEMAS,
     TPCH_JOIN_RELATIONSHIPS,
     TPCH_SEMANTIC_METRICS,
     TPCH_TABLE_NAMES,
@@ -34,20 +38,25 @@ from src.utils.table_keywords import TABLE_KEYWORD_MAP
 # ==============================================================================
 
 
-def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]]:
-    """Tra cứu các bảng và cột TPC-H có liên quan đến câu hỏi nghiệp vụ.
+def search_tables_and_columns(query: str, top_k: int = 8) -> list[dict[str, Any]]:
+    """Tra cứu các bảng và cột TPC-DS có liên quan đến câu hỏi nghiệp vụ.
 
     Args:
         query: Câu hỏi hoặc từ khóa tìm kiếm của người dùng.
-        top_k: Số lượng bảng tối đa trả về (mặc định: 5).
+        top_k: Số lượng bảng tối đa trả về (mặc định: 8).
 
     Returns:
-        Danh sách thông tin các bảng khớp kèm mô tả tóm tắt.
+        Danh sách thông tin các bảng khớp kèm mô tả tóm tắt và DDL.
     """
     normalized_query = query.lower()
-    table_scores: dict[str, int] = {tbl: 0 for tbl in TPCH_TABLE_NAMES}
+
+    # Hỗ trợ cả bảng 24 bảng TPC-DS và 8 bảng TPC-H (nếu có từ khóa legacy)
+    all_table_candidates = list(dict.fromkeys(TPCDS_TABLE_NAMES + TPCH_TABLE_NAMES))
+    table_scores: dict[str, int] = {tbl: 0 for tbl in all_table_candidates}
 
     for tbl, keywords in TABLE_KEYWORD_MAP.items():
+        if tbl not in table_scores:
+            continue
         for kw in keywords:
             if kw in normalized_query:
                 table_scores[tbl] += 2
@@ -55,11 +64,134 @@ def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]
         if tbl in normalized_query:
             table_scores[tbl] += 3
 
-    # Nếu câu hỏi có từ khóa chỉ số doanh thu/lợi nhuận -> bắt buộc cộng điểm lineitem, orders
+    # Heuristic 1: Yếu tố thời gian (năm, tháng, quý, ngày, số năm cụ thể)
+    time_keywords = [
+        "năm",
+        "nam",
+        "tháng",
+        "thang",
+        "quý",
+        "quy",
+        "ngày",
+        "ngay",
+        "year",
+        "month",
+        "quarter",
+        "date",
+        "hàng năm",
+        "theo tháng",
+        "1998",
+        "1999",
+        "2000",
+        "2001",
+        "2002",
+        "2003",
+    ]
+    if any(k in normalized_query for k in time_keywords):
+        table_scores["date_dim"] += 6
+
+    # Heuristic 2: Điều hướng kênh bán hàng & Đổi trả
+    if any(
+        k in normalized_query
+        for k in ["bán lẻ", "ban le", "cửa hàng", "cua hang", "quầy", "store"]
+    ):
+        table_scores["store_sales"] += 4
+    if any(
+        k in normalized_query
+        for k in ["trực tuyến", "truc tuyen", "online", "web", "website"]
+    ):
+        table_scores["web_sales"] += 4
+    if any(
+        k in normalized_query for k in ["catalog", "danh mục", "danh muc", "bưu điện"]
+    ):
+        table_scores["catalog_sales"] += 4
+    if any(
+        k in normalized_query
+        for k in ["đổi trả", "doi tra", "hoàn hàng", "hoan hang", "trả lại", "returns"]
+    ):
+        table_scores["store_returns"] += 3
+        table_scores["web_returns"] += 3
+        table_scores["reason"] += 2
+
+    # Doanh thu / Lợi nhuận chung -> cộng điểm cả 3 kênh bán
     revenue_keywords = ["doanh thu", "doanh so", "revenue", "lợi nhuận", "chiết khấu"]
     if any(k in normalized_query for k in revenue_keywords):
+        table_scores["store_sales"] += 3
+        table_scores["web_sales"] += 2
+        table_scores["catalog_sales"] += 2
+        # Tương thích TPC-H
         table_scores["lineitem"] += 4
         table_scores["orders"] += 3
+
+    # Heuristic 3: Sản phẩm / Mặt hàng
+    if any(
+        k in normalized_query
+        for k in [
+            "sản phẩm",
+            "san pham",
+            "ngành hàng",
+            "nganh hang",
+            "mặt hàng",
+            "mat hang",
+            "item",
+            "category",
+            "brand",
+            "thương hiệu",
+        ]
+    ):
+        table_scores["item"] += 4
+
+    # Heuristic 4: Khách hàng, Địa chỉ, Nhân khẩu học
+    if any(
+        k in normalized_query
+        for k in ["khách hàng", "khach hang", "người mua", "customer"]
+    ):
+        table_scores["customer"] += 3
+    if any(
+        k in normalized_query
+        for k in [
+            "địa chỉ",
+            "dia chi",
+            "tiểu bang",
+            "tieu bang",
+            "bang",
+            "thành phố",
+            "state",
+            "city",
+            "california",
+            "texas",
+        ]
+    ):
+        table_scores["customer_address"] += 4
+        table_scores["customer"] += 2
+    if any(
+        k in normalized_query
+        for k in [
+            "giới tính",
+            "gioi tinh",
+            "hôn nhân",
+            "hon nhan",
+            "nam",
+            "nữ",
+            "kết hôn",
+            "gender",
+        ]
+    ):
+        table_scores["customer_demographics"] += 4
+        table_scores["customer"] += 2
+    if any(
+        k in normalized_query
+        for k in [
+            "thu nhập",
+            "thu nhap",
+            "hộ gia đình",
+            "ho gia dinh",
+            "income",
+            "household",
+        ]
+    ):
+        table_scores["household_demographics"] += 3
+        table_scores["income_band"] += 3
 
     # Sắp xếp các bảng có score > 0
     ranked_tables = sorted(
@@ -69,14 +201,15 @@ def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]
     )
 
     if not ranked_tables:
-        # Nếu câu hỏi quá chung chung, fallback trả về top_k bảng nghiệp vụ cốt lõi
-        ranked_tables = ["orders", "customer", "lineitem", "part", "supplier"]
+        # Nếu câu hỏi quá chung chung, fallback trả về top bảng nghiệp vụ cốt lõi
+        ranked_tables = ["store_sales", "web_sales", "date_dim", "item", "customer"]
 
     selected = ranked_tables[:top_k]
 
+    all_schemas = {**TPCH_TABLE_SCHEMAS, **TPCDS_TABLE_SCHEMAS}
     results: list[dict[str, Any]] = []
     for tbl in selected:
-        schema = TPCH_TABLE_SCHEMAS.get(tbl, "")
+        schema = all_schemas.get(tbl, "")
         results.append(
             {
                 "table": tbl,
@@ -91,7 +224,7 @@ def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]
 def search_categorical_values(
     query: str, min_score: float = 65.0, top_k: int = 5
 ) -> list[dict[str, Any]]:
-    """Tra cứu các giá trị danh mục phân loại thực tế (Entity/Value Linking) trong database TPC-H.
+    """Tra cứu các giá trị danh mục phân loại thực tế (Entity/Value Linking) trong database.
 
     Args:
         query: Câu hỏi hoặc từ khóa của người dùng.
@@ -144,6 +277,10 @@ def retrieve_schema_context(
     Returns:
         SchemaContextResult chứa bảng, điều kiện join, filter danh mục và Markdown.
     """
+    all_schemas = {**TPCH_TABLE_SCHEMAS, **TPCDS_TABLE_SCHEMAS}
+    all_joins = list(TPCDS_JOIN_RELATIONSHIPS) + list(TPCH_JOIN_RELATIONSHIPS)
+    all_metrics = {**TPCH_SEMANTIC_METRICS, **TPCDS_SEMANTIC_METRICS}
+
     # 1. Tìm các giá trị danh mục khớp trong câu hỏi
     categorical_matches = find_matching_categorical_values(
         question, top_k=5, min_score=65.0
@@ -156,19 +293,66 @@ def retrieve_schema_context(
 
     # 2. Xác định các bảng được chọn
     if selected_tables is not None:
-        tables_to_use = [
-            t.lower() for t in selected_tables if t.lower() in TPCH_TABLE_SCHEMAS
-        ]
+        tables_to_use = [t.lower() for t in selected_tables if t.lower() in all_schemas]
     else:
         found_tables = [
-            r["table"] for r in search_tables_and_columns(question, top_k=6)
+            r["table"] for r in search_tables_and_columns(question, top_k=8)
         ]
         # Bổ sung bảng xuất hiện từ categorical matches
         for m in categorical_matches:
             if m.table not in found_tables:
                 found_tables.append(m.table)
 
-        # Đảm bảo tính toàn vẹn quan hệ JOIN (Ví dụ: customer và region cần nation làm cầu nối)
+        # Đảm bảo tính toàn vẹn quan hệ JOIN (Snowflake Hierarchy Bridge Tables)
+        # 1. customer_address -> customer
+        if "customer_address" in found_tables and "customer" not in found_tables:
+            found_tables.append("customer")
+        # 2. customer_demographics -> customer
+        if "customer_demographics" in found_tables and "customer" not in found_tables:
+            found_tables.append("customer")
+        # 3. income_band -> household_demographics -> customer
+        if (
+            "income_band" in found_tables
+            and "household_demographics" not in found_tables
+        ):
+            found_tables.append("household_demographics")
+        if "household_demographics" in found_tables and "customer" not in found_tables:
+            found_tables.append("customer")
+        # 4. Khi có Fact Sales và có yếu tố thời gian trong câu hỏi -> Bắt buộc gắn date_dim
+        sales_facts = {
+            "store_sales",
+            "web_sales",
+            "catalog_sales",
+            "store_returns",
+            "web_returns",
+            "catalog_returns",
+            "inventory",
+        }
+        time_cues = [
+            "năm",
+            "nam",
+            "tháng",
+            "thang",
+            "quý",
+            "quy",
+            "ngày",
+            "ngay",
+            "year",
+            "month",
+            "date",
+            "2000",
+            "2001",
+            "2002",
+            "2003",
+        ]
+        if (
+            "date_dim" not in found_tables
+            and any(f in found_tables for f in sales_facts)
+            and any(c in question.lower() for c in time_cues)
+        ):
+            found_tables.append("date_dim")
+
+        # 5. Tương thích TPC-H Bridge Tables
         if "region" in found_tables and "nation" not in found_tables:
             found_tables.append("nation")
         if (
@@ -184,19 +368,19 @@ def retrieve_schema_context(
         ):
             found_tables.append("nation")
 
-        tables_to_use = [t for t in TPCH_TABLE_NAMES if t in found_tables]
+        tables_to_use = [t for t in found_tables if t in all_schemas]
 
     # 3. Trích xuất các điều kiện JOIN giữa các bảng được chọn
     table_set = set(tables_to_use)
     relevant_joins: list[str] = [
         j.condition
-        for j in TPCH_JOIN_RELATIONSHIPS
+        for j in all_joins
         if j.from_table in table_set and j.to_table in table_set
     ]
 
     # 4. Trích xuất công thức chỉ số nghiệp vụ (dbt Semantic Metrics) liên quan
     metric_formulas: list[str] = []
-    for metric in TPCH_SEMANTIC_METRICS.values():
+    for metric in all_metrics.values():
         # Kiểm tra bảng cần thiết của metric có trong tables_to_use không
         if any(tbl in table_set for tbl in metric.required_tables):
             metric_formulas.append(f"{metric.vietnamese_name}: {metric.formula}")
@@ -239,7 +423,7 @@ def get_schema_retriever_subagent(model: str | None = None) -> dict[str, Any]:
     return {
         "name": "schema-retriever",
         "description": (
-            "Chuyên tra cứu lược đồ cơ sở dữ liệu TPC-H (bảng, cột, quan hệ JOIN), "
+            "Chuyên tra cứu lược đồ cơ sở dữ liệu TPC-DS 24 bảng (bảng, cột, quan hệ JOIN Snowflake), "
             "công thức chỉ số dbt metrics và các giá trị danh mục phân loại thực tế "
             "(categorical values) tương ứng với câu hỏi nghiệp vụ."
         ),

@@ -8,6 +8,7 @@ Hỗ trợ cơ chế Self-Correction tối đa 3 lần retry theo kiến trúc v
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from typing import Any
 
@@ -79,6 +80,58 @@ async def aexecute_analysis_task(
         QueryArtifact chứa kết quả dữ liệu hoặc thông tin lỗi.
     """
     task.status = "EXECUTING"
+
+    # 0. Kiểm tra nếu task này đã được phê duyệt HITL trước đó (Resume từ Persistent Store)
+    from src.agents.control_pipeline.pending_store import (
+        consume_pending_approval,
+        get_pending_approval,
+    )
+
+    q_hash = hashlib.sha256(task.description.encode()).hexdigest()[:16]
+    approved_pending = get_pending_approval(
+        session_id=user_context.session_id,
+        task_id=task.task_id,
+        plan_id=task.plan_id,
+        question_hash=q_hash,
+        status="APPROVED",
+        consumed=False,
+    )
+    # Fallback kiểm tra nếu approval không có plan_id (từ request đơn lẻ hoặc test)
+    if not approved_pending and not task.plan_id:
+        approved_pending = get_pending_approval(
+            session_id=user_context.session_id,
+            task_id=task.task_id,
+            status="APPROVED",
+            consumed=False,
+        )
+
+    if (
+        approved_pending
+        and approved_pending.execution_result
+        and consume_pending_approval(approved_pending.approval_id)
+    ):
+        logger.info(
+            "Task %s (plan %s) đã được phê duyệt HITL trước đó. Nạp lại kết quả thực thi bền vững và đánh dấu consumed.",
+            task.task_id,
+            task.plan_id,
+        )
+        exec_res = approved_pending.execution_result
+        task.status = "SUCCESS" if exec_res.get("success", True) else "FAILED"
+        return QueryArtifact(
+            task_id=task.task_id,
+            sql=approved_pending.sql,
+            dialect="duckdb",
+            explanation="Kết quả thực thi từ phê duyệt Quản trị viên (HITL Approved).",
+            tables_used=approved_pending.tables_used,
+            columns_used=[],
+            status=task.status,
+            data=exec_res.get("data", []),
+            columns=exec_res.get("columns", []),
+            row_count=exec_res.get("row_count", len(exec_res.get("data", []))),
+            execution_time_ms=exec_res.get("execution_time_ms", 0.0),
+            error_message=exec_res.get("error_message"),
+        )
+
     question = _build_task_prompt(task, prior_artifacts)
 
     # 1. Trích xuất ngữ cảnh lược đồ TPC-H và Entity/Categorical Linking cho riêng task này
@@ -89,29 +142,35 @@ async def aexecute_analysis_task(
     last_sql = ""
     last_pipeline_output: ControlPipelineOutput | None = None
 
-    for attempt in range(max_retries + 1):
+    # Guardrail MAX_RETRIES = 3 (ISSUE-07): Clamp chặt chẽ trong khoảng [0, MAX_TASK_RETRIES]
+    effective_max_retries = min(max(0, max_retries), MAX_TASK_RETRIES)
+
+    for attempt in range(effective_max_retries + 1):
         task.retry_count = attempt
         logger.info(
             "Thực thi task %s (Attempt %d/%d): %s",
             task.task_id,
             attempt,
-            max_retries,
+            effective_max_retries,
             task.description,
         )
 
-        # 2. Sinh câu lệnh SQL với đầy đủ schema_context
-        sql_result: SQLGenerationResult = generate_sql(
+        # 2. Sinh câu lệnh SQL bất đồng bộ không chặn event loop (ISSUE-06)
+        sql_result: SQLGenerationResult = await asyncio.to_thread(
+            generate_sql,
             question=question,
             schema_context=schema_context,
             error_context=error_context,
         )
         last_sql = sql_result.sql
 
-        # 3. Chạy qua Control Pipeline
-        pipeline_output: ControlPipelineOutput = run_control_pipeline(
+        # 3. Chạy qua Control Pipeline bất đồng bộ (ISSUE-06 & ISSUE-08)
+        pipeline_output: ControlPipelineOutput = await asyncio.to_thread(
+            run_control_pipeline,
             sql=sql_result.sql,
             user_context=user_context,
             session_id=user_context.session_id,
+            question=task.description,
         )
         last_pipeline_output = pipeline_output
 
@@ -138,6 +197,46 @@ async def aexecute_analysis_task(
             task.query_artifact = artifact
             return artifact
 
+        # 4b. Kiểm tra nếu câu lệnh bị tạm dừng chờ duyệt HITL (ISSUE-03)
+        if pipeline_output.get("status") == "BLOCKED_HITL":
+            logger.info(
+                "Task %s tạm dừng chờ phê duyệt HITL: %s",
+                task.task_id,
+                pipeline_output.get("hitl_reason"),
+            )
+            from src.agents.control_pipeline.pending_store import save_pending_approval
+
+            q_hash = hashlib.sha256(task.description.encode()).hexdigest()[:16]
+            save_pending_approval(
+                session_id=user_context.session_id,
+                sql=last_sql,
+                reason=pipeline_output.get("hitl_reason"),
+                estimated_bytes=pipeline_output.get("bytes_scanned", 0),
+                tables_used=pipeline_output.get("tables_used", []),
+                task_id=task.task_id,
+                plan_id=task.plan_id,
+                question_hash=q_hash,
+                user_context=user_context,
+            )
+            task.status = "BLOCKED_HITL"
+            artifact = QueryArtifact(
+                task_id=task.task_id,
+                sql=last_sql,
+                dialect=sql_result.dialect,
+                explanation=sql_result.explanation,
+                tables_used=pipeline_output.get("tables_used", []),
+                columns_used=pipeline_output.get("columns_used", []),
+                status="BLOCKED_HITL",
+                data=[],
+                columns=[],
+                row_count=0,
+                execution_time_ms=pipeline_output.get("execution_time_ms", 0.0),
+                error_message=pipeline_output.get("error_message")
+                or "Truy vấn chờ phê duyệt HITL.",
+            )
+            task.query_artifact = artifact
+            return artifact
+
         # 5. Truy vấn không hợp lệ -> Chuẩn bị error_context có cấu trúc cho lần thử tiếp theo
         actionable_feedback = (
             pipeline_output.get("actionable_feedback") or "Truy vấn không hợp lệ."
@@ -160,7 +259,9 @@ async def aexecute_analysis_task(
         )
 
     # 5. Nếu vượt quá số lần retry mà vẫn thất bại
-    logger.error("Task %s THẤT BẠI sau %d lần thử", task.task_id, max_retries + 1)
+    logger.error(
+        "Task %s THẤT BẠI sau %d lần thử", task.task_id, effective_max_retries + 1
+    )
     task.status = "FAILED"
     status_str = _map_pipeline_status(last_pipeline_output or {})
 

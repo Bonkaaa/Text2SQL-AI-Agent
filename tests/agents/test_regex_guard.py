@@ -60,7 +60,10 @@ def test_regex_guard_blocks_ddl_dml_injection(attack_query: str):
     assert result.is_safe is False, f"Thất bại trong việc chặn DDL/DML: {attack_query}"
     assert result.violation_type == RegexViolationType.DDL_DML_INJECTION
     assert result.matched_pattern is not None
-    assert result.refusal_message == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.DDL_DML_INJECTION]
+    assert (
+        result.refusal_message
+        == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.DDL_DML_INJECTION]
+    )
 
 
 # ==============================================================================
@@ -95,10 +98,15 @@ def test_regex_guard_blocks_prompt_injection(injection_query: str):
     """Kiểm tra chặn đứng các nỗ lực Jailbreak, ghi đè chỉ dẫn hoặc đòi xem System Prompt."""
     result: RegexGuardResult = evaluate_regex_guardrails(injection_query)
 
-    assert result.is_safe is False, f"Thất bại trong việc chặn Prompt Injection: {injection_query}"
+    assert result.is_safe is False, (
+        f"Thất bại trong việc chặn Prompt Injection: {injection_query}"
+    )
     assert result.violation_type == RegexViolationType.PROMPT_INJECTION
     assert result.matched_pattern is not None
-    assert result.refusal_message == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.PROMPT_INJECTION]
+    assert (
+        result.refusal_message
+        == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.PROMPT_INJECTION]
+    )
 
 
 # ==============================================================================
@@ -123,10 +131,15 @@ def test_regex_guard_blocks_script_injection(script_query: str):
     """Kiểm tra chặn đứng các đoạn mã XSS hoặc mã độc shell."""
     result: RegexGuardResult = evaluate_regex_guardrails(script_query)
 
-    assert result.is_safe is False, f"Thất bại trong việc chặn Script Injection: {script_query}"
+    assert result.is_safe is False, (
+        f"Thất bại trong việc chặn Script Injection: {script_query}"
+    )
     assert result.violation_type == RegexViolationType.SCRIPT_INJECTION
     assert result.matched_pattern is not None
-    assert result.refusal_message == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.SCRIPT_INJECTION]
+    assert (
+        result.refusal_message
+        == HARDCODED_REFUSAL_MESSAGES[RegexViolationType.SCRIPT_INJECTION]
+    )
 
 
 # ==============================================================================
@@ -157,7 +170,9 @@ def test_regex_guard_allows_safe_business_queries(safe_query: str):
     """Đảm bảo không chặn nhầm (Zero False Positive) bất kỳ câu hỏi kinh doanh hợp lệ nào."""
     result: RegexGuardResult = evaluate_regex_guardrails(safe_query)
 
-    assert result.is_safe is True, f"Bị chặn nhầm (False Positive): {safe_query} (Pattern: {result.matched_pattern})"
+    assert result.is_safe is True, (
+        f"Bị chặn nhầm (False Positive): {safe_query} (Pattern: {result.matched_pattern})"
+    )
     assert result.violation_type is None
     assert result.matched_pattern is None
     assert result.refusal_message is None

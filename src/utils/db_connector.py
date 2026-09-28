@@ -33,6 +33,10 @@ class CostEstimateResult(BaseModel):
     explanation: str | None = Field(
         default=None, description="Giải thích chi tiết về ước lượng chi phí từ EXPLAIN"
     )
+    syntax_or_schema_error: str | None = Field(
+        default=None,
+        description="Chi tiết lỗi cú pháp hoặc schema (binder/catalog error) phát hiện qua EXPLAIN",
+    )
 
 
 class QueryResult(BaseModel):
@@ -145,14 +149,38 @@ class DuckDBConnector(BaseWarehouseConnector):
                     traverse_plan(root_node)
 
         except duckdb.Error as exc:
-            # Nếu câu SQL có lỗi cú pháp hoặc cột không tồn tại, EXPLAIN sẽ fail
+            # Phân biệt lỗi cú pháp/schema (Binder/Catalog/Parser Error) với lỗi ước lượng chi phí
+            err_str = str(exc)
+            exc_type = type(exc).__name__
+            is_schema_or_syntax_error = (
+                "Binder" in exc_type
+                or "Catalog" in exc_type
+                or "Parser" in exc_type
+                or "Syntax" in exc_type
+                or "Binder Error" in err_str
+                or "Catalog Error" in err_str
+                or "Parser Error" in err_str
+                or "syntax error" in err_str.lower()
+            )
+            if is_schema_or_syntax_error:
+                logger.warning("DuckDB query validation failed in EXPLAIN: %s", exc)
+                return CostEstimateResult(
+                    estimated_bytes=max_budget_bytes + 1,
+                    estimated_rows=0,
+                    is_within_budget=False,
+                    max_budget_bytes=max_budget_bytes,
+                    explanation=f"Lỗi cú pháp hoặc schema phát hiện khi EXPLAIN (Fail-Closed): {exc}",
+                    syntax_or_schema_error=f"Database query error: {exc}",
+                )
+
+            # Áp dụng nguyên lý Fail-Closed: Không cho phép vượt kiểm duyệt chi phí khi không ước lượng được
             logger.warning("DuckDB EXPLAIN failed: %s", exc)
             return CostEstimateResult(
-                estimated_bytes=1024,
+                estimated_bytes=max_budget_bytes + 1,
                 estimated_rows=0,
-                is_within_budget=True,
+                is_within_budget=False,
                 max_budget_bytes=max_budget_bytes,
-                explanation=f"Không thể chạy EXPLAIN: {exc}",
+                explanation=f"Không thể ước lượng chi phí qua EXPLAIN (Fail-Closed): {exc}",
             )
 
         # Đảm bảo mức tối thiểu 1024 bytes nếu query hợp lệ
@@ -293,12 +321,14 @@ class BigQueryConnector(BaseWarehouseConnector):
         try:
             from google.cloud import bigquery
         except ImportError:
-            logger.warning("Thư viện google-cloud-bigquery chưa được cài đặt.")
+            logger.warning(
+                "Thư viện google-cloud-bigquery chưa được cài đặt (Fail-Closed)."
+            )
             return CostEstimateResult(
-                estimated_bytes=0,
-                is_within_budget=True,
+                estimated_bytes=max_budget_bytes + 1,
+                is_within_budget=False,
                 max_budget_bytes=max_budget_bytes,
-                explanation="Chưa cài đặt google-cloud-bigquery client.",
+                explanation="Không thể ước lượng chi phí vì chưa cài đặt google-cloud-bigquery client (Fail-Closed).",
             )
 
         try:
@@ -323,10 +353,10 @@ class BigQueryConnector(BaseWarehouseConnector):
         except Exception as exc:  # noqa: BLE001
             logger.error("BigQuery dry-run error: %s", exc)
             return CostEstimateResult(
-                estimated_bytes=0,
+                estimated_bytes=max_budget_bytes + 1,
                 is_within_budget=False,
                 max_budget_bytes=max_budget_bytes,
-                explanation=f"Lỗi khi thực hiện BigQuery dry-run: {exc}",
+                explanation=f"Lỗi khi thực hiện BigQuery dry-run (Fail-Closed): {exc}",
             )
 
     def execute_query(

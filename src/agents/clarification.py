@@ -25,16 +25,16 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 
 DEFAULT_CLARIFICATION_OPTIONS_POOL: Final[list[str]] = [
-    "Xem tổng doanh thu theo từng năm (1992 - 1998)",
+    "Xem tổng doanh thu theo từng năm (1998 - 2002)",
+    "Tổng doanh số theo 3 kênh bán hàng (Store, Web, Catalog) năm 2001",
+    "Top 5 danh mục sản phẩm (Categories) có doanh thu cao nhất năm 2001",
+    "Doanh thu bán lẻ tại cửa hàng (Store Sales) theo từng bang",
+    "Top 10 mặt hàng bán chạy nhất qua kênh Website (Web Sales)",
+    "Tỷ lệ trả hàng (Returns) theo từng lý do hoàn trả",
+    "Doanh thu và lợi nhuận ròng (Net Profit) theo từng quý năm 2002",
+    "Số lượng khách hàng theo từng phân khúc nhân khẩu học",
+    "Hiệu quả các chiến dịch khuyến mãi (Promotion) năm 2001",
     "Top 5 khách hàng có tổng chi tiêu cao nhất",
-    "Doanh thu theo từng phân khúc thị trường (Market Segment)",
-    "Top 10 mặt hàng (Parts) bán chạy nhất năm 1995",
-    "Tổng số đơn đặt hàng theo từng trạng thái (Order Status)",
-    "Danh sách các nhà cung cấp có số dư tài khoản cao nhất",
-    "Doanh thu và lợi nhuận theo từng khu vực địa lý (Region)",
-    "Top 5 quốc gia có doanh số bán hàng lớn nhất",
-    "Các đơn hàng có mức ưu tiên khẩn cấp (1-URGENT) trong năm 1996",
-    "Mức chiết khấu trung bình theo từng phương thức vận chuyển (Ship Mode)",
 ]
 
 

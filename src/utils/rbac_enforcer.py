@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from src.models.rbac import UserContext, get_role_permissions
+from src.models.rbac import UserContext, UserRole, get_role_permissions
 
 
 class RBACCheckResult(BaseModel):
@@ -30,6 +30,7 @@ def enforce_rbac_policy(
     tables_used: list[str],
     columns_used: list[str],
     user_context: UserContext,
+    has_star: bool = False,
 ) -> RBACCheckResult:
     """Đối chiếu danh sách bảng và cột trích xuất từ AST với quyền hạn của người dùng.
 
@@ -37,6 +38,7 @@ def enforce_rbac_policy(
         tables_used: Danh sách bảng xuất hiện trong câu query.
         columns_used: Danh sách cột xuất hiện trong câu query.
         user_context: Ngữ cảnh người dùng (chứa role, user_id, session_id).
+        has_star: True nếu câu query có chứa ký tự wildcard (*).
 
     Returns:
         RBACCheckResult: Kết quả phê duyệt quyền hạn hoặc danh sách vi phạm.
@@ -55,9 +57,43 @@ def enforce_rbac_policy(
     )
 
     # 2. Kiểm tra các cột nằm trong danh sách bị cấm
-    violating_columns = sorted(
-        [col for col in columns_used if col.lower() in denied_columns]
-    )
+    violating_columns_set: set[str] = {
+        col.lower() for col in columns_used if col.lower() in denied_columns
+    }
+
+    # Nếu query sử dụng wildcard (*), mở rộng kiểm tra tất cả các cột của bảng tương ứng
+    if has_star and denied_columns:
+        from src.utils.schema_context import TPCDS_TABLE_COLUMNS, TPCH_TABLE_COLUMNS
+
+        all_table_columns: dict[str, list[str]] = {}
+        for tbl_name, cols in TPCH_TABLE_COLUMNS.items():
+            all_table_columns[tbl_name] = list(cols)
+        for tbl_name, cols in TPCDS_TABLE_COLUMNS.items():
+            if tbl_name in all_table_columns:
+                all_table_columns[tbl_name] = list(
+                    dict.fromkeys(all_table_columns[tbl_name] + cols)
+                )
+            else:
+                all_table_columns[tbl_name] = list(cols)
+
+        for tbl in tables_used:
+            tbl_lower = tbl.lower()
+            if tbl_lower in all_table_columns:
+                for col_name in all_table_columns[tbl_lower]:
+                    c_lower = col_name.lower()
+                    if c_lower in denied_columns:
+                        violating_columns_set.add(c_lower)
+            elif user_context.role != UserRole.ADMIN:
+                # Bảng không xác định trong schema mà có wildcard: Fail-Closed
+                return RBACCheckResult(
+                    is_allowed=False,
+                    violating_tables=[tbl_lower],
+                    violating_columns=["*"],
+                    error_type="FORBIDDEN_WILDCARD",
+                    error_message=f"Không thể mở rộng hoặc xác minh cột an toàn cho truy vấn ký tự đại diện (*) trên bảng '{tbl}' (Fail-Closed RBAC). Vui lòng chỉ định rõ danh sách cột.",
+                )
+
+    violating_columns = sorted(violating_columns_set)
 
     # Nếu không có vi phạm nào
     if not violating_tables and not violating_columns:

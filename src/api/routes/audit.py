@@ -32,7 +32,9 @@ async def get_audit_logs(
     audit_logger: Annotated[AuditLogger, Depends(get_audit_logger)],
     limit: int = Query(default=50, ge=1, le=500, description="Số lượng bản ghi tối đa"),
     offset: int = Query(default=0, ge=0, description="Vị trí bắt đầu"),
-    session_id: str | None = Query(default=None, description="Lọc theo mã phiên làm việc"),
+    session_id: str | None = Query(
+        default=None, description="Lọc theo mã phiên làm việc"
+    ),
 ) -> AuditLogsResponse:
     """Truy xuất danh sách nhật ký kiểm toán có phân trang."""
     events = audit_logger.get_logs(session_id=session_id, limit=limit + offset)

@@ -107,7 +107,7 @@ def test_single_model(
         clean_content = str(content).strip().replace("\n", " ")
 
         print(f"[+] THÀNH CÔNG! (Thời gian phản hồi: {result['latency_sec']}s)")
-        print(f"    - Phản hồi từ model: \"{clean_content}\"")
+        print(f'    - Phản hồi từ model: "{clean_content}"')
 
         result["status"] = "SUCCESS"
         result["message"] = clean_content

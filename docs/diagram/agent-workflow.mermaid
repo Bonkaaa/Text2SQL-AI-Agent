@@ -1,0 +1,301 @@
+flowchart TD
+    %% =========================================================================
+    %% TẦNG 1: TIẾP NHẬN YÊU CẦU & API
+    %% =========================================================================
+
+    User(["👤 Người dùng (Client)"])
+    API["🌐 FastAPI Endpoint<br/>POST /api/v1/query/ask"]
+
+    User -->|"Gửi câu hỏi tự nhiên + UserContext"| API
+
+
+    %% =========================================================================
+    %% TẦNG 2: PRE-FLIGHT GATEKEEPER
+    %% =========================================================================
+
+    subgraph Preflight["🛡️ Stage 1: Pre-Flight Gatekeeper Engine"]
+
+        Tier1Regex{"Tier 1: Regex Guard<br/>(< 0.1ms, $0)"}
+
+        Tier2LLM{"Tier 2: Unified LLM Guard<br/>(Structured Output)"}
+
+        BlockRegex["🚫 Chặn cứng<br/>SECURITY_BLOCKED<br/>Hardcoded Refusal"]
+
+        BlockLLM["🚫 Chặn cứng<br/>SECURITY_BLOCKED<br/>Hardcoded Refusal"]
+
+        ClarifyFastPath["❓ Fast-Path Clarification<br/>CLARIFICATION_REQUIRED<br/>Trả về câu hỏi + Gợi ý A, B, C"]
+
+        SupervisorEntry["➡️ Chuyển giao sang Stage 2"]
+
+        Tier1Regex -->|"Phát hiện DDL/DML / Prompt Injection"| BlockRegex
+        Tier1Regex -->|"An toàn"| Tier2LLM
+
+        Tier2LLM -->|"Vi phạm an ninh / Ngoài miền TPC-H"| BlockLLM
+        Tier2LLM -->|"Câu hỏi mơ hồ / Thiếu điều kiện"| ClarifyFastPath
+        Tier2LLM -->|"Hợp lệ & Rõ ràng (ALLOWED)"| SupervisorEntry
+    end
+
+    API --> Tier1Regex
+
+    BlockRegex --> RetSecurity["Trả về lỗi an ninh tức thì"]
+    BlockLLM --> RetSecurity
+
+    ClarifyFastPath --> RetClarify["Trả về giao diện yêu cầu làm rõ"]
+
+    RetSecurity --> FinalResp
+    RetClarify --> FinalResp
+
+
+    %% =========================================================================
+    %% TẦNG 3: MASTER DEEP AGENT SUPERVISOR
+    %% =========================================================================
+
+    subgraph Supervisor["🧠 Stage 2: Master Deep Agent Supervisor (Tier 1 Reasoning)"]
+
+        PlanTodos["TodoListMiddleware<br/>Hoạch định & write_todos"]
+
+        MemoryCheck["Nạp Memory (AGENTS.md)<br/>& Skills (TPC-H, DuckDB)"]
+
+        IntentRoute{"Phân luồng ý định<br/>(Intent Routing)"}
+
+        ConsultAgent["💬 Subagent: consultation-agent<br/>(Mode: Isolated, Tier 2 LLM)"]
+
+        ConsultTools["Metadata Tools<br/>(No SQL)"]
+
+        ToolSearch["search_tables_and_columns"]
+        ToolSamples["get_column_samples_and_values"]
+        ToolMetrics["search_business_definition"]
+
+        ConsultResp["Giải đáp chào hỏi /<br/>Từ điển dữ liệu TPC-H"]
+
+        AnalyticsEntry["🚀 Kích hoạt analytics-subagent<br/>(CompiledSubAgent bọc LangGraph)"]
+
+        PlanTodos --> MemoryCheck
+        MemoryCheck --> IntentRoute
+
+        IntentRoute -->|"Ý định: CONVERSATION / METADATA"| ConsultAgent
+        IntentRoute -->|"Ý định: ANALYTICS"| AnalyticsEntry
+
+        ConsultAgent --> ConsultTools
+
+        ConsultTools --> ToolSearch
+        ConsultTools --> ToolSamples
+        ConsultTools --> ToolMetrics
+
+        ToolSearch --> ConsultResp
+        ToolSamples --> ConsultResp
+        ToolMetrics --> ConsultResp
+    end
+
+    SupervisorEntry --> PlanTodos
+
+
+    %% =========================================================================
+    %% TẦNG 4: ANALYTICS LANGGRAPH SUBGRAPH
+    %% =========================================================================
+
+    subgraph AnalyticsGraph["📊 Stage 3: Analytics LangGraph Subgraph (v4.0)"]
+
+        PlannerNode["1. planner_node<br/>Sinh AnalysisPlan (1-3 tasks)"]
+
+        ExecutorNode["2. executor_node<br/>Thực thi từng AnalysisTask"]
+
+        RetrieveSchema["Tra cứu DDL & Categorical Values<br/>(schema_retriever)"]
+
+        GenSQL["Sinh câu lệnh DuckDB SQL<br/>(sql_generator + 4 Tools)"]
+
+        ControlSubGraph["Gửi câu lệnh vào Control Pipeline"]
+
+        CheckValid{"Truy vấn<br/>hợp lệ?"}
+
+        ArtifactSuccess["Tạo QueryArtifact<br/>(SUCCESS)"]
+
+        ArtifactFailed["Tạo QueryArtifact<br/>(FAILED)"]
+
+        RetrySQL["Nạp error_context & suggested_fix<br/>(Self-Correction Loop)"]
+
+        EvidenceNode["3. evidence_node<br/>Evidence Analyzer"]
+
+        CheckEvidence{"Đã đủ dữ liệu<br/>để trả lời?"}
+
+        AddDrilldown["Bổ sung task mới vào plan<br/>(Drill-down)"]
+
+        PresentationNode["4. presentation_node<br/>Response Synthesizer (2 nhịp)"]
+
+        PlannerNode --> ExecutorNode
+
+        ExecutorNode --> RetrieveSchema
+        RetrieveSchema --> GenSQL
+        GenSQL --> ControlSubGraph
+
+        ControlSubGraph --> CheckValid
+
+        CheckValid -->|"Thành công"| ArtifactSuccess
+        CheckValid -->|"Thất bại & retry < 3"| RetrySQL
+        CheckValid -->|"Thất bại & retry >= 3"| ArtifactFailed
+
+        RetrySQL --> GenSQL
+
+        ArtifactSuccess --> EvidenceNode
+        ArtifactFailed --> EvidenceNode
+
+        EvidenceNode --> CheckEvidence
+
+        CheckEvidence -->|"Chưa đủ & Còn ngân sách (max_tasks)"| AddDrilldown
+        AddDrilldown --> ExecutorNode
+
+        CheckEvidence -->|"Đã đủ HOẶC Hết ngân sách"| PresentationNode
+
+
+        %% ---------------------------------------------------------------------
+        %% SYNTHESIS FLOW
+        %% ---------------------------------------------------------------------
+
+        subgraph SynthesisFlow["🧩 Cơ chế Composable Response & Data Hydration"]
+
+            SynthStep1["Nhịp 1: LLM tạo SynthesisDecision<br/>(direct_answer, insight, artifact specs)"]
+
+            SynthStep2["Nhịp 2: Deterministic Data Hydration<br/>(Rót dữ liệu thật 100% vào KPI & Recharts)"]
+
+            RespPackage["Đóng gói ResponsePackage hoàn chỉnh"]
+
+            PresentationNode --> SynthStep1
+            SynthStep1 --> SynthStep2
+            SynthStep2 --> RespPackage
+        end
+    end
+
+    AnalyticsEntry --> PlannerNode
+
+
+    %% =========================================================================
+    %% TẦNG 5: DETERMINISTIC CONTROL PIPELINE
+    %% =========================================================================
+
+    subgraph ControlPipeline["🔒 Stage 4: Deterministic Control Pipeline"]
+
+        ASTCheck{"1. ast_check<br/>(sqlglot AST)"}
+
+        RBACCheck{"2. rbac_check<br/>(UserRole)"}
+
+        CostGuard{"3. cost_guard<br/>(Dry-run EXPLAIN)"}
+
+        HITLGate["4. hitl_gate<br/>Tạm dừng luồng bằng interrupt()"]
+
+        HITLApproval{"Chờ Quản trị viên duyệt<br/>(POST /query/approve)"}
+
+        ExecuteNode["5. execute<br/>DuckDB Connector<br/>(Limit 5000, Timeout 30s)"]
+
+        AuditNode["6. audit_node<br/>Ghi log kiểm toán"]
+
+        ErrNode["7. err_node<br/>Chuẩn hóa lỗi"]
+
+        DiagNode["8. diagnostic<br/>LLM phân tích lỗi & tạo suggested_fix"]
+
+        ASTCheck -->|"Cấm DDL/DML / Không phải SELECT"| ErrNode
+        ASTCheck -->|"Hợp lệ (SELECT only)"| RBACCheck
+
+        RBACCheck -->|"Không đủ quyền"| ErrNode
+        RBACCheck -->|"Hợp lệ"| CostGuard
+
+        CostGuard -->|"Chi phí vượt ngưỡng tối đa"| ErrNode
+        CostGuard -->|"Nguy cơ cao (Cartesian / No Partition)"| HITLGate
+        CostGuard -->|"An toàn"| ExecuteNode
+
+        HITLGate -->|"Lưu Checkpoint & Báo PENDING_APPROVAL"| HITLApproval
+
+        HITLApproval -->|"Từ chối (approved=False)"| ErrNode
+        HITLApproval -->|"Phê duyệt (Command Resume)"| ExecuteNode
+
+        ExecuteNode -->|"Thành công"| AuditNode
+        ExecuteNode -->|"Lỗi DB / Timeout"| ErrNode
+
+        ErrNode --> DiagNode
+        DiagNode --> AuditNode
+    end
+
+    ControlSubGraph --> ASTCheck
+    AuditNode --> CheckValid
+
+
+    %% =========================================================================
+    %% WAREHOUSE
+    %% =========================================================================
+
+    Warehouse[("🗄️ Warehouse<br/>DuckDB Engine")]
+
+    ExecuteNode -->|"Thực thi truy vấn<br/>(Timeout 30s, Row Limit)"| Warehouse
+
+    Warehouse -->|"Kết quả dữ liệu thô<br/>(Rows, Columns, Scanned Bytes)"| AuditNode
+
+
+    %% =========================================================================
+    %% HITL RESUME FLOW
+    %% =========================================================================
+
+    HITLUser["👤 Người dùng / Admin"]
+
+    HITLApproval -.->|"PENDING_APPROVAL"| HITLUser
+
+    HITLUser -.->|"POST /query/approve<br/>(approved=True)"| HITLApproval
+
+
+    %% =========================================================================
+    %% TẦNG 6: INTEGRITY & FINAL RESPONSE
+    %% =========================================================================
+
+    subgraph Finalization["🛡️ Stage 5: Integrity & Final Response"]
+
+        IntegrityGuard{"Supervisor Guard:<br/>Toàn bộ query thất bại?"}
+
+        DeterministicFallback["Kích hoạt Deterministic Fallback<br/>(Zero-Hallucination Guard,<br/>không bịa số liệu)"]
+
+        FinalFormat["Trích xuất SQL, Bảng dữ liệu,<br/>Cấu hình Recharts"]
+
+        FinalResp(["📋 QueryResponse Hoàn Chỉnh<br/>(direct_answer, data, columns,<br/>recharts_config, artifacts)"])
+
+        IntegrityGuard -->|"Đúng (Tất cả failed)"| DeterministicFallback
+        IntegrityGuard -->|"Sai (Có query thành công)"| FinalFormat
+
+        DeterministicFallback --> FinalFormat
+        FinalFormat --> FinalResp
+    end
+
+    RespPackage --> IntegrityGuard
+    ConsultResp --> FinalFormat
+
+    FinalResp --> User
+
+
+    %% =========================================================================
+    %% RESPONSE TO API
+    %% =========================================================================
+
+    APIResponse["QueryResponse<br/>(status, data, columns, recharts_config, artifacts)"]
+
+    FinalResp --> APIResponse
+    APIResponse --> User
+
+
+    %% =========================================================================
+    %% STYLING
+    %% =========================================================================
+
+    classDef preflightStyle fill:#fee2e2,stroke:#ef4444,stroke-width:1.5px,color:#991b1b;
+    classDef supervisorStyle fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e40af;
+    classDef analyticsStyle fill:#fef3c7,stroke:#f59e0b,stroke-width:1.5px,color:#92400e;
+    classDef controlStyle fill:#ccfbf1,stroke:#14b8a6,stroke-width:1.5px,color:#115e59;
+    classDef successStyle fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46;
+    classDef dangerStyle fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#991b1b;
+
+    class Tier1Regex,Tier2LLM,BlockRegex,BlockLLM,ClarifyFastPath preflightStyle;
+
+    class PlanTodos,MemoryCheck,IntentRoute,ConsultAgent,ConsultTools,ToolSearch,ToolSamples,ToolMetrics supervisorStyle;
+
+    class PlannerNode,ExecutorNode,RetrieveSchema,GenSQL,EvidenceNode,CheckEvidence,AddDrilldown,PresentationNode,SynthStep1,SynthStep2 analyticsStyle;
+
+    class ASTCheck,RBACCheck,CostGuard,HITLGate,HITLApproval,ExecuteNode,AuditNode,ErrNode,DiagNode controlStyle;
+
+    class ArtifactSuccess,RespPackage,FinalResp,APIResponse successStyle;
+
+    class BlockRegex,BlockLLM,DeterministicFallback dangerStyle;

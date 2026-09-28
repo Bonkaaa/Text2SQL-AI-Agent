@@ -131,3 +131,61 @@ def test_search_business_definition_not_found():
     res = search_business_definition(query="chỉ số kì lạ không tồn tại 12345")
     assert res["found"] is False
     assert "available_metrics" in res
+
+
+def test_find_join_path_tpcds_direct_store_sales_to_date_dim():
+    """Kiểm tra tìm đường nối trực tiếp TPC-DS giữa store_sales và date_dim."""
+    res = find_join_path(table_a="store_sales", table_b="date_dim")
+    assert res["found"] is True
+    assert res["tables_chain"] == ["store_sales", "date_dim"]
+    assert len(res["join_conditions"]) == 1
+    assert (
+        "store_sales.ss_sold_date_sk = date_dim.d_date_sk" in res["join_conditions"][0]
+    )
+    assert res["bridge_tables_needed"] == []
+
+
+def test_find_join_path_tpcds_direct_store_sales_to_customer_address():
+    """Kiểm tra tìm đường nối trực tiếp TPC-DS giữa store_sales và customer_address."""
+    res = find_join_path(table_a="store_sales", table_b="customer_address")
+    assert res["found"] is True
+    assert res["tables_chain"] == ["store_sales", "customer_address"]
+    assert len(res["join_conditions"]) == 1
+    assert (
+        "store_sales.ss_addr_sk = customer_address.ca_address_sk"
+        in res["join_conditions"][0]
+    )
+
+
+def test_find_join_path_tpcds_multi_hop_store_sales_to_income_band():
+    """Kiểm tra tìm đường nối đa chặng TPC-DS: store_sales -> household_demographics -> income_band."""
+    res = find_join_path(table_a="store_sales", table_b="income_band")
+    assert res["found"] is True
+    assert res["tables_chain"] == [
+        "store_sales",
+        "household_demographics",
+        "income_band",
+    ]
+    assert len(res["join_conditions"]) == 2
+    assert res["bridge_tables_needed"] == ["household_demographics"]
+    conditions_str = " ".join(res["join_conditions"])
+    assert "ss_hdemo_sk = household_demographics.hd_demo_sk" in conditions_str
+    assert "hd_income_band_sk = income_band.ib_income_band_sk" in conditions_str
+
+
+def test_search_business_definition_tpcds_store_sales_revenue():
+    """Kiểm tra tra cứu chỉ số dbt TPC-DS store_net_sales."""
+    res = search_business_definition(query="doanh thu cửa hàng store sales")
+    assert res["found"] is True
+    assert res["metric_id"] == "store_net_sales"
+    assert "SUM(ss_net_paid)" in res["formula"]
+    assert "store_sales" in res["required_tables"]
+
+
+def test_get_column_samples_and_values_tpcds_item_category():
+    """Kiểm tra lấy giá trị danh mục TPC-DS cho cột i_category trong bảng item."""
+    res = get_column_samples_and_values(table="item", column="i_category")
+    assert res["status"] == "SUCCESS"
+    assert "Books" in res["values"]
+    assert "Electronics" in res["values"]
+    assert "Home" in res["values"]

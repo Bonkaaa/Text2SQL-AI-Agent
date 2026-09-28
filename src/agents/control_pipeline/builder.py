@@ -84,24 +84,70 @@ def build_control_pipeline_graph(
 
 
 def run_control_pipeline(
-    graph: CompiledStateGraph,
-    input_data: ControlPipelineInput,
+    graph: CompiledStateGraph | ControlPipelineInput | None = None,
+    input_data: ControlPipelineInput | None = None,
     thread_id: str | None = None,
+    *,
+    sql: str | None = None,
+    user_context: UserContext | None = None,
+    session_id: str | None = None,
+    question: str | None = None,
+    hitl_required: bool = False,
+    hitl_approved: bool | None = None,
 ) -> ControlPipelineOutput:
-    """Hàm tiện ích chạy toàn bộ pipeline kiểm duyệt và trả về ControlPipelineOutput."""
-    session_id = input_data.get("session_id", "default_session")
-    thread = thread_id or session_id
+    """Hàm tiện ích chạy toàn bộ pipeline kiểm duyệt và trả về ControlPipelineOutput.
+
+    Hỗ trợ hai cách gọi:
+    1. Truyền graph và input_data: run_control_pipeline(graph, input_data)
+    2. Truyền trực tiếp qua keyword args: run_control_pipeline(sql=..., user_context=..., session_id=...)
+    """
+    # Xử lý trường hợp tham số đầu tiên là input_data (dict)
+    if isinstance(graph, dict):
+        input_data = graph
+        graph = None
+
+    if input_data is None:
+        session = session_id or (
+            user_context.session_id if user_context else "default_session"
+        )
+        u_ctx = user_context or UserContext(
+            user_id="default_user",
+            session_id=session,
+            role=UserRole.ANALYST,
+        )
+        resolved_input: ControlPipelineInput = {
+            "sql": sql or "",
+            "user_context": u_ctx,
+            "session_id": session,
+            "question": question,
+            "hitl_required": hitl_required,
+            "hitl_approved": hitl_approved,
+        }
+    else:
+        resolved_input = input_data
+        if question and "question" not in resolved_input:
+            resolved_input["question"] = question
+
+    active_graph = (
+        graph
+        if isinstance(graph, CompiledStateGraph)
+        else build_control_pipeline_graph()
+    )
+
+    sess_id = resolved_input.get("session_id", "default_session")
+    thread = thread_id or sess_id
     config = {"configurable": {"thread_id": thread}}
 
     initial_state: dict[str, Any] = {
-        "sql": input_data["sql"],
-        "user_context": input_data["user_context"],
-        "session_id": session_id,
-        "hitl_required": input_data.get("hitl_required", False),
-        "hitl_approved": input_data.get("hitl_approved"),
+        "sql": resolved_input["sql"],
+        "question": resolved_input.get("question"),
+        "user_context": resolved_input["user_context"],
+        "session_id": sess_id,
+        "hitl_required": resolved_input.get("hitl_required", False),
+        "hitl_approved": resolved_input.get("hitl_approved"),
     }
 
-    final_state = graph.invoke(initial_state, config=config)
+    final_state = active_graph.invoke(initial_state, config=config)
     execution_result = final_state.get("execution_result")
 
     if execution_result:
@@ -109,13 +155,15 @@ def run_control_pipeline(
 
     # Trường hợp đồ thị bị tạm dừng bởi HITL Gatekeeper qua interrupt()
     if final_state.get("__interrupt__") or (
-        final_state.get("hitl_required") and final_state.get("hitl_approved") is not True
+        final_state.get("hitl_required")
+        and final_state.get("hitl_approved") is not True
     ):
         return {
             "is_valid": False,
             "status": "BLOCKED_HITL",
             "error_type": "HITL_REQUIRED",
-            "error_message": final_state.get("hitl_reason") or "Truy vấn cần phê duyệt từ quản trị viên.",
+            "error_message": final_state.get("hitl_reason")
+            or "Truy vấn cần phê duyệt từ quản trị viên.",
             "actionable_feedback": "Vui lòng xác nhận phê duyệt truy vấn hoặc bổ sung điều kiện lọc.",
             "diagnostic_result": None,
             "data": None,

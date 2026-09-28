@@ -44,26 +44,27 @@ TIER2_REFUSAL_MESSAGES: Final[dict[SafetyCategory, str]] = {
         "Hệ thống chỉ hỗ trợ truy vấn đọc dữ liệu phân tích (SELECT)."
     ),
     SafetyCategory.UNSUPPORTED_OUT_OF_DOMAIN: (
-        "Hệ thống chỉ hỗ trợ giải đáp và phân tích dữ liệu kinh doanh & chuỗi cung ứng (chuẩn TPC-H). "
-        "Vui lòng đặt câu hỏi liên quan đến doanh thu, đơn hàng, khách hàng, nhà cung cấp hoặc tồn kho."
+        "Hệ thống chỉ hỗ trợ giải đáp và phân tích dữ liệu kinh doanh & chuỗi cung ứng (chuẩn TPC-H) "
+        "cùng bán lẻ đa kênh (chuẩn TPC-DS). Vui lòng đặt câu hỏi liên quan đến doanh thu (Store, Web, Catalog), "
+        "sản phẩm, khách hàng, nhà cung cấp hoặc tồn kho."
     ),
 }
 
 # ==============================================================================
-# 1. POOL GỢI Ý PHƯƠNG ÁN LÀM RÕ (TPC-H SUGGESTIONS POOL)
+# 1. POOL GỢI Ý PHƯƠNG ÁN LÀM RÕ (TPC-DS & TPC-H SUGGESTIONS POOL)
 # ==============================================================================
 
 DEFAULT_CLARIFICATION_OPTIONS_POOL: Final[list[str]] = [
-    "Xem tổng doanh thu theo từng năm (1992 - 1998)",
+    "Xem tổng doanh thu theo từng năm (1998 - 2002)",
+    "Tổng doanh số theo 3 kênh bán hàng (Store, Web, Catalog) năm 2001",
+    "Top 5 danh mục sản phẩm (Categories) có doanh thu cao nhất năm 2001",
+    "Doanh thu bán lẻ tại cửa hàng (Store Sales) theo từng bang",
+    "Top 10 mặt hàng bán chạy nhất qua kênh Website (Web Sales)",
+    "Tỷ lệ trả hàng (Returns) theo từng lý do hoàn trả",
+    "Doanh thu và lợi nhuận ròng (Net Profit) theo từng quý năm 2002",
+    "Số lượng khách hàng theo từng phân khúc nhân khẩu học",
+    "Hiệu quả các chiến dịch khuyến mãi (Promotion) năm 2001",
     "Top 5 khách hàng có tổng chi tiêu cao nhất",
-    "Doanh thu theo từng phân khúc thị trường (Market Segment)",
-    "Top 10 mặt hàng (Parts) bán chạy nhất năm 1995",
-    "Tổng số đơn đặt hàng theo từng trạng thái (Order Status)",
-    "Danh sách các nhà cung cấp có số dư tài khoản cao nhất",
-    "Doanh thu và lợi nhuận theo từng khu vực địa lý (Region)",
-    "Top 5 quốc gia có doanh số bán hàng lớn nhất",
-    "Các đơn hàng có mức ưu tiên khẩn cấp (1-URGENT) trong năm 1996",
-    "Mức chiết khấu trung bình theo từng phương thức vận chuyển (Ship Mode)",
 ]
 
 
@@ -119,7 +120,9 @@ def evaluate_input_preflight(
         return PreflightDecision(
             decision=PreflightDecisionType.SECURITY_BLOCKED,
             is_safe=False,
-            safety_category=regex_result.violation_type.value if regex_result.violation_type else "REGEX_VIOLATION",
+            safety_category=regex_result.violation_type.value
+            if regex_result.violation_type
+            else "REGEX_VIOLATION",
             refusal_message=regex_result.refusal_message,
             needs_clarification=False,
             tier="tier1_regex",
@@ -134,7 +137,9 @@ def evaluate_input_preflight(
     # Bước 3: Tier 2 - Gọi LLM với Structured Output (InputPreflightEvaluation)
     try:
         structured_llm = chat_model.with_structured_output(InputPreflightEvaluation)
-        messages = PREFLIGHT_GATEKEEPER_PROMPT.format_messages(question=cleaned_question)
+        messages = PREFLIGHT_GATEKEEPER_PROMPT.format_messages(
+            question=cleaned_question
+        )
         eval_result = structured_llm.invoke(messages)
 
         if isinstance(eval_result, dict):
@@ -152,7 +157,9 @@ def evaluate_input_preflight(
 
     except Exception:
         # Cơ chế Fail-Open an toàn: khi có lỗi LLM API/mạng, cho phép tiếp tục luồng an toàn
-        logger.exception("[PreflightGatekeeper] Lỗi khi gọi LLM Preflight. Kích hoạt Fail-Open.")
+        logger.exception(
+            "[PreflightGatekeeper] Lỗi khi gọi LLM Preflight. Kích hoạt Fail-Open."
+        )
         return PreflightDecision(
             decision=PreflightDecisionType.ALLOWED,
             is_safe=True,
@@ -175,7 +182,9 @@ def evaluate_input_preflight(
         return PreflightDecision(
             decision=PreflightDecisionType.SECURITY_BLOCKED,
             is_safe=False,
-            safety_category=category_enum.value if hasattr(category_enum, "value") else str(category_enum),
+            safety_category=category_enum.value
+            if hasattr(category_enum, "value")
+            else str(category_enum),
             refusal_message=refusal_msg,
             needs_clarification=False,
             evaluation=eval_result,

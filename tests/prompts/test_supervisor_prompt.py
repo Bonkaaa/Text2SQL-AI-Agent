@@ -43,7 +43,11 @@ def test_supervisor_prompt_pure_orchestrator_delegation():
     prompt_lower = prompt.lower()
 
     # 1. Kiểm tra vai trò Pure Orchestrator
-    assert "orchestrator" in prompt_lower or "nhạc trưởng" in prompt_lower or "điều phối" in prompt_lower
+    assert (
+        "orchestrator" in prompt_lower
+        or "nhạc trưởng" in prompt_lower
+        or "điều phối" in prompt_lower
+    )
 
     # 2. Kiểm tra ủy quyền consultation-agent cho câu hỏi xã giao & metadata
     assert "consultation-agent" in prompt
@@ -54,5 +58,3 @@ def test_supervisor_prompt_pure_orchestrator_delegation():
 
     # 4. Kiểm tra nguyên tắc zero data = zero insight
     assert "zero data = zero insight" in prompt_lower
-
-

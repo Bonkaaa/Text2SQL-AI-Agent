@@ -48,24 +48,34 @@ def fake_llm() -> FakeListChatModel:
 
 
 def test_get_supervisor_subagents(fake_llm):
-    """Kiểm tra khởi tạo danh sách 5 subagent chuyên biệt cho Supervisor."""
+    """Kiểm tra khởi tạo danh sách 2 subagent cốt lõi cho Pure Orchestrator."""
     subagents = get_supervisor_subagents(
         tier1_model=fake_llm,
         tier2_model=fake_llm,
     )
-    assert len(subagents) == 5
+    assert len(subagents) == 2
 
     subagent_names = [sub["name"] for sub in subagents]
     assert "consultation-agent" in subagent_names
-    assert "schema-retriever" in subagent_names
-    assert "sql-generator" in subagent_names
-    assert "control-pipeline" in subagent_names
-    assert "response-synthesizer" in subagent_names
+    assert "analytics-subagent" in subagent_names
 
     for sub in subagents:
         assert sub["mode"] == "isolated"
         assert "description" in sub
         assert len(sub["description"]) > 10
+
+    # Kiểm tra cờ legacy phục vụ kiểm thử tương thích ngược
+    legacy_subs = get_supervisor_subagents(
+        tier1_model=fake_llm,
+        tier2_model=fake_llm,
+        include_legacy_subagents=True,
+    )
+    assert len(legacy_subs) == 6
+    legacy_names = [sub["name"] for sub in legacy_subs]
+    assert "schema-retriever" in legacy_names
+    assert "sql-generator" in legacy_names
+    assert "control-pipeline" in legacy_names
+    assert "response-synthesizer" in legacy_names
 
 
 def test_create_text2sql_supervisor_graph_structure(fake_llm):
@@ -99,8 +109,6 @@ def test_create_text2sql_supervisor_graph_structure(fake_llm):
     assert "search_tables_and_columns" not in tool_names
     assert "get_column_samples_and_values" not in tool_names
     assert "search_business_definition" not in tool_names
-
-
 
 
 def test_create_text2sql_supervisor_custom_skills_and_memory(fake_llm):
@@ -430,11 +438,11 @@ def test_supervisor_delegates_to_consultation_subagent(mock_analyst_user):
     )
 
     config = {"configurable": {"thread_id": "test_thread_delegation_consult"}}
-    input_state = {"messages": [HumanMessage(content="Hệ thống có bảng customer không?")]}
+    input_state = {
+        "messages": [HumanMessage(content="Hệ thống có bảng customer không?")]
+    }
     output = agent.invoke(input_state, config=config, context=mock_analyst_user)
 
     assert "messages" in output
     final_content = output["messages"][-1].content
     assert "customer" in final_content
-
-

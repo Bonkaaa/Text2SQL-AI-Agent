@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -86,6 +86,10 @@ class AnalysisTask(BaseModel):
     """Một nhiệm vụ truy vấn phân tích đơn lẻ trong kế hoạch tổng thể."""
 
     task_id: str = Field(description="Mã định danh nhiệm vụ (task_1, task_2,...)")
+    plan_id: str | None = Field(
+        default=None,
+        description="Định danh kế hoạch phân tích (plan_id) để cô lập ngữ cảnh duyệt",
+    )
     description: str = Field(
         description="Câu hỏi nghiệp vụ cụ thể cần trả lời bằng SQL"
     )
@@ -149,11 +153,14 @@ class AnalysisPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_budget_ceiling(self) -> AnalysisPlan:
-        """Đảm bảo số lượng nhiệm vụ không bao giờ vượt quá trần max_tasks."""
+        """Đảm bảo số lượng nhiệm vụ không bao giờ vượt quá trần max_tasks và gán plan_id cho tasks."""
         if len(self.tasks) > self.max_tasks:
             raise ValueError(
                 f"Số lượng tasks ({len(self.tasks)}) vượt quá trần cho phép ({self.max_tasks})"
             )
+        for task in self.tasks:
+            if not task.plan_id:
+                task.plan_id = self.plan_id
         return self
 
     @property
@@ -325,6 +332,183 @@ class ArtifactBundle(BaseModel):
 
 
 # ==============================================================================
+# COMPOSABLE PRESENTATION & ARTIFACT PRIMITIVES (Phase 3)
+# ==============================================================================
+
+
+class KpiArtifact(BaseModel):
+    """Thẻ chỉ số số liệu định lượng (cho câu hỏi đơn hoặc chỉ số quan trọng)."""
+
+    type: Literal["kpi"] = "kpi"
+    title: str = Field(description="Tiêu đề chỉ số")
+    value: float | int | str = Field(description="Giá trị chỉ số")
+    unit: str | None = Field(
+        default=None, description="Đơn vị tính (USD, %, chiếc,...)"
+    )
+    delta: float | None = Field(
+        default=None, description="Độ biến động so với kỳ trước"
+    )
+    delta_type: Literal["increase", "decrease", "neutral"] | None = Field(
+        default=None, description="Chiều hướng biến động"
+    )
+
+
+class ChartArtifact(BaseModel):
+    """Biểu đồ trực quan hóa Recharts hoàn chỉnh kèm mảng data đã hydrate."""
+
+    type: Literal["chart"] = "chart"
+    chart_type: Literal["bar", "line", "area", "pie", "composed"] = Field(
+        description="Loại biểu đồ Recharts"
+    )
+    title: str = Field(description="Tiêu đề biểu đồ")
+    x_key: str = Field(description="Tên trường dữ liệu cho trục X")
+    y_keys: list[str] = Field(description="Danh sách tên trường cho trục Y")
+    series_labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Nhãn hiển thị tiếng Việt cho các chuỗi dữ liệu",
+    )
+    data: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Mảng dữ liệu thực tế rót từ kết quả truy vấn",
+    )
+
+
+class TableArtifact(BaseModel):
+    """Bảng số liệu chi tiết kèm mảng rows đã hydrate."""
+
+    type: Literal["table"] = "table"
+    title: str = Field(description="Tiêu đề bảng dữ liệu")
+    columns: list[str] = Field(description="Danh sách các cột hiển thị")
+    column_formats: dict[str, str] = Field(
+        default_factory=dict,
+        description="Định dạng cột (ví dụ: {'revenue': 'currency'})",
+    )
+    rows: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Dữ liệu các dòng thực tế",
+    )
+    total_row_count: int = Field(default=0, description="Tổng số dòng dữ liệu")
+
+
+class EvidenceArtifact(BaseModel):
+    """Dẫn chứng liên kết luận điểm nhận định với câu SQL và mẫu số liệu."""
+
+    type: Literal["evidence"] = "evidence"
+    task_id: str = Field(description="Mã định danh nhiệm vụ (task_1,...)")
+    claim: str = Field(description="Luận điểm hoặc nhận xét rút ra từ bằng chứng")
+    supporting_sql: str = Field(description="Câu truy vấn SQL chứng minh luận điểm")
+    sample_values: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Dữ liệu mẫu làm bằng chứng",
+    )
+
+
+class CalloutArtifact(BaseModel):
+    """Cảnh báo, thông tin lưu ý hoặc thông báo không có dữ liệu."""
+
+    type: Literal["callout"] = "callout"
+    variant: Literal["info", "warning", "error", "no_data"] = Field(
+        default="info", description="Mức độ nghiêm trọng của thông báo"
+    )
+    message: str = Field(description="Nội dung lưu ý hoặc cảnh báo bằng tiếng Việt")
+
+
+class FileArtifact(BaseModel):
+    """Tệp tin xuất xưởng cho phép tải về (CSV, Excel,...)."""
+
+    type: Literal["file"] = "file"
+    file_name: str = Field(description="Tên tệp tin")
+    file_type: Literal["csv", "xlsx", "json"] = Field(
+        default="csv", description="Định dạng tệp"
+    )
+    download_url: str = Field(description="Đường dẫn tải tệp")
+
+
+# Tagged / Discriminated Union cho mọi Artifacts
+ArtifactItem = Annotated[
+    KpiArtifact
+    | ChartArtifact
+    | TableArtifact
+    | EvidenceArtifact
+    | CalloutArtifact
+    | FileArtifact,
+    Field(discriminator="type"),
+]
+
+
+class ArtifactSpec(BaseModel):
+    """Hợp đồng đặc tả cấu hình Artifact do LLM tự do lựa chọn (chưa chứa data thô)."""
+
+    artifact_type: Literal["kpi", "chart", "table", "callout"] = Field(
+        description="Loại artifact cần tạo"
+    )
+    target_task_id: str = Field(
+        description="Mã task_id cung cấp dữ liệu nguồn (ví dụ: task_1)"
+    )
+
+    # Cấu hình KPI
+    kpi_title: str | None = None
+    kpi_metric_column: str | None = None
+    kpi_unit: str | None = None
+
+    # Cấu hình Chart
+    chart_type: Literal["bar", "line", "area", "pie", "composed"] | None = None
+    chart_title: str | None = None
+    x_axis_column: str | None = None
+    y_axis_columns: list[str] | None = None
+    series_labels: dict[str, str] | None = None
+
+    # Cấu hình Table
+    table_title: str | None = None
+    display_columns: list[str] | None = None
+
+    # Cấu hình Callout
+    callout_variant: Literal["info", "warning", "error", "no_data"] | None = None
+    callout_message: str | None = None
+
+
+class SynthesisDecision(BaseModel):
+    """Structured Output từ 1 lần gọi Tier 2 LLM ở bước Response Synthesizer."""
+
+    direct_answer: str = Field(description="Câu trả lời ngắn gọn, trực diện")
+    detailed_insight: list[str] = Field(
+        default_factory=list,
+        description="Các gạch đầu dòng nhận xét kinh doanh từ số liệu",
+    )
+    selected_artifacts: list[ArtifactSpec] = Field(
+        default_factory=list,
+        description="Danh sách các artifact specs do LLM tự do lựa chọn kết hợp",
+    )
+
+
+class ResponsePackage(BaseModel):
+    """Gói phản hồi linh hoạt hoàn chỉnh xuất xưởng về API và Frontend Next.js."""
+
+    session_id: str = Field(description="Mã phiên làm việc (thread_id)")
+    direct_answer: str = Field(description="Câu trả lời chính trực diện")
+    detailed_insight: list[str] = Field(
+        default_factory=list,
+        description="Danh sách nhận định phân tích định lượng",
+    )
+    layout: Literal["focus", "stacked", "dashboard_grid"] = Field(
+        default="stacked",
+        description="Bố cục hiển thị đề xuất cho Frontend",
+    )
+    artifacts: list[ArtifactItem] = Field(
+        default_factory=list,
+        description="Danh sách các artifact đã được hydrate dữ liệu thật 100%",
+    )
+    executed_queries: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Danh sách task_id và câu SQL đã chạy phục vụ kiểm thử và benchmark",
+    )
+    total_execution_time_ms: float = Field(
+        default=0.0,
+        description="Tổng thời gian thực thi (ms)",
+    )
+
+
+# ==============================================================================
 # PRE-FLIGHT GUARDRAILS & CLARIFICATION MODELS (Component 2.5.2)
 # ==============================================================================
 
@@ -346,12 +530,11 @@ class InputPreflightEvaluation(BaseModel):
         description="True nếu câu hỏi an toàn và nằm trong phạm vi nghiệp vụ phân tích dữ liệu TPC-H; False nếu vi phạm bảo mật hoặc hoàn toàn lạc đề."
     )
     safety_category: SafetyCategory = Field(
-        default=SafetyCategory.SAFE,
-        description="Phân loại mức độ an toàn của câu hỏi."
+        default=SafetyCategory.SAFE, description="Phân loại mức độ an toàn của câu hỏi."
     )
     safety_reason: str | None = Field(
         default=None,
-        description="Giải thích ngắn gọn lý do kỹ thuật nếu phát hiện câu hỏi không an toàn hoặc ngoài miền."
+        description="Giải thích ngắn gọn lý do kỹ thuật nếu phát hiện câu hỏi không an toàn hoặc ngoài miền.",
     )
 
     # 2. Clarification Section
@@ -360,15 +543,15 @@ class InputPreflightEvaluation(BaseModel):
     )
     clarification_reason: str | None = Field(
         default=None,
-        description="Lý do cần làm rõ (ví dụ: 'Chưa có mốc thời gian', 'Thiếu đối tượng phân tích cụ thể')."
+        description="Lý do cần làm rõ (ví dụ: 'Chưa có mốc thời gian', 'Thiếu đối tượng phân tích cụ thể').",
     )
     clarification_question: str | None = Field(
         default=None,
-        description="Câu hỏi tiếng Việt lịch sự, định hướng nghiệp vụ để hỏi lại người dùng."
+        description="Câu hỏi tiếng Việt lịch sự, định hướng nghiệp vụ để hỏi lại người dùng.",
     )
     suggested_options: list[str] = Field(
         default_factory=list,
-        description="Danh sách từ 2-4 tùy chọn gợi ý cụ thể A, B, C... dựa trên ngữ cảnh TPC-H."
+        description="Danh sách từ 2-4 tùy chọn gợi ý cụ thể A, B, C... dựa trên ngữ cảnh TPC-H.",
     )
 
 
@@ -386,36 +569,27 @@ class PreflightDecision(BaseModel):
     decision: PreflightDecisionType = Field(
         description="Quyết định cuối cùng của Gatekeeper"
     )
-    is_safe: bool = Field(
-        description="True nếu an toàn, False nếu bị chặn an ninh"
-    )
+    is_safe: bool = Field(description="True nếu an toàn, False nếu bị chặn an ninh")
     safety_category: str | None = Field(
-        default=None,
-        description="Phân loại an toàn hoặc vi phạm"
+        default=None, description="Phân loại an toàn hoặc vi phạm"
     )
     refusal_message: str | None = Field(
-        default=None,
-        description="Thông báo từ chối tĩnh chuẩn hóa nếu bị chặn"
+        default=None, description="Thông báo từ chối tĩnh chuẩn hóa nếu bị chặn"
     )
     needs_clarification: bool = Field(
-        default=False,
-        description="True nếu cần hỏi lại người dùng"
+        default=False, description="True nếu cần hỏi lại người dùng"
     )
     clarification_question: str | None = Field(
-        default=None,
-        description="Câu hỏi làm rõ cho người dùng"
+        default=None, description="Câu hỏi làm rõ cho người dùng"
     )
     suggested_options: list[str] = Field(
-        default_factory=list,
-        description="Danh sách tùy chọn gợi ý A, B, C..."
+        default_factory=list, description="Danh sách tùy chọn gợi ý A, B, C..."
     )
     evaluation: InputPreflightEvaluation | None = Field(
-        default=None,
-        description="Chi tiết structured evaluation từ Tier 2 LLM nếu có"
+        default=None, description="Chi tiết structured evaluation từ Tier 2 LLM nếu có"
     )
     tier: Literal["tier1_regex", "tier2_llm", "fallback"] = Field(
-        default="tier1_regex",
-        description="Tầng kiểm duyệt đã đưa ra quyết định này"
+        default="tier1_regex", description="Tầng kiểm duyệt đã đưa ra quyết định này"
     )
 
 
@@ -424,13 +598,23 @@ __all__ = [
     "AnalysisTask",
     "AnalyticsResult",
     "ArtifactBundle",
+    "ArtifactItem",
+    "ArtifactSpec",
+    "CalloutArtifact",
+    "ChartArtifact",
     "ChartSpec",
+    "EvidenceArtifact",
     "EvidenceEvaluation",
     "EvidenceStore",
+    "FileArtifact",
     "InputPreflightEvaluation",
+    "KpiArtifact",
     "PreflightDecision",
     "PreflightDecisionType",
     "QueryArtifact",
+    "ResponsePackage",
     "SafetyCategory",
+    "SynthesisDecision",
+    "TableArtifact",
     "TableSpec",
 ]

@@ -78,7 +78,10 @@ def test_input_preflight_evaluation_clarification_required():
 
     assert eval_result.is_safe is True
     assert eval_result.needs_clarification is True
-    assert eval_result.clarification_question == "Bạn muốn xem doanh thu trong giai đoạn nào?"
+    assert (
+        eval_result.clarification_question
+        == "Bạn muốn xem doanh thu trong giai đoạn nào?"
+    )
     assert len(eval_result.suggested_options) == 3
     assert eval_result.suggested_options[0] == "A. Năm 1994"
 

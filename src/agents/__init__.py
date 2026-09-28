@@ -18,7 +18,9 @@ from src.agents.self_correction import (
     run_self_correction_loop,
 )
 from src.agents.sql_generator import (
+    agenerate_sql,
     clean_sql_query,
+    create_sql_generator_agent,
     generate_sql,
     get_sql_generator_subagent,
     sql_generator_subagent,
@@ -37,10 +39,12 @@ from src.agents.synthesizer import (
 
 __all__ = [
     "DEFAULT_CLARIFICATION_OPTIONS_POOL",
+    "agenerate_sql",
     "arun_supervisor",
     "check_clarification_needed",
     "clean_sql_query",
     "consultation_subagent",
+    "create_sql_generator_agent",
     "create_text2sql_supervisor",
     "generate_sql",
     "get_consultation_subagent",

@@ -15,7 +15,7 @@ services:
       - DEBUG=false
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - DUCKDB_PATH=/app/data/tpch.duckdb
+      - DUCKDB_PATH=/app/data/tpcds.duckdb
       - TRACE_OUTPUT_DIR=/app/outputs
     volumes:
       - duckdb_data:/app/data

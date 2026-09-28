@@ -2,16 +2,13 @@ import duckdb
 
 con = duckdb.connect()
 
-# Kích hoạt module TPC-H
-con.execute("INSTALL tpch; LOAD tpch;")
+# Kích hoạt module TPC-DS
+con.execute("INSTALL tpcds; LOAD tpcds;")
 
-# Sinh dữ liệu: sf = 0.1 (~100MB để test) hoặc sf = 1 (~1GB dữ liệu chuẩn)
-con.execute("CALL dbgen(sf = 0.1);")
+# Sinh dữ liệu: sf = 0.01 (~15MB dev/test), sf = 0.1 (~120MB demo), hoặc sf = 1 (~1GB dữ liệu chuẩn)
+con.execute("CALL dsdgen(sf = 0.1);")
 
-# # Xuất toàn bộ 8 bảng thành file CSV vào thư mục 'tpch_csv'
-# con.execute("EXPORT DATABASE 'tpch_csv' (FORMAT CSV, HEADER TRUE);")
-
-# Hoặc xuất ra định dạng PARQUET nếu muốn nạp nhanh vào kho dữ liệu
+# Xuất dữ liệu ra định dạng PARQUET vào thư mục 'data' để nạp nhanh vào kho dữ liệu khi cần
 con.execute("EXPORT DATABASE 'data' (FORMAT PARQUET);")
 
-print("Đã tạo xong 8 bảng dữ liệu TPC-H!")
+print("Đã tạo xong 24 bảng dữ liệu TPC-DS dạng PARQUET trong thư mục 'data'!")

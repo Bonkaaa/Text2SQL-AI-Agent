@@ -32,4 +32,3 @@ __all__ = [
     "search_tables_and_columns",
     "search_tables_and_columns_tool",
 ]
-

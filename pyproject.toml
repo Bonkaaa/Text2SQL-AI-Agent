@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Bonkaa", email = "kinnguynhu@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "duckdb>=1.5.5",
 ]

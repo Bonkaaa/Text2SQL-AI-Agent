@@ -97,7 +97,10 @@ def test_tier2_blocks_semantic_prompt_injection():
     assert result.is_safe is False
     assert result.tier == "tier2_llm"
     assert result.safety_category == SafetyCategory.UNSAFE_PROMPT_INJECTION.value
-    assert result.refusal_message == TIER2_REFUSAL_MESSAGES[SafetyCategory.UNSAFE_PROMPT_INJECTION]
+    assert (
+        result.refusal_message
+        == TIER2_REFUSAL_MESSAGES[SafetyCategory.UNSAFE_PROMPT_INJECTION]
+    )
 
 
 def test_tier2_blocks_unsupported_out_of_domain():
@@ -123,7 +126,10 @@ def test_tier2_blocks_unsupported_out_of_domain():
     assert result.is_safe is False
     assert result.tier == "tier2_llm"
     assert result.safety_category == SafetyCategory.UNSUPPORTED_OUT_OF_DOMAIN.value
-    assert result.refusal_message == TIER2_REFUSAL_MESSAGES[SafetyCategory.UNSUPPORTED_OUT_OF_DOMAIN]
+    assert (
+        result.refusal_message
+        == TIER2_REFUSAL_MESSAGES[SafetyCategory.UNSUPPORTED_OUT_OF_DOMAIN]
+    )
     assert "chuỗi cung ứng (chuẩn TPC-H)" in (result.refusal_message or "")
 
 
@@ -144,7 +150,11 @@ def test_tier2_clarification_required():
         needs_clarification=True,
         clarification_reason="Chưa xác định mốc thời gian và nhóm sản phẩm",
         clarification_question="Bạn muốn xem thống kê doanh thu trong khoảng thời gian nào?",
-        suggested_options=["A. Năm 1994", "B. Năm 1995", "C. Toàn bộ lịch sử (1992-1998)"],
+        suggested_options=[
+            "A. Năm 1994",
+            "B. Năm 1995",
+            "C. Toàn bộ lịch sử (1992-1998)",
+        ],
     )
 
     result = evaluate_input_preflight(
@@ -155,7 +165,10 @@ def test_tier2_clarification_required():
     assert result.decision == PreflightDecisionType.CLARIFICATION_REQUIRED
     assert result.is_safe is True
     assert result.needs_clarification is True
-    assert result.clarification_question == "Bạn muốn xem thống kê doanh thu trong khoảng thời gian nào?"
+    assert (
+        result.clarification_question
+        == "Bạn muốn xem thống kê doanh thu trong khoảng thời gian nào?"
+    )
     assert len(result.suggested_options) == 3
     assert result.suggested_options[0] == "A. Năm 1994"
 
@@ -199,7 +212,9 @@ def test_tier2_fail_open_fallback_on_llm_exception():
     mock_llm = MagicMock()
     mock_structured = MagicMock()
     mock_llm.with_structured_output.return_value = mock_structured
-    mock_structured.invoke.side_effect = TimeoutError("Connection to LLM provider timed out")
+    mock_structured.invoke.side_effect = TimeoutError(
+        "Connection to LLM provider timed out"
+    )
 
     result = evaluate_input_preflight(
         question="Báo cáo tình hình vận chuyển quý 3",
