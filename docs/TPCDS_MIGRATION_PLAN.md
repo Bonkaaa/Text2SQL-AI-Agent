@@ -238,10 +238,10 @@ Khi cấu hình cho SQL Generator Subagent trên TPC-DS, **3 quy tắc cốt lõ
   - [x] Cập nhật `src/agents/tools/metadata_tools.py` và `src/agents/schema_retriever.py`
   - [x] Cập nhật RBAC matrix trong `src/models/rbac.py`
 
-- [ ] **Giai đoạn 4: Frontend, Evals & Tài liệu**
-  - [ ] Tạo `src/frontend/data/tpcdsSchema.ts` (24 bảng)
-  - [ ] Cập nhật `SchemaDrawer.tsx` (phân nhóm Fact / Dimension)
-  - [ ] Cập nhật `PromptPresets.tsx` & `DesktopWindowChrome.tsx`
-  - [ ] Soạn 50 câu hỏi benchmark tiếng Việt mới trong `evals/datasets/benchmark_vi.json`
-  - [ ] Chạy lại toàn bộ `pytest tests/` và benchmark runner
-  - [ ] Cập nhật `AGENTS.md` và `docs/DATABASE_SCHEMA.md`
+- [x] **Giai đoạn 4: Frontend, Evals & Tài liệu**
+  - [x] Tạo `src/frontend/data/tpcdsSchema.ts` (24 bảng)
+  - [x] Cập nhật `SchemaDrawer.tsx` (phân nhóm Fact / Dimension)
+  - [x] Cập nhật `PromptPresets.tsx` & `DesktopWindowChrome.tsx`
+  - [x] Soạn 50 câu hỏi benchmark tiếng Việt mới trong `evals/datasets/benchmark_vi.json`
+  - [x] Chạy lại toàn bộ `pytest tests/` và benchmark runner
+  - [x] Cập nhật `AGENTS.md` và `docs/DATABASE_SCHEMA.md`

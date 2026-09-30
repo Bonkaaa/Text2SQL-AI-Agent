@@ -1,7 +1,16 @@
 "use client";
 
 import React from "react";
-import { TrendingUp, Users, Truck, Percent, LucideIcon } from "lucide-react";
+import {
+  TrendingUp,
+  Users,
+  Truck,
+  Percent,
+  ShoppingBag,
+  RotateCcw,
+  Store,
+  LucideIcon,
+} from "lucide-react";
 
 export interface PromptPresetItem {
   id: string;
@@ -11,6 +20,41 @@ export interface PromptPresetItem {
   icon: LucideIcon;
   colorClass?: string;
 }
+
+export const TPCDS_PROMPT_PRESETS: PromptPresetItem[] = [
+  {
+    id: "omnichannel-sales",
+    category: "Doanh thu",
+    label: "Doanh số đa kênh",
+    query: "So sánh tổng doanh thu bán hàng giữa 3 kênh Store, Web và Catalog trong năm 2001",
+    icon: TrendingUp,
+    colorClass: "text-emerald-400 group-hover:text-emerald-300",
+  },
+  {
+    id: "top-categories",
+    category: "Hàng hóa",
+    label: "Top 5 danh mục",
+    query: "Top 5 danh mục sản phẩm (Categories) có doanh thu cao nhất trên kênh Store năm 2001",
+    icon: ShoppingBag,
+    colorClass: "text-brand-400 group-hover:text-brand-300",
+  },
+  {
+    id: "return-reasons",
+    category: "Đổi trả",
+    label: "Lý do đổi trả",
+    query: "Thống kê tỷ lệ và số tiền đổi trả hàng (Store Returns) theo từng lý do hoàn trả",
+    icon: RotateCcw,
+    colorClass: "text-amber-400 group-hover:text-amber-300",
+  },
+  {
+    id: "store-california",
+    category: "Cửa hàng",
+    label: "Doanh số tại California",
+    query: "Doanh số và lợi nhuận ròng của các cửa hàng bán lẻ tại bang California",
+    icon: Store,
+    colorClass: "text-purple-400 group-hover:text-purple-300",
+  },
+];
 
 export const TPCH_PROMPT_PRESETS: PromptPresetItem[] = [
   {
@@ -58,7 +102,7 @@ export function PromptPresets({
   onSelectPrompt,
   disabled = false,
   className = "",
-  presets = TPCH_PROMPT_PRESETS,
+  presets = TPCDS_PROMPT_PRESETS,
 }: PromptPresetsProps) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, query: string) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -73,7 +117,7 @@ export function PromptPresets({
     <div
       className={`flex items-center justify-center flex-wrap gap-2.5 max-w-2xl px-4 ${className}`}
       role="group"
-      aria-label="Các câu hỏi mẫu TPC-H gợi ý"
+      aria-label="Các câu hỏi mẫu TPC-DS gợi ý"
     >
       {presets.map((item) => {
         const IconComponent = item.icon;

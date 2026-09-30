@@ -3,8 +3,8 @@
 Đóng gói SQL Generator dưới dạng một DeepAgent hoàn chỉnh chạy trên nền LangGraph runtime:
 - Đồ thị CompiledStateGraph khởi tạo qua `create_deep_agent`.
 - Tự động nạp kỹ năng nghiệp vụ:
-  * `skills/duckdb-sql`: Cú pháp tối ưu DuckDB, DATE literals, khoảng thời gian INTERVAL, ILIKE, GROUP BY ALL, Window functions.
-  * `skills/tpch-analytics`: Định nghĩa chỉ số dbt Semantic Metrics và ngữ nghĩa 8 bảng TPC-H.
+  * `skills/duckdb-sql`: Cú pháp tối ưu DuckDB v1.2+, DATE literals, QUALIFY window filtering, NULLIF, GROUP BY ALL.
+  * `skills/tpcds-analytics`: Định nghĩa chỉ số dbt Semantic Metrics, mô hình đa kênh và ngữ nghĩa 24 bảng TPC-DS.
 - Gắn trực tiếp 4 Active Metadata Tools:
   * `search_tables_and_columns`: Tra cứu DDL bảng và cột theo từ khóa.
   * `get_column_samples_and_values`: Tra cứu giá trị thực tế của các cột phân loại (categorical values).
@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_SQL_GENERATOR_SKILLS: Final[list[str]] = [
     "skills/duckdb-sql",
     "skills/tpcds-analytics",
-    "skills/tpch-analytics",
 ]
 
 
@@ -129,7 +128,7 @@ def create_sql_generator_agent(
     Args:
         model: Chat model instance hoặc tên model (mặc định lấy Tier 1 từ Settings).
         tools: Danh sách công cụ tra cứu siêu dữ liệu (mặc định SQL_GENERATOR_TOOLS).
-        skills: Danh sách kỹ năng nạp vào agent (mặc định duckdb-sql và tpch-analytics).
+        skills: Danh sách kỹ năng nạp vào agent (mặc định duckdb-sql và tpcds-analytics).
         checkpointer: Checkpointer quản lý trạng thái phiên (nếu có).
         system_prompt: Lời nhắc hệ thống định hướng chuyên gia SQL.
         name: Định danh tên agent trong hệ thống LangGraph.
@@ -260,7 +259,7 @@ def generate_sql(
         error_context: Lịch sử lỗi từ Control Pipeline ở chu kỳ retry trước (nếu có).
         llm: Instance Chat Model (nếu None sẽ tự khởi tạo Tier 1 qua get_chat_model).
         tools: Danh sách tools cung cấp cho agent (mặc định SQL_GENERATOR_TOOLS).
-        skills: Danh sách skills nạp vào agent (mặc định duckdb-sql và tpch-analytics).
+        skills: Danh sách skills nạp vào agent (mặc định duckdb-sql và tpcds-analytics).
         agent: DeepAgent StateGraph đã biên dịch (nếu None sẽ tự khởi tạo).
         max_tool_iterations: Tham số tương thích ngược.
 
@@ -314,7 +313,7 @@ async def agenerate_sql(
         error_context: Lịch sử lỗi từ Control Pipeline ở chu kỳ retry trước (nếu có).
         llm: Instance Chat Model (nếu None sẽ tự khởi tạo Tier 1 qua get_chat_model).
         tools: Danh sách tools cung cấp cho agent (mặc định SQL_GENERATOR_TOOLS).
-        skills: Danh sách skills nạp vào agent (mặc định duckdb-sql và tpch-analytics).
+        skills: Danh sách skills nạp vào agent (mặc định duckdb-sql và tpcds-analytics).
         agent: DeepAgent StateGraph đã biên dịch (nếu None sẽ tự khởi tạo).
         max_tool_iterations: Tham số tương thích ngược.
 

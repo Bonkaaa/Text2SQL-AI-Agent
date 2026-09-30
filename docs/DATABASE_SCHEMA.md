@@ -1,10 +1,11 @@
 # DATABASE_SCHEMA.md — Database Architecture & Data Dictionary
 
 > **Dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp  
-> **Phiên bản**: 2.0 (Chuẩn hóa theo TPC-H Benchmark Schema)  
+> **Phiên bản**: 3.0 (Chuẩn hóa theo TPC-DS Benchmark Omnichannel Retail Schema - 24 Bảng)  
 > **Phạm vi**: 
 > 1. **Application & Governance Database**: Quản lý người dùng, phiên hội thoại, phân quyền và Audit Log.
-> 2. **Business Analytics Warehouse (TPC-H Benchmark)**: Kho dữ liệu bán buôn, chuỗi cung ứng và thương mại chuẩn quốc tế (8 bảng) phục vụ AI Agent chuyển đổi Text-to-SQL.
+> 2. **Business Analytics Warehouse (TPC-DS Benchmark)**: Kho dữ liệu bán lẻ đa kênh chuẩn quốc tế (24 bảng: Store, Web, Catalog, Returns, Inventory, Dimensions) phục vụ AI Agent chuyển đổi Text-to-SQL.
+> 3. **Legacy Warehouse Compatibility (TPC-H)**: Hỗ trợ chuyển đổi tuần tự (Strangler Fig pattern).
 
 ---
 
@@ -12,7 +13,7 @@
 
 Hệ thống phân định rạch ròi giữa 2 lớp cơ sở dữ liệu:
 - **Lớp 1: Operational & Governance Database (PostgreSQL / SQLite)**: Phục vụ Backend FastAPI, quản lý Session, Checkpointer LangGraph, lưu trữ vết kiểm định Audit Log và các Few-shot Examples.
-- **Lớp 2: Enterprise Analytics Warehouse (DuckDB / BigQuery Sandbox - TPC-H Schema)**: Kho dữ liệu kinh doanh chuẩn công nghiệp mô phỏng hoạt động phân phối, cung ứng hàng hóa toàn cầu. Nơi AI Agent thực thi các câu lệnh `SELECT` để trả số liệu cho người dùng.
+- **Lớp 2: Enterprise Analytics Warehouse (DuckDB / BigQuery Sandbox - TPC-DS Schema 24 Bảng)**: Kho dữ liệu kinh doanh chuẩn công nghiệp mô phỏng chuỗi phân phối đa kênh (Omnichannel: Cửa hàng thực tế, Catalog đặt hàng qua thư tín, và Kênh thương mại điện tử Web). Nơi AI Agent thực thi các câu lệnh `SELECT` để trả số liệu cho người dùng.
 
 ---
 
@@ -64,35 +65,26 @@ erDiagram
         string user_role
         text natural_query
         text generated_sql
-        string status "SUCCESS, REJECTED, FAILED, BLOCKED_RBAC"
+        string status "SUCCESS, BLOCKED_AST, BLOCKED_RBAC, OVER_BUDGET, USER_REJECTED, RUNTIME_ERROR"
         bigint bytes_scanned
         float execution_time_ms
         string approved_by
         text error_reason
         timestamp created_at
     }
-
-    FEW_SHOT_EXAMPLES {
-        uuid id PK
-        string domain "tpch"
-        text natural_question
-        text ground_truth_sql
-        string difficulty "EASY, MEDIUM, HARD"
-        boolean is_active
-    }
 ```
 
-### 2.2. Chi tiết các bảng (Application & Governance)
+### 2.2. Chi tiết Từ điển Dữ liệu (Governance Tables)
 
 #### Bảng `users`
 | Cột | Kiểu | Nullable | Khóa | Mô tả |
 |---|---|---|---|---|
-| `id` | UUID | No | PK | Định danh người dùng (đồng bộ từ Supabase Auth) |
-| `email` | VARCHAR(255) | No | Unique | Email đăng nhập của nhân viên |
-| `full_name` | VARCHAR(255) | No | | Họ và tên nhân viên |
-| `role` | VARCHAR(50) | No | | Vai trò: `Analyst` (chỉ đọc nghiệp vụ) hoặc `Admin` (toàn quyền) |
-| `is_active` | BOOLEAN | No | | Trạng thái tài khoản (mặc định: `TRUE`) |
-| `created_at` | TIMESTAMP | No | | Thời điểm tạo tài khoản |
+| `id` | UUID | No | PK | Định danh người dùng duy nhất |
+| `email` | VARCHAR(255) | No | Unique | Email đăng nhập |
+| `full_name` | VARCHAR(100) | No | | Tên hiển thị của nhân sự |
+| `role` | VARCHAR(50) | No | | Quyền hạn: `analyst`, `admin`, `viewer` |
+| `is_active` | BOOLEAN | No | | Cờ trạng thái tài khoản |
+| `created_at` | TIMESTAMP | No | | Thời gian tạo tài khoản |
 
 #### Bảng `chat_sessions`
 | Cột | Kiểu | Nullable | Khóa | Mô tả |
@@ -131,351 +123,111 @@ erDiagram
 | `error_reason` | TEXT | Yes | | Chi tiết nguyên nhân nếu truy vấn bị từ chối/thất bại |
 | `created_at` | TIMESTAMP | No | | Thời điểm ghi nhận |
 
-#### Bảng `few_shot_examples` (Vector Retrieval Data Source)
-| Cột | Kiểu | Nullable | Khóa | Mô tả |
-|---|---|---|---|---|
-| `id` | UUID | No | PK | Mã ví dụ mẫu |
-| `domain` | VARCHAR(50) | No | | Ngành nghiệp vụ (`tpch`) |
-| `natural_question` | TEXT | No | | Câu hỏi mẫu tiếng Việt |
-| `ground_truth_sql` | TEXT | No | | Câu lệnh SQL chuẩn (trích từ TPC-H 22 queries hoặc custom) |
-| `difficulty` | VARCHAR(20) | No | | Độ khó: `EASY`, `MEDIUM`, `HARD` |
-| `is_active` | BOOLEAN | No | | Cờ kích hoạt sử dụng trong bộ few-shot |
-
 ---
 
-## 3. LỚP 2: ENTERPRISE ANALYTICS WAREHOUSE (CHUẨN TPC-H)
+## 3. LỚP 2: ENTERPRISE ANALYTICS WAREHOUSE (CHUẨN TPC-DS 24 BẢNG)
 
-Mô hình TPC-H gồm **8 bảng quan hệ** phản ánh toàn diện hoạt động chuỗi cung ứng, quản lý tồn kho, khách hàng và phân tích doanh thu bán hàng quốc tế.
+Mô hình TPC-DS tổ chức theo mô hình **Constellation Schema (Nhiều Fact chia sẻ Dimensions)** gồm **24 bảng quan hệ**:
+- **3 Fact Sales**: `store_sales`, `catalog_sales`, `web_sales`
+- **3 Fact Returns**: `store_returns`, `catalog_returns`, `web_returns`
+- **1 Fact Inventory**: `inventory`
+- **17 Dimensions**: `date_dim`, `time_dim`, `item`, `customer`, `customer_address`, `customer_demographics`, `household_demographics`, `income_band`, `store`, `call_center`, `catalog_page`, `web_site`, `web_page`, `warehouse`, `ship_mode`, `promotion`, `reason`.
 
-### 3.1. Sơ đồ thực thể ERD (TPC-H Schema)
+### 3.1. Sơ đồ thực thể ERD Tổng quan (TPC-DS Constellation)
 
 ```mermaid
 erDiagram
-    REGION ||--o{ NATION : contains
-    NATION ||--o{ SUPPLIER : locates
-    NATION ||--o{ CUSTOMER : locates
-    SUPPLIER ||--o{ PARTSUPP : supplies
-    PART ||--o{ PARTSUPP : supplied_by
-    CUSTOMER ||--o{ ORDERS : places
-    ORDERS ||--o{ LINEITEM : contains
-    PARTSUPP ||--o{ LINEITEM : fulfills
+    DATE_DIM ||--o{ STORE_SALES : sold_date
+    DATE_DIM ||--o{ CATALOG_SALES : sold_date
+    DATE_DIM ||--o{ WEB_SALES : sold_date
+    DATE_DIM ||--o{ STORE_RETURNS : returned_date
+    DATE_DIM ||--o{ CATALOG_RETURNS : returned_date
+    DATE_DIM ||--o{ WEB_RETURNS : returned_date
+    DATE_DIM ||--o{ INVENTORY : date
 
-    REGION {
-        int r_regionkey PK
-        string r_name
-        string r_comment
-    }
+    ITEM ||--o{ STORE_SALES : item
+    ITEM ||--o{ CATALOG_SALES : item
+    ITEM ||--o{ WEB_SALES : item
+    ITEM ||--o{ STORE_RETURNS : item
+    ITEM ||--o{ INVENTORY : item
 
-    NATION {
-        int n_nationkey PK
-        string n_name
-        int n_regionkey FK
-        string n_comment
-    }
+    CUSTOMER ||--o{ STORE_SALES : customer
+    CUSTOMER ||--o{ CATALOG_SALES : customer
+    CUSTOMER ||--o{ WEB_SALES : customer
+    CUSTOMER ||--o{ STORE_RETURNS : customer
 
-    SUPPLIER {
-        int s_suppkey PK
-        string s_name
-        string s_address
-        int s_nationkey FK
-        string s_phone "PII nhay cam"
-        decimal s_acctbal "Tai chinh nhay cam"
-        string s_comment
-    }
+    CUSTOMER ||--o{ CUSTOMER_ADDRESS : current_addr
+    CUSTOMER ||--o{ CUSTOMER_DEMOGRAPHICS : demographics
 
-    CUSTOMER {
-        int c_custkey PK
-        string c_name
-        string c_address "PII nhay cam"
-        int c_nationkey FK
-        string c_phone "PII nhay cam"
-        decimal c_acctbal "Tai chinh nhay cam"
-        string c_mktsegment
-        string c_comment
-    }
+    STORE ||--o{ STORE_SALES : store
+    STORE ||--o{ STORE_RETURNS : store
 
-    PART {
-        int p_partkey PK
-        string p_name
-        string p_mfgr
-        string p_brand
-        string p_type
-        int p_size
-        string p_container
-        decimal p_retailprice
-        string p_comment
-    }
-
-    PARTSUPP {
-        int ps_partkey PK,FK
-        int ps_suppkey PK,FK
-        int ps_availqty
-        decimal ps_supplycost
-        string ps_comment
-    }
-
-    ORDERS {
-        int o_orderkey PK
-        int o_custkey FK
-        string o_orderstatus "O, F, P"
-        decimal o_totalprice
-        date o_orderdate
-        string o_orderpriority
-        string o_clerk
-        int o_shippriority
-        string o_comment
-    }
-
-    LINEITEM {
-        int l_orderkey PK,FK
-        int l_partkey FK
-        int l_suppkey FK
-        int l_linenumber PK
-        decimal l_quantity
-        decimal l_extendedprice
-        decimal l_discount
-        decimal l_tax
-        string l_returnflag "R, A, N"
-        string l_linestatus "O, F"
-        date l_shipdate
-        date l_commitdate
-        date l_receiptdate
-        string l_shipinstruct
-        string l_shipmode
-        string l_comment
-    }
+    WAREHOUSE ||--o{ INVENTORY : warehouse
+    PROMOTION ||--o{ STORE_SALES : promo
+    REASON ||--o{ STORE_RETURNS : return_reason
+    SHIP_MODE ||--o{ CATALOG_SALES : ship_mode
 ```
 
 ---
 
-### 3.2. Chi tiết 8 bảng trong TPC-H
+### 3.2. Ba Quy Tắc Vàng Khi Truy Vấn TPC-DS (Golden Rules)
 
-#### 1. Bảng `region` (Khu vực địa lý)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `r_regionkey` | INTEGER | No | PK | Mã khu vực: `0, 1, 2, 3, 4` |
-| `r_name` | CHAR(25) | No | | Tên khu vực: `'AFRICA'`, `'AMERICA'`, `'ASIA'`, `'EUROPE'`, `'MIDDLE EAST'` |
-| `r_comment` | VARCHAR(152) | Yes | | Ghi chú mô tả khu vực |
-
-#### 2. Bảng `nation` (Quốc gia)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `n_nationkey` | INTEGER | No | PK | Mã quốc gia: `0` đến `24` (25 quốc gia chuẩn) |
-| `n_name` | CHAR(25) | No | | Tên quốc gia: `'VIETNAM'`, `'JAPAN'`, `'UNITED STATES'`, `'GERMANY'` |
-| `n_regionkey` | INTEGER | No | FK | Khóa ngoại tham chiếu `region(r_regionkey)` |
-| `n_comment` | VARCHAR(152) | Yes | | Ghi chú thông tin quốc gia |
-
-#### 3. Bảng `supplier` (Nhà cung cấp hàng hóa)
-| Cột | Kiểu | Nullable | Khóa | Quyền truy cập RBAC |
-|---|---|---|---|---|
-| `s_suppkey` | INTEGER | No | PK | Tất cả roles |
-| `s_name` | CHAR(25) | No | | Tên nhà cung cấp: `'Supplier#000000001'` |
-| `s_address` | VARCHAR(40) | No | | Địa chỉ kho/trụ sở |
-| `s_nationkey` | INTEGER | No | FK | Khóa ngoại tham chiếu `nation(n_nationkey)` |
-| `s_phone` | CHAR(15) | No | | **CẤM role Analyst (PII nhạy cảm)** |
-| `s_acctbal` | DECIMAL(15,2)| No | | **CẤM role Analyst (Dữ liệu tài chính đối tác)** |
-| `s_comment` | VARCHAR(101) | Yes | | Nhận xét hoặc đánh giá khiếu nại |
-
-#### 4. Bảng `customer` (Khách hàng)
-| Cột | Kiểu | Nullable | Khóa | Quyền truy cập RBAC |
-|---|---|---|---|---|
-| `c_custkey` | INTEGER | No | PK | Tất cả roles |
-| `c_name` | VARCHAR(25) | No | | Tên khách hàng: `'Customer#000000001'` |
-| `c_address` | VARCHAR(40) | No | | **CẤM role Analyst (PII địa chỉ cá nhân)** |
-| `c_nationkey` | INTEGER | No | FK | Khóa ngoại tham chiếu `nation(n_nationkey)` |
-| `c_phone` | CHAR(15) | No | | **CẤM role Analyst (PII SĐT)** |
-| `c_acctbal` | DECIMAL(15,2)| No | | **CẤM role Analyst (Số dư tài khoản cá nhân)** |
-| `c_mktsegment`| CHAR(10) | No | | Phân khúc thị trường: `'AUTOMOBILE'`, `'BUILDING'`, `'FURNITURE'`, `'HOUSEHOLD'`, `'MACHINERY'` |
-| `c_comment` | VARCHAR(117) | Yes | | Ghi chú khách hàng |
-
-#### 5. Bảng `part` (Danh mục mặt hàng / linh kiện)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `p_partkey` | INTEGER | No | PK | Mã mặt hàng: `1, 2, 3...` |
-| `p_name` | VARCHAR(55) | No | | Tên mặt hàng: `'goldenrod lavender spring...''` |
-| `p_mfgr` | CHAR(25) | No | | Nhà sản xuất: `'Manufacturer#1'`, `'Manufacturer#2'` |
-| `p_brand` | CHAR(10) | No | | Thương hiệu: `'Brand#11'`, `'Brand#23'` |
-| `p_type` | VARCHAR(25) | No | | Loại sản phẩm: `'ECONOMY ANODIZED STEEL'`, `'PROMO POLISHED BRASS'` |
-| `p_size` | INTEGER | No | | Kích thước sản phẩm: `1` đến `50` |
-| `p_container` | CHAR(10) | No | | Quy cách đóng gói: `'SM CASE'`, `'JUMBO BOX'`, `'MED BAG'` |
-| `p_retailprice`| DECIMAL(15,2)| No | | Giá bán lẻ niêm yết (USD) |
-| `p_comment` | VARCHAR(23) | Yes | | Mô tả chi tiết |
-
-#### 6. Bảng `partsupp` (Mối quan hệ Cung ứng - Tồn kho)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `ps_partkey` | INTEGER | No | PK, FK| Khóa ngoại tham chiếu `part(p_partkey)` |
-| `ps_suppkey` | INTEGER | No | PK, FK| Khóa ngoại tham chiếu `supplier(s_suppkey)` |
-| `ps_availqty` | INTEGER | No | | Số lượng tồn kho sẵn sàng cung cấp |
-| `ps_supplycost`| DECIMAL(15,2)| No | | Đơn giá chi phí nhập hàng từ nhà cung cấp |
-| `ps_comment` | VARCHAR(199) | Yes | | Ghi chú tồn kho |
-
-#### 7. Bảng `orders` (Đơn đặt hàng)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `o_orderkey` | INTEGER | No | PK | Mã đơn hàng: `1, 2, 3...` |
-| `o_custkey` | INTEGER | No | FK | Khóa ngoại tham chiếu `customer(c_custkey)` |
-| `o_orderstatus`| CHAR(1) | No | | Trạng thái: `'O'` (Open/Đang xử lý), `'F'` (Fulfilled/Hoàn tất), `'P'` (Pending/Chờ duyệt) |
-| `o_totalprice` | DECIMAL(15,2)| No | | Tổng giá trị đơn hàng |
-| `o_orderdate` | DATE | No | | Ngày đặt hàng (VD: `1995-03-15`) |
-| `o_orderpriority`| CHAR(15) | No | | Mức ưu tiên: `'1-URGENT'`, `'2-HIGH'`, `'3-MEDIUM'`, `'4-NOT SPECIFIED'`, `'5-LOW'` |
-| `o_clerk` | CHAR(15) | No | | Nhân viên phụ trách đơn hàng: `'Clerk#000000001'` |
-| `o_shippriority`| INTEGER | No | | Thứ tự ưu tiên vận chuyển |
-| `o_comment` | VARCHAR(79) | Yes | | Ghi chú đơn hàng |
-
-#### 8. Bảng `lineitem` (Chi tiết dòng hàng - Bảng sự kiện lớn nhất)
-| Cột | Kiểu | Nullable | Khóa | Mô tả & Giá trị mẫu |
-|---|---|---|---|---|
-| `l_orderkey` | INTEGER | No | PK, FK| Khóa ngoại tham chiếu `orders(o_orderkey)` |
-| `l_linenumber` | INTEGER | No | PK | Số thứ tự dòng hàng trong đơn |
-| `l_partkey` | INTEGER | No | FK | Mặt hàng được mua |
-| `l_suppkey` | INTEGER | No | FK | Nhà cung cấp xuất hàng |
-| `l_quantity` | DECIMAL(15,2)| No | | Số lượng đặt mua |
-| `l_extendedprice`| DECIMAL(15,2)| No | | Giá gốc = `quantity * retailprice` |
-| `l_discount` | DECIMAL(15,2)| No | | Tỷ lệ chiết khấu (từ `0.00` đến `0.10`, tức 0% - 10%) |
-| `l_tax` | DECIMAL(15,2)| No | | Thuế suất (từ `0.00` đến `0.08`, tức 0% - 8%) |
-| `l_returnflag` | CHAR(1) | No | | Cờ hoàn hàng: `'R'` (Returned), `'A'` (Accepted), `'N'` (None) |
-| `l_linestatus` | CHAR(1) | No | | Trạng thái dòng hàng: `'O'` (Open), `'F'` (Finished) |
-| `l_shipdate` | DATE | No | | Ngày xuất kho vận chuyển |
-| `l_commitdate` | DATE | No | | Ngày cam kết giao |
-| `l_receiptdate`| DATE | No | | Ngày khách nhận hàng thực tế |
-| `l_shipinstruct`| CHAR(25) | No | | Chỉ dẫn giao: `'DELIVER IN PERSON'`, `'TAKE BACK RETURN'`, `'NONE'` |
-| `l_shipmode` | CHAR(10) | No | | Phương thức vận chuyển: `'AIR'`, `'FOB'`, `'MAIL'`, `'RAIL'`, `'REG AIR'`, `'SHIP'`, `'TRUCK'` |
-| `l_comment` | VARCHAR(44) | Yes | | Ghi chú dòng hàng |
+1. **Quy tắc ngày tháng (Date Dimension Join)**:
+   - Các bảng Fact (`store_sales`, `web_sales`, etc.) không chứa cột ngày dạng DATE hay TIMESTAMP trực tiếp.
+   - Luôn sử dụng surrogate key (ví dụ: `ss_sold_date_sk = date_dim.d_date_sk`) để lọc theo `d_year`, `d_moy` (tháng), `d_qoy` (quý).
+2. **Quy tắc doanh thu thuần (Net Paid Metrics)**:
+   - Luôn sử dụng các metric doanh thu thực tế sau chiết khấu: `ss_net_paid` (Store), `cs_net_paid` (Catalog), `ws_net_paid` (Web).
+   - Lợi nhuận ròng tương ứng: `ss_net_profit`, `cs_net_profit`, `ws_net_profit`.
+3. **Quy tắc bảo vệ PII & RBAC**:
+   - Các cột: `c_first_name`, `c_last_name`, `c_email_address`, `c_birth_day`, `ca_street_name`, `ca_street_number` chứa thông tin định danh cá nhân nhạy cảm (PII).
+   - Truy vấn người dùng thuộc vai trò bị hạn chế sẽ tự động bị chặn hoặc áp dụng mặt nạ (masking).
 
 ---
 
-## 4. DBT SEMANTIC METRICS LAYER (TỪ ĐIỂN CÔNG THỨC KINH DOANH TPC-H)
+### 3.3. Danh mục 24 Bảng TPC-DS Chi tiết
 
-Khi người dùng hỏi số liệu, Agent phải sinh SQL tuân thủ đúng các công thức chuẩn doanh nghiệp sau:
-
-| Tên chỉ số nghiệp vụ | Công thức SQL chuẩn hóa | Giải thích nghiệp vụ |
-|---|---|---|
-| **Doanh thu gộp (Gross Revenue)** | `SUM(l_extendedprice)` | Tổng giá trị hàng hóa chưa trừ chiết khấu và thuế |
-| **Doanh thu thuần (Discounted Net Revenue)** | `SUM(l_extendedprice * (1 - l_discount))` | Doanh thu thực thu sau chiết khấu (Chuẩn TPC-H Q1/Q6) |
-| **Tổng tiền thanh toán (Total Charge)** | `SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax))` | Doanh thu sau chiết khấu cộng thêm thuế |
-| **Tỷ lệ hoàn hàng (Return Rate)** | `COUNT(CASE WHEN l_returnflag = 'R' THEN 1 END) * 100.0 / COUNT(*)` | Tỷ lệ đơn hàng bị trả lại so với tổng dòng hàng |
-| **Tỷ lệ giao hàng trễ (Late Ship Rate)** | `COUNT(CASE WHEN l_receiptdate > l_commitdate THEN 1 END) * 100.0 / COUNT(*)` | Tỷ lệ đơn hàng nhận sau ngày cam kết |
-| **Giá trị tồn kho chi phí (Supply Value)** | `SUM(ps_availqty * ps_supplycost)` | Tổng vốn tồn đọng trong kho theo giá nhập nhà cung cấp |
-
----
-
-## 5. MA TRẬN PHÂN QUYỀN TRUY CẬP DỮ LIỆU (RBAC MATRIX CHO TPC-H)
-
-LangGraph AST Node sẽ kiểm tra câu SQL của người dùng dựa trên ma trận cứng này:
-
-| Bảng / Cột | Vai trò `Analyst` | Vai trò `Admin` |
-|---|---|---|
-| Bảng `region`, `nation`, `part`, `partsupp` | ✅ Cho phép toàn bộ | ✅ Toàn quyền |
-| Bảng `orders`, `lineitem` | ✅ Cho phép toàn bộ | ✅ Toàn quyền |
-| Cột `customer.c_name`, `customer.c_mktsegment` | ✅ Cho phép xem | ✅ Toàn quyền |
-| Cột `customer.c_phone` | ❌ **CẤM (PII nhạy cảm)** | ✅ Cho phép xem |
-| Cột `customer.c_address` | ❌ **CẤM (PII địa chỉ)** | ✅ Cho phép xem |
-| Cột `customer.c_acctbal` | ❌ **CẤM (Tài chính nhạy cảm)** | ✅ Cho phép xem |
-| Cột `supplier.s_phone` | ❌ **CẤM (PII đối tác)** | ✅ Cho phép xem |
-| Cột `supplier.s_acctbal` | ❌ **CẤM (Tài chính đối tác)** | ✅ Cho phép xem |
-| Bảng nội bộ `audit_logs` | ❌ **CẤM (Chỉ Admin thanh tra)** | ✅ Toàn quyền xem và query |
+| Tên Bảng | Phân Loại | Khóa Chính / Surrogate | Mô tả Nghiệp vụ | Cột Nhạy Cảm (PII) |
+|---|---|---|---|---|
+| `store_sales` | Fact Bán hàng | `ss_item_sk`, `ss_ticket_number` | Giao dịch bán lẻ tại chuỗi cửa hàng vật lý | Không |
+| `catalog_sales` | Fact Bán hàng | `cs_item_sk`, `cs_order_number` | Giao dịch bán hàng qua danh mục Catalog / Bưu điện | Không |
+| `web_sales` | Fact Bán hàng | `ws_item_sk`, `ws_order_number` | Giao dịch bán lẻ qua trang thương mại điện tử | Không |
+| `store_returns` | Fact Trả hàng | `sr_item_sk`, `sr_ticket_number` | Đổi trả và hoàn tiền tại cửa hàng vật lý | Không |
+| `catalog_returns`| Fact Trả hàng | `cr_item_sk`, `cr_order_number` | Đổi trả hàng qua kênh bưu chính Catalog | Không |
+| `web_returns` | Fact Trả hàng | `wr_item_sk`, `wr_order_number` | Đổi trả hàng mua trực tuyến qua kênh Web | Không |
+| `inventory` | Fact Tồn kho | `inv_date_sk`, `inv_item_sk`, `inv_warehouse_sk` | Số lượng tồn kho theo mặt hàng và kho hàng | Không |
+| `customer` | Dimension | `c_customer_sk` | Thông tin hồ sơ khách hàng | `c_first_name`, `c_last_name`, `c_email_address` |
+| `customer_address` | Dimension | `ca_address_sk` | Địa chỉ cư trú và giao hàng của khách hàng | `ca_street_number`, `ca_street_name` |
+| `customer_demographics` | Dimension | `cd_demo_sk` | Nhân khẩu học (giới tính, hôn nhân, học vấn) | Không |
+| `date_dim` | Dimension | `d_date_sk` | Lịch kinh doanh (ngày, tuần, tháng, quý, năm) | Không |
+| `time_dim` | Dimension | `t_time_sk` | Chi tiết thời gian (giờ, phút, giây, ca bán) | Không |
+| `item` | Dimension | `i_item_sk` | Danh mục hàng hóa, thương hiệu, ngành hàng | Không |
+| `store` | Dimension | `s_store_sk` | Thông tin cửa hàng, diện tích, bang, quản lý | Không |
+| `warehouse` | Dimension | `w_warehouse_sk` | Thông tin kho bãi và trung tâm phân phối | Không |
+| `ship_mode` | Dimension | `sm_ship_mode_sk` | Phương thức vận chuyển (AIR, TRUCK, SHIP) | Không |
+| `promotion` | Dimension | `p_promo_sk` | Chương trình ưu đãi, giảm giá tiếp thị | Không |
+| `reason` | Dimension | `r_reason_sk` | Danh mục lý do đổi trả hàng | Không |
+| `call_center` | Dimension | `cc_call_center_sk`| Trung tâm chăm sóc khách hàng & tiếp nhận đơn | `cc_name`, `cc_manager` |
+| `catalog_page` | Dimension | `cp_catalog_page_sk`| Trang danh mục ấn phẩm phát hành | Không |
+| `web_site` | Dimension | `web_site_sk` | Cổng thông tin website bán hàng | Không |
+| `web_page` | Dimension | `wp_web_page_sk` | Trang đích, giỏ hàng, trang sản phẩm web | Không |
+| `household_demographics`| Dimension | `hd_demo_sk` | Quy mô hộ gia đình và phương tiện đi lại | Không |
+| `income_band` | Dimension | `ib_income_band_sk`| Bậc thu nhập của khách hàng | Không |
 
 ---
 
-## 6. MẪU DDL TẠO BẢNG CHẠY THỰC TẾ (DUCKDB & BIGQUERY)
+## 4. BẢO MẬT & PHÂN QUYỀN (RBAC & PII POLICY)
 
-### 6.1. Khởi tạo trực tiếp qua DuckDB Extension (Khuyên dùng - Nhanh nhất)
-Như đã thiết lập trong `scripts/install_data.py`:
-```python
-import duckdb
+| Vai trò (Role) | Bảng Fact được truy cập | Xem Cột PII (`c_first_name`, `email`) | Xem Doanh thu thuần |
+|---|---|---|---|
+| **Admin** | Toàn quyền (7 Fact + 17 Dim) | Được phép toàn quyền | Toàn quyền |
+| **Analyst** | Toàn quyền (7 Fact + 17 Dim) | Được phép (cho phân tích khách hàng) | Toàn quyền |
+| **Business User** | Store / Catalog / Web Sales | Bị hạn chế / Ẩn cột PII | Toàn quyền |
+| **Viewer** | Chỉ xem thống kê tổng hợp | Bị chặn tuyệt đối | Số liệu tổng hợp |
 
-con = duckdb.connect("data/tpch.duckdb")
-con.execute("INSTALL tpch; LOAD tpch;")
-con.execute("CALL dbgen(sf = 0.1);")  # sf=0.1 (~100MB) hoặc sf=1 (~1GB)
-```
+---
 
-### 6.2. DDL chuẩn tạo schema thủ công (BigQuery / DuckDB Standard SQL)
-```sql
-CREATE TABLE IF NOT EXISTS region (
-    r_regionkey INTEGER PRIMARY KEY,
-    r_name CHAR(25) NOT NULL,
-    r_comment VARCHAR(152)
-);
+## 5. PHỤ LỤC: LƯỢC ĐỒ TPC-H (LEGACY COMPATIBILITY)
 
-CREATE TABLE IF NOT EXISTS nation (
-    n_nationkey INTEGER PRIMARY KEY,
-    n_name CHAR(25) NOT NULL,
-    n_regionkey INTEGER REFERENCES region(r_regionkey),
-    n_comment VARCHAR(152)
-);
-
-CREATE TABLE IF NOT EXISTS supplier (
-    s_suppkey INTEGER PRIMARY KEY,
-    s_name CHAR(25) NOT NULL,
-    s_address VARCHAR(40) NOT NULL,
-    s_nationkey INTEGER REFERENCES nation(n_nationkey),
-    s_phone CHAR(15) NOT NULL,
-    s_acctbal DECIMAL(15, 2) NOT NULL,
-    s_comment VARCHAR(101)
-);
-
-CREATE TABLE IF NOT EXISTS customer (
-    c_custkey INTEGER PRIMARY KEY,
-    c_name VARCHAR(25) NOT NULL,
-    c_address VARCHAR(40) NOT NULL,
-    c_nationkey INTEGER REFERENCES nation(n_nationkey),
-    c_phone CHAR(15) NOT NULL,
-    c_acctbal DECIMAL(15, 2) NOT NULL,
-    c_mktsegment CHAR(10) NOT NULL,
-    c_comment VARCHAR(117)
-);
-
-CREATE TABLE IF NOT EXISTS part (
-    p_partkey INTEGER PRIMARY KEY,
-    p_name VARCHAR(55) NOT NULL,
-    p_mfgr CHAR(25) NOT NULL,
-    p_brand CHAR(10) NOT NULL,
-    p_type VARCHAR(25) NOT NULL,
-    p_size INTEGER NOT NULL,
-    p_container CHAR(10) NOT NULL,
-    p_retailprice DECIMAL(15, 2) NOT NULL,
-    p_comment VARCHAR(23)
-);
-
-CREATE TABLE IF NOT EXISTS partsupp (
-    ps_partkey INTEGER REFERENCES part(p_partkey),
-    ps_suppkey INTEGER REFERENCES supplier(s_suppkey),
-    ps_availqty INTEGER NOT NULL,
-    ps_supplycost DECIMAL(15, 2) NOT NULL,
-    ps_comment VARCHAR(199),
-    PRIMARY KEY (ps_partkey, ps_suppkey)
-);
-
-CREATE TABLE IF NOT EXISTS orders (
-    o_orderkey INTEGER PRIMARY KEY,
-    o_custkey INTEGER REFERENCES customer(c_custkey),
-    o_orderstatus CHAR(1) NOT NULL,
-    o_totalprice DECIMAL(15, 2) NOT NULL,
-    o_orderdate DATE NOT NULL,
-    o_orderpriority CHAR(15) NOT NULL,
-    o_clerk CHAR(15) NOT NULL,
-    o_shippriority INTEGER NOT NULL,
-    o_comment VARCHAR(79)
-);
-
-CREATE TABLE IF NOT EXISTS lineitem (
-    l_orderkey INTEGER REFERENCES orders(o_orderkey),
-    l_linenumber INTEGER NOT NULL,
-    l_partkey INTEGER REFERENCES part(p_partkey),
-    l_suppkey INTEGER REFERENCES supplier(s_suppkey),
-    l_quantity DECIMAL(15, 2) NOT NULL,
-    l_extendedprice DECIMAL(15, 2) NOT NULL,
-    l_discount DECIMAL(15, 2) NOT NULL,
-    l_tax DECIMAL(15, 2) NOT NULL,
-    l_returnflag CHAR(1) NOT NULL,
-    l_linestatus CHAR(1) NOT NULL,
-    l_shipdate DATE NOT NULL,
-    l_commitdate DATE NOT NULL,
-    l_receiptdate DATE NOT NULL,
-    l_shipinstruct CHAR(25) NOT NULL,
-    l_shipmode CHAR(10) NOT NULL,
-    l_comment VARCHAR(44),
-    PRIMARY KEY (l_orderkey, l_linenumber)
-);
-```
+Nhằm duy trì tính tương thích chuyển đổi tuần tự (Strangler Fig Pattern), hệ thống vẫn hỗ trợ các kết nối tới kho dữ liệu TPC-H 8 bảng khi được chỉ định:
+- `customer`, `orders`, `lineitem`, `part`, `partsupp`, `supplier`, `nation`, `region`.
+- Database file mặc định: `data/tpcds.duckdb` (TPC-DS) và tùy chọn dự phòng `data/tpch.duckdb` (TPC-H).

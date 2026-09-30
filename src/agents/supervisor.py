@@ -5,8 +5,8 @@ Kiến trúc lai (Hybrid Architecture) kết hợp:
    - create_deep_agent từ thư viện deepagents chuẩn LangChain.
    - Hoạch định kế hoạch động với TodoListMiddleware (công cụ write_todos).
    - Domain Knowledge thông qua Skills:
-     * skills/tpch-analytics: Từ điển dữ liệu TPC-H 8 bảng, dbt metrics, categorical mappings.
-     * skills/duckdb-sql: Quy chuẩn DuckDB dialect, DATE literals, khoảng thời gian INTERVAL, window functions.
+     * skills/analytics-orchestrator: Chuẩn hóa SOP điều phối, phân luồng Pure Orchestrator.
+     * skills/tpcds-analytics: Từ điển dữ liệu TPC-DS 24 bảng, dbt metrics, categorical mappings, Snowflake schema.
    - Operating Memory: Quy chuẩn vận hành từ AGENTS.md.
    - Phân quyền & RBAC: context_schema=UserContext.
    - Cách ly phiên: Virtual Filesystem (StateBackend) và SessionTracer ghi vết.
@@ -79,12 +79,10 @@ from src.utils.session_tracer import SessionTracer
 
 logger = logging.getLogger(__name__)
 
-# Danh sách kỹ năng nghiệp vụ mặc định nạp cho Deep Agent Supervisor
+# Danh sách kỹ năng nghiệp vụ mặc định nạp cho Deep Agent Supervisor (Pure Orchestrator)
 DEFAULT_SUPERVISOR_SKILLS: Final[list[str]] = [
     "skills/analytics-orchestrator",
     "skills/tpcds-analytics",
-    "skills/tpch-analytics",
-    "skills/duckdb-sql",
 ]
 
 # Danh sách tài liệu bộ nhớ vận hành hệ thống
@@ -175,7 +173,7 @@ def create_text2sql_supervisor(
     - Model: Tier 1 Reasoning Model (OpenAI gpt-4o / Google gemini-2.5-pro / Anthropic sonnet-3-5).
     - Planning Middleware: Luôn gắn TodoListMiddleware cung cấp công cụ `write_todos`.
     - Subagents: 4 Subagents chuyên biệt giao tiếp qua công cụ `task`.
-    - Skills: Nạp tri thức miền TPC-H và quy chuẩn DuckDB.
+    - Skills: Nạp tri thức miền TPC-DS và quy chuẩn điều phối Orchestrator.
     - Operating Memory: Nạp cẩm nang quy ước kỹ thuật AGENTS.md.
     - RBAC & Context: Ràng buộc context_schema với UserContext.
     - Filesystem: StateBackend ảo cô lập trạng thái theo phiên.

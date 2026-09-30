@@ -18,8 +18,8 @@ export function DesktopWindowChrome() {
   const [activeTabId, setActiveTabId] = useState("tab-agent");
   const [tabs, setTabs] = useState([
     {
-      id: "tab-tpch",
-      title: "TPC-H Warehouse",
+      id: "tab-tpcds",
+      title: "TPC-DS Warehouse",
       icon: Database,
       closable: false,
     },
