@@ -1,317 +1,368 @@
 # ARCHITECTURE.md — System Architecture & Design Specification
 
 > **Dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp  
-> **Phiên bản**: 2.0 (Three-Tier Architecture + Hybrid Agentic Governance)  
-> **Trọng tâm tài liệu**: Trả lời câu hỏi *"Hệ thống này được tổ chức như thế nào, các thành phần giao tiếp ra sao, và dữ liệu chảy theo luồng nào?"*
+> **Phiên bản**: 4.0 (Three-Tier Architecture + 6-Layer Hybrid Agentic Governance Engine)  
+> **Bộ dữ liệu chuẩn**: **TPC-DS Benchmark (Omnichannel Retail & Enterprise Data Warehouse - 24 Bảng)**  
+> **Trọng tâm tài liệu**: Trả lời câu hỏi *"Hệ thống này được tổ chức như thế nào, các tầng thành phần giao tiếp ra sao, và dữ liệu chuyển hóa theo luồng nào?"*
 
 ---
 
 ## 1. TỔNG QUAN KIẾN TRÚC HỆ THỐNG (SYSTEM OVERVIEW)
 
-Hệ thống được thiết kế theo mô hình **Kiến trúc 3 tầng (Three-Tier Architecture)** kết hợp với **Mô hình Hybrid Agent (DeepAgents + LangGraph)** nhằm phân tách ranh giới rõ ràng giữa Tương tác người dùng (Frontend), Nghiệp vụ kết nối (Backend Gateway) và Bộ não suy luận kiểm duyệt (AI Agent Governance).
+Hệ thống được thiết kế theo mô hình **Kiến trúc 3 tầng (Three-Tier Architecture)** kết hợp với **Mô hình Tác tử Lai 6 Lớp (6-Layer Hybrid Agentic Architecture)** nhằm phân định ranh giới tuyệt đối giữa:
+1. **Tương tác người dùng (Frontend Workstation)**: Trình diễn dữ liệu trực quan, điều hành phân tích, duyệt lệnh an toàn.
+2. **Cổng dịch vụ doanh nghiệp (Backend Gateway)**: Tiếp nhận yêu cầu, quản lý phiên làm việc đa luồng (`thread_id`), xác thực và điều phối.
+3. **Bộ não suy luận phân cấp (AI Reasoning Engine)**: Mô phỏng phương pháp luận của Senior Data Analyst — tiếp nhận bài toán, làm rõ mơ hồ, lập kế hoạch phân rã giả thuyết, thu thập bằng chứng tuần tự và tổng hợp báo cáo.
+4. **Hàng rào an ninh tất định (Deterministic Governance Pipeline)**: Dùng mã nguồn Python thuần túy (AST parser `sqlglot`, RBAC policy, Cost Guard, HITL `interrupt`, Timeout & Limit) để bảo đảm an toàn dữ liệu 100%, không trao quyền an ninh cho LLM.
+5. **Kho dữ liệu chuẩn công nghiệp (Enterprise Data Warehouse)**: Vận hành trên lược đồ Snowflake 24 bảng TPC-DS, kết hợp công cụ dò đường khóa ngoại BFS và liên kết bảng thời gian `date_dim`.
 
-### Ba nguyên tắc thiết kế cốt lõi:
-1. **Separation of Concerns (Tách biệt trách nhiệm)**: Frontend chỉ lo hiển thị & tương tác; Backend lo xác thực, phân quyền và phiên làm việc; Agent lo suy luận và kiểm soát truy vấn.
-2. **Hybrid Reasoning & Control**: Dùng LLM cho các bước đòi hỏi tư duy linh hoạt (hiểu tiếng Việt, tra cứu ngữ nghĩa, soạn SQL) nhưng bắt buộc dùng **Code tất định (Deterministic Code)** cho các khâu an toàn dữ liệu (AST check, RBAC, Dry-run cost, Audit log).
-3. **Multi-tenant Session Isolation**: Mọi trạng thái trung gian (`schema_context.md`, `draft_sql.sql`) được cô lập nghiêm ngặt theo `thread_id` trong Virtual Filesystem.
+### Bốn nguyên tắc thiết kế cốt lõi:
+1. **Separation of Concerns (Tách biệt trách nhiệm)**: Frontend chỉ đảm nhiệm hiển thị & tương tác; Backend lo xác thực và quản lý phiên; Agent lo suy luận logic; Control Pipeline lo bảo mật; Warehouse lo lưu trữ và xử lý truy vấn OLAP.
+2. **Hybrid Reasoning & Deterministic Control**: LLM chỉ được dùng ở các khâu đòi hỏi tư duy ngôn ngữ linh hoạt (hiểu ý định, phân rã giả thuyết, viết SQL, diễn giải insight). Toàn bộ các bước kiểm tra an toàn (chặn DDL/DML, lọc cột PII, đo bytes quét, phê duyệt con người, log kiểm toán) bắt buộc thực thi bằng **Code tất định (0 token LLM)**.
+3. **Multi-Query Evidence Collection over Monolithic SQL**: Thay vì ép LLM sinh một câu lệnh SQL phức tạp dài hàng trăm dòng, hệ thống phân rã thành tối đa 3 nhiệm vụ truy vấn tập trung ($N \le 3$), tích lũy kết quả vào `EvidenceStore` rồi mới phân tích tương quan.
+4. **Typed Contract Delivery (Zero Regex Scraping)**: Toàn bộ dữ liệu trao đổi giữa Backend và Frontend đóng gói trong các mô hình định kiểu mạnh (Pydantic V2 `ResponsePackage` và `ArtifactBundle`), triệt tiêu hoàn toàn rủi ro vỡ giao diện do regex parsing chuỗi Markdown.
 
 ---
 
-## 2. BA SƠ ĐỒ KIẾN TRÚC BẮT BUỘC (THE 3 CORE DIAGRAMS)
+## 2. BA SƠ ĐỒ KIẾN TRÚC CỐT LÕI (THE 3 CORE DIAGRAMS)
 
 ---
 
 ### Diagram 1: System Overview Diagram (Bức tranh toàn cảnh hệ thống)
-Sơ đồ thể hiện toàn bộ các tầng ứng dụng, các module nội bộ và các kết nối với dịch vụ bên ngoài:
 
 ```mermaid
 graph TB
-    subgraph ClientLayer ["1. Tầng Trình duyệt & Người dùng (Client)"]
-        UserAnalyst["Analyst (Hỏi số liệu, duyệt query)"]
-        UserAdmin["Admin (Quản trị schema, kiểm soát log)"]
+    subgraph ClientLayer ["1. Tầng Trình duyệt & Người dùng (Client Layer)"]
+        UserAnalyst["Analyst (Hỏi kinh doanh, khám phá dữ liệu)"]
+        UserAdmin["Admin (Quản trị chính sách, kiểm soát chi phí & audit)"]
     end
 
-    subgraph FrontendLayer ["2. Tầng Giao diện (Next.js + Recharts)"]
-        ChatUI["Chat Interface (Hỏi đáp tiếng Việt, Streaming)"]
-        HITLModal["HITL Approval Modal (Xem trước SQL & Cost)"]
-        DataViz["Data Visualization (Recharts + Data Table)"]
-        AuthUI["Auth Guard (Supabase Auth Login)"]
+    subgraph FrontendLayer ["2. Tầng Giao diện Điều hành (Next.js Workstation UI)"]
+        Launchpad["Executive Launchpad (Khởi tạo câu hỏi, mẫu TPC-DS)"]
+        ChatUI["Chat Interface (Hỏi đáp tiếng Việt, SSE Streaming)"]
+        InspectorDrawer["Inspector Drawer (Theo dõi tiến trình & Reasoning Traces)"]
+        SchemaDrawer["TPC-DS Schema Explorer (24 bảng & Danh bạ chỉ mục)"]
+        HITLModal["HITL Approval Modal (Xem trước SQL, Cost & Phê duyệt)"]
+        ComposableViz["Composable Visualizer (KPI Cards, Recharts, Data Table)"]
     end
 
     subgraph BackendLayer ["3. Tầng Dịch vụ Cổng (FastAPI Gateway)"]
-        APIRouter["API Router (/ask, /approve, /history)"]
-        AuthMiddleware["RBAC & Auth Middleware"]
-        SessionMgr["Session Checkpointer (LangGraph Memory)"]
-        AuditService["Audit Log Service"]
+        APIRouter["API Router (/ask, /approve, /history, /metrics)"]
+        AuthMiddleware["RBAC & Security Context Middleware"]
+        SessionMgr["Session Checkpointer (LangGraph MemorySaver / SQLite)"]
+        AuditService["Audit Logger Service (JSON Lines / Postgres)"]
     end
 
-    subgraph AgentLayer ["4. Tầng AI Agent (DeepAgents + LangGraph)"]
-        Supervisor["Deep Agent Supervisor (Planner & Todo)"]
-        Clarifier["Clarification Loop (Xử lý mơ hồ)"]
-        Retriever["Schema & Value Retriever"]
-        SQLGen["SQL Generator (Error-aware Prompting)"]
-        ControlPipeline["LangGraph Control Subgraph (AST + Cost + RBAC)"]
-        Synthesizer["Response Synthesizer (Chart & Insights)"]
+    subgraph AgentLayer ["4. Tầng Trí tuệ Tác tử (Hybrid Agent Engine v4.0)"]
+        Gatekeeper["Pre-flight Gatekeeper (Regex Guard + Unified LLM Clarification)"]
+        Supervisor["Master DeepAgents Supervisor (Pure Orchestrator)"]
+        
+        subgraph AnalyticsGraph ["Analytics LangGraph Subgraph (v4.0)"]
+            Planner["Analysis Planner (Goal + Hypotheses + Task DAG <= 3)"]
+            TaskExecutor["Sequential Task Executor (Task SQL Gen + Schema Tools)"]
+            EvidenceStore[("Evidence Store: Tích lũy kết quả truy vấn")]
+            EvidenceAnalyzer["Evidence Analyzer (Tính toán toán học & Kiểm chứng giả thuyết)"]
+            Synthesizer["Response Synthesizer (Composable Spec + Data Hydration)"]
+        end
+
+        subgraph ControlGraph ["Deterministic Control Pipeline Subgraph"]
+            ASTCheck["AST Sanitizer (sqlglot - SELECT only)"]
+            RBACCheck["RBAC Policy (Chặn PII: Họ tên, Email, Địa chỉ)"]
+            CostGuard["Cost Guard (DuckDB explain / BigQuery dryRun)"]
+            HITLGate["HITL Gate (LangGraph interrupt)"]
+            Executor["Warehouse Executor (Timeout 30s + LIMIT 1000)"]
+            DiagAgent["Error Diagnostic Agent (Self-correction <= 3 lần)"]
+            AuditNode["Audit Logger Node"]
+        end
     end
 
-    subgraph StorageLayer ["5. Tầng Dữ liệu & Warehouse (TPC-H Benchmark)"]
-        WarehouseDuckDB[("DuckDB: data/tpch.duckdb (Local TPC-H)")]
-        WarehouseBigQuery[("BigQuery: TPC-H Sandbox (Cloud Warehouse)")]
-        VectorStore[("Vector DB: Qdrant / pgvector")]
-        AuditDB[("PostgreSQL / SQLite (Audit & Sessions)")]
+    subgraph StorageLayer ["5. Tầng Dữ liệu & Kho Phân tích (TPC-DS Warehouse)"]
+        WarehouseDuckDB[("DuckDB: data/tpcds.duckdb (Local OLAP 24 bảng)")]
+        WarehouseCloud[("Google BigQuery / Supabase Sandbox (Cloud DW)")]
+        CategoricalIndex[("Categorical Registry & Inverted Keyword Map")]
+        AuditDB[("SQLite / PostgreSQL (Sessions & Audit Logs)")]
     end
 
-    subgraph ExternalServices ["6. Dịch vụ AI & Đám mây"]
-        LLMTier1["LLM Tier 1: Claude 3.5 Sonnet / GPT-4o"]
-        LLMTier2["LLM Tier 2: Claude 3.5 Haiku / GPT-4o-mini"]
+    subgraph ExternalLLM ["6. Dịch vụ Mô hình Ngôn ngữ Lớn"]
+        LLMTier1["Tier 1 (Reasoning): Google Gemini 2.5 Pro / Claude 3.5 Sonnet"]
+        LLMTier2["Tier 2 (Fast/Utility): Google Gemini 2.5 Flash / Haiku"]
     end
 
     %% Client -> Frontend
+    UserAnalyst --> Launchpad
     UserAnalyst --> ChatUI
     UserAnalyst --> HITLModal
-    UserAdmin --> DataViz
-    UserAdmin --> AuthUI
+    UserAdmin --> InspectorDrawer
+    UserAdmin --> SchemaDrawer
 
     %% Frontend -> Backend
-    ChatUI -->|HTTP SSE Streaming| APIRouter
-    HITLModal -->|POST /approve| APIRouter
-    AuthUI --> AuthMiddleware
+    ChatUI -->|HTTP POST /api/v1/query/ask| APIRouter
+    HITLModal -->|HTTP POST /api/v1/query/approve| APIRouter
+    InspectorDrawer -->|HTTP GET /api/v1/query/history| APIRouter
 
     %% Backend internal
     APIRouter --> AuthMiddleware
     APIRouter --> SessionMgr
-    APIRouter --> Supervisor
+    APIRouter --> Gatekeeper
 
-    %% Agent internal
-    Supervisor --> Clarifier
-    Supervisor --> Retriever
-    Supervisor --> SQLGen
-    Supervisor --> ControlPipeline
-    Supervisor --> Synthesizer
+    %% Gatekeeper -> Branches
+    Gatekeeper -->|Bị chặn an toàn| APIRouter
+    Gatekeeper -->|Cần làm rõ| ChatUI
+    Gatekeeper -->|Hợp lệ| Supervisor
 
-    %% Agent -> Data & External
-    Retriever --> VectorStore
-    Retriever --> LLMTier2
-    SQLGen --> LLMTier1
-    ControlPipeline --> WarehouseDuckDB
-    ControlPipeline --> WarehouseBigQuery
-    ControlPipeline --> AuditService
+    %% Supervisor -> Analytics
+    Supervisor --> Planner
+    Planner --> TaskExecutor
+    TaskExecutor <--> CategoricalIndex
+    TaskExecutor --> ASTCheck
+
+    %% Control Pipeline Flow
+    ASTCheck --> RBACCheck
+    RBACCheck --> CostGuard
+    CostGuard --> HITLGate
+    HITLGate -->|interrupt payload| HITLModal
+    HITLGate -->|Duyệt| Executor
+    Executor --> WarehouseDuckDB
+    Executor --> WarehouseCloud
+    Executor --> EvidenceStore
+    Executor -.->|Lỗi thực thi| DiagAgent
+    DiagAgent -.->|Sửa truy vấn (<=3 lần)| TaskExecutor
+    Executor --> AuditNode
+    AuditNode --> AuditService
     AuditService --> AuditDB
+
+    %% Evidence -> Analyzer -> Synthesizer
+    EvidenceStore --> EvidenceAnalyzer
+    EvidenceAnalyzer --> Synthesizer
+    Synthesizer --> ComposableViz
+
+    %% LLM connections
+    Planner --> LLMTier1
+    TaskExecutor --> LLMTier1
+    EvidenceAnalyzer --> LLMTier1
     Synthesizer --> LLMTier2
+    Gatekeeper --> LLMTier2
+    DiagAgent --> LLMTier2
 ```
 
 ---
 
-### Diagram 2: Agent Flow Diagram (Luồng xử lý chi tiết bên trong Agent)
-Sơ đồ thể hiện chu trình nhận thức, rẽ nhánh điều kiện, chốt chặn HITL và vòng lặp tự sửa lỗi (Bounded Self-Correction Loop):
+### Diagram 2: Agent Flow Diagram (Luồng hoạt động v4.0 chi tiết)
 
 ```mermaid
 flowchart TD
-    U["Người dùng gửi câu hỏi tiếng Việt"] --> API["FastAPI Gateway - Session Thread Manager"]
-    API --> DA["Deep Agent Supervisor<br/>Quản lý Plan, Todos và Session State"]
+    START(["Người dùng gửi câu hỏi tiếng Việt"]) --> API["FastAPI Gateway (/api/v1/query/ask)"]
+    
+    %% Tầng 1: Pre-flight Gatekeeper
+    API --> G1{"Tier 1: Regex Guard<br/>(< 0.1ms, $0)"}
+    G1 -- "Vi phạm DML/DDL hoặc Injection" --> BLOCK_FAST["Từ chối ngay lập tức<br/>(Deterministic Refusal)"]
+    
+    G1 -- "Hợp lệ" --> G2{"Tier 2: Unified LLM Guard<br/>(Kiểm tra mơ hồ & Ngoài miền)"}
+    G2 -- "Thiếu thông tin / Mơ hồ" --> CLARIFY["Yêu cầu làm rõ<br/>(Gợi ý lựa chọn A, B, C)"]
+    CLARIFY --> RET_USER(["Gửi phản hồi về người dùng"])
+    G2 -- "Lạc đề / Độc hại" --> BLOCK_LLM["Từ chối lịch sự theo mẫu chuẩn"]
+    BLOCK_FAST --> RET_USER
+    BLOCK_LLM --> RET_USER
 
-    %% Bước 1: Ambiguity Check
-    DA --> QA{"Phân tích độ rõ ràng:<br/>Rõ ràng hay Mơ hồ?"}
-    QA -->|Mơ hồ hoặc Thiếu bộ lọc| CL["Hỏi lại người dùng<br/>Clarification Question"]
-    CL --> U
+    %% Tầng 2: Router & Lập kế hoạch
+    G2 -- "Hợp lệ" --> ROUTER{"Intent Router"}
+    ROUTER -- "Xã giao / Tra cứu Schema" --> CONV["Consultation Agent<br/>(Trả lời nhanh, 0 SQL)"]
+    CONV --> RET_USER
 
-    %% Bước 2: Schema & Value Retrieval
-    QA -->|Rõ ràng| SR["Subagent: Schema và Value Retriever<br/>Vector DDL + Categorical Index + dbt Metrics"]
-    SR -->|Ghi session://schema_context.md| DA
+    ROUTER -- "Phân tích dữ liệu" --> PLANNER["Analysis Planner<br/>- Mục tiêu cốt lõi (Goal)<br/>- 1-2 Giả thuyết cần chứng minh<br/>- Danh sách Tasks tuần tự (N <= 3)"]
+    
+    %% Vòng lặp thực thi tuần tự
+    PLANNER --> TASK_LOOP{"Còn Task cần chạy?<br/>(i <= N)"}
+    
+    TASK_LOOP -- "Chạy Task i" --> RETRIEVER["Active Metadata Tools<br/>- Lọc 24 bảng TPC-DS (Schema Pruning)<br/>- Tra cứu giá trị danh mục (Categorical Registry)<br/>- Dò đường nối BFS (Snowflake Join Path)"]
+    RETRIEVER --> SQL_GEN["Task Query Generator<br/>(Soạn SQL tập trung cho Task i)"]
+    
+    %% Hàng rào kiểm duyệt tất định
+    SQL_GEN --> AST{"AST Sanitizer (sqlglot)<br/>Chỉ cho phép SELECT?"}
+    AST -- "Sai" --> DIAG["Diagnostic Agent<br/>(Chẩn đoán mã lỗi)"]
+    AST -- "Đúng" --> RBAC{"RBAC Policy Check<br/>Có cột cấm / PII không?"}
+    RBAC -- "Vi phạm" --> DIAG
+    RBAC -- "Hợp lệ" --> COST{"Cost Guard<br/>Ước tính bytes scanned"}
+    COST -- "Vượt quota" --> DIAG
+    COST -- "Hợp lệ" --> HITL{"Cần duyệt HITL?<br/>(Chi phí cao / bảng lớn)"}
+    
+    HITL -- "Có" --> INT["LangGraph interrupt()<br/>Gửi SQL & Cost sang UI"]
+    INT --> WAIT_USER{"Người dùng duyệt?"}
+    WAIT_USER -- "Từ chối" --> DIAG
+    WAIT_USER -- "Đồng ý" --> EXEC
+    HITL -- "Không" --> EXEC["Warehouse Executor<br/>(DuckDB / BigQuery, Timeout 30s)"]
+    
+    EXEC -- "Database Runtime Error" --> DIAG
+    DIAG --> RETRY_CHECK{"retry_count < 3?"}
+    RETRY_CHECK -- "Còn lượt" --> SQL_GEN
+    RETRY_CHECK -- "Hết lượt" --> TASK_FAIL["Đóng gói lỗi truy vấn"]
+    
+    EXEC -- "Thành công" --> STORE["Tích lũy kết quả vào EvidenceStore<br/>(Sample data, Summary stats, Lineage)"]
+    TASK_FAIL --> STORE
+    STORE --> TASK_LOOP
 
-    %% Bước 3: SQL Generation
-    DA --> SG["Subagent: SQL Generator<br/>Prompting + Few-shot + Context"]
-    SG -->|Ghi session://draft_sql.sql| SP
-
-    %% Bước 4: LangGraph Deterministic Control Pipeline
-    subgraph SP [LangGraph Subgraph - SQL Control Pipeline]
-        direction TB
-        V1["1. AST Check - sqlglot<br/>Chỉ SELECT, chặn DDL và DML"] --> V2["2. RBAC Policy Check<br/>Đối chiếu bảng và cột với Role"]
-        V2 --> V3["3. Cost Guard - Dry-run<br/>BigQuery dryRun hoặc DuckDB explain"]
-        
-        V3 -->|Vi phạm AST hoặc RBAC hoặc Quá Budget| ERR["Node ERR:<br/>Đóng gói mã lỗi và thông báo kỹ thuật"]
-        
-        V3 -->|Hợp lệ| HITL["4. Human-In-The-Loop<br/>LangGraph interrupt: Chờ phê duyệt"]
-        HITL -->|Từ chối| ERR
-        HITL -->|Duyệt SQL| EX["5. Warehouse Executor<br/>Thực thi có Timeout và Row LIMIT"]
-        
-        EX -->|Runtime DB Error| ERR
-        EX -->|Thành công| AUDIT["6. Audit Logger<br/>Lưu User, Role, SQL, Cost, Latency"]
-    end
-
-    %% Vòng lặp sửa lỗi tự động
-    ERR --> RETRY_CHECK{"Số lần thử lại<br/>retry_count dưới 3 lần?"}
-    RETRY_CHECK -->|Còn lượt| SG
-    RETRY_CHECK -->|Hết lượt| FAIL["Thông báo lỗi thân thiện và Audit log thất bại"]
-    FAIL --> U
-
-    %% Bước 5: Response Synthesis
-    AUDIT --> RS["Subagent: Response Synthesizer<br/>Chọn cấu hình Recharts và Trích xuất Insight"]
-    RS --> OUT["Kết quả: Bảng dữ liệu + Biểu đồ tương tác + Lời giải thích"]
-    OUT --> U
+    %% Phân tích & Trình diễn
+    TASK_LOOP -- "Hoàn thành mọi Task" --> ANALYZER["Evidence Analyzer<br/>- Tính toán: Tỷ trọng, Tăng trưởng (Δ%), Outliers<br/>- Xác nhận hoặc bác bỏ giả thuyết ban đầu"]
+    ANALYZER --> SYNTH["Response Synthesizer<br/>- Chọn bố cục Artifacts linh hoạt<br/>- Deterministic Data Hydration<br/>- Soạn thảo Executive Insight bằng tiếng Việt"]
+    SYNTH --> OUT_BUNDLE["Đóng gói Typed ResponsePackage<br/>(KPI Cards + Charts + Tables + Callouts)"]
+    OUT_BUNDLE --> RET_USER
 ```
 
 ---
 
-### Diagram 3: Deployment Diagram (Mô hình triển khai hạ tầng)
-Sơ đồ thể hiện cách đóng gói ứng dụng, container, networking, và môi trường triển khai thực tế:
+### Diagram 3: Deployment & Infrastructure Topology (Mô hình triển khai)
 
 ```mermaid
 graph LR
-    subgraph CloudVercel ["Cloud Frontend Hosting (Vercel)"]
-        NextApp["Next.js 14 App Router (React + Recharts)"]
+    subgraph ClientBrowsers ["Trình duyệt người dùng (Client Devices)"]
+        Browser["Chrome / Edge / Firefox (HTTPS)"]
     end
 
-    subgraph CloudServer ["Backend Server (Render / Railway / Docker Host)"]
-        subgraph DockerCompose ["Docker Container Runtime"]
-            FastAPIServer["FastAPI Application Server (Uvicorn Async)"]
-            LangGraphEngine["DeepAgents & LangGraph Control Engine"]
-            LocalDuckDB[("DuckDB File Storage (.duckdb)")]
+    subgraph VercelEdge ["Cloud Frontend Hosting (Vercel Edge Network)"]
+        NextApp["Next.js 14 App Router<br/>- React 18 & Tailwind CSS<br/>- Recharts Data Visualization<br/>- Lucide Icons & Responsive Workstation"]
+    end
+
+    subgraph BackendHost ["Backend Server Environment (Docker / Cloud Run)"]
+        subgraph AppContainer ["Docker Container: text2sql-backend"]
+            FastAPIServer["FastAPI Gateway (Uvicorn Async Worker)"]
+            AgentEngine["DeepAgents + LangGraph Analytics Subgraph"]
+            ControlPipeline["Deterministic Control Pipeline (AST, RBAC, Cost)"]
+            DuckDBLocal[("DuckDB In-Process Engine<br/>data/tpcds.duckdb (sf=0.01..1)")]
         end
     end
 
-    subgraph ManagedDataLayer ["Managed Cloud Services (Free Tier / Sandbox)"]
-        SupabaseAuth["Supabase Auth (JWT Provider)"]
-        CloudBigQuery[("Google BigQuery Sandbox (Warehouse)")]
-        VectorService[("Qdrant Cloud / Supabase pgvector")]
-        PostgresAudit[("Supabase PostgreSQL (Audit & State)")]
+    subgraph CloudServices ["Enterprise Cloud Infrastructure (Optional Sandbox)"]
+        BigQuerySandbox[("Google BigQuery Sandbox<br/>(TPC-DS 24 Tables Cloud DW)")]
+        SupabasePostgres[("Supabase PostgreSQL<br/>- Audit Logs Table<br/>- LangGraph State Checkpoint")]
     end
 
-    subgraph LLMCloudProviders ["LLM Providers API"]
-        AnthropicAPI["Anthropic Claude API (Sonnet & Haiku)"]
-        OpenAIAPI["OpenAI API (Fallback)"]
+    subgraph LLMGateways ["LLM Inference Providers"]
+        GeminiAPI["Google AI Studio API<br/>(Gemini 2.5 Pro / Flash)"]
+        DeepSeekAPI["DeepSeek API / LiteLLM Proxy<br/>(Reasoning Alternative)"]
     end
 
-    InternetUsers((End Users / Browsers)) -->|HTTPS / WSS| NextApp
-    NextApp -->|REST API / SSE Streams| FastAPIServer
-    NextApp -->|Auth Login / Token| SupabaseAuth
-    FastAPIServer -->|Validate JWT| SupabaseAuth
-    FastAPIServer --> LangGraphEngine
-    LangGraphEngine -->|Read/Write Session Checkpoint| PostgresAudit
-    LangGraphEngine -->|Vector Search| VectorService
-    LangGraphEngine -->|Dry-run & Query| CloudBigQuery
-    LangGraphEngine -->|Dev Query| LocalDuckDB
-    LangGraphEngine -->|Model Inference| AnthropicAPI
-    LangGraphEngine -->|Model Inference| OpenAIAPI
+    Browser -->|HTTPS / WSS Streaming| NextApp
+    NextApp -->|REST API / SSE| FastAPIServer
+    FastAPIServer --> AgentEngine
+    AgentEngine --> ControlPipeline
+    ControlPipeline --> DuckDBLocal
+    ControlPipeline --> BigQuerySandbox
+    ControlPipeline --> SupabasePostgres
+    AgentEngine --> GeminiAPI
+    AgentEngine --> DeepSeekAPI
 ```
 
 ---
 
 ## 3. CHI TIẾT CÁC THÀNH PHẦN (COMPONENTS BREAKDOWN)
 
-### 3.1. Tầng Giao diện (Frontend - Next.js & Recharts)
-- **Chat Interface**:
-  - *Trách nhiệm*: Nhận câu hỏi tiếng Việt, hiển thị streaming câu trả lời qua Server-Sent Events (SSE).
-  - *Công nghệ*: Next.js 14 (App Router), Tailwind CSS, Lucide Icons.
-- **HITL Approval Modal**:
-  - *Trách nhiệm*: Nhận payload ngắt phiên từ LangGraph (`interrupt`), hiển thị câu SQL dự kiến, lời giải thích, và số bytes ước tính; gửi tín hiệu `approve` hoặc `reject` về backend.
-- **Dynamic Visualizer**:
-  - *Trách nhiệm*: Nhận cấu hình JSON từ Agent để render biểu đồ động (Bar, Line, Area, Pie) bằng thư viện **Recharts** kèm bảng số liệu có hỗ trợ tải file CSV.
+### 3.1. Tầng Giao diện Điều hành (Next.js Workstation)
+- **Executive Launchpad ([`ExecutiveLaunchpad.tsx`](file:///d:/Text2SQL-AI-Agent/src/frontend/components/chat/ExecutiveLaunchpad.tsx))**: Khung gợi ý ngữ cảnh thông minh, phân chia theo 3 miền kinh doanh chính của TPC-DS (Doanh số Đa kênh, Quản trị Tồn kho, Hiệu quả Khuyến mãi).
+- **TPC-DS Schema Explorer ([`tpcdsSchema.ts`](file:///d:/Text2SQL-AI-Agent/src/frontend/data/tpcdsSchema.ts), [`SchemaDrawer.tsx`](file:///d:/Text2SQL-AI-Agent/src/frontend/components/layout/SchemaDrawer.tsx))**: Bảng danh mục 24 bảng dữ liệu, cấu trúc cột, khóa ngoại và các chỉ số nghiệp vụ chuẩn (Semantic Metrics).
+- **Inspector Drawer ([`InspectorDrawer.tsx`](file:///d:/Text2SQL-AI-Agent/src/frontend/components/layout/InspectorDrawer.tsx))**: Cửa sổ chuyên dụng hiển thị vết suy luận (Reasoning Traces), kế hoạch nhiệm vụ (`AnalysisPlan`), câu lệnh SQL đã sinh và số bytes quét.
+- **HITL Approval Modal**: Khung xem trước câu lệnh SQL kèm chi phí ước tính, chặn tiến trình thực thi cho đến khi người dùng bấm xác nhận.
+- **Composable Visualizer**: Hiển thị linh hoạt các khối Artifact: KPI Summary Cards, Biểu đồ đa dạng (Bar, Line, Area, Composed) và Data Table có tính năng xuất CSV.
 
-### 3.2. Tầng Cổng dịch vụ (Backend Gateway - FastAPI)
-- **API Router**:
-  - `POST /api/v1/ask`: Tiếp nhận câu hỏi, khởi tạo hoặc nối tiếp phiên hội thoại (`thread_id`).
-  - `POST /api/v1/approve`: Gửi quyết định của người dùng để đánh thức (resume) node HITL đang bị tạm dừng.
-  - `GET /api/v1/history/{thread_id}`: Lấy lịch sử hội thoại và biểu đồ đã sinh.
-  - `GET /api/v1/audit/logs`: API dành riêng cho Admin tra cứu nhật ký truy vấn và chi phí.
-- **Auth & RBAC Middleware**:
-  - Giải mã JWT token từ Supabase Auth, trích xuất `user_id` và `role` (`Analyst` hoặc `Admin`) gắn vào request state.
+### 3.2. Tầng Cổng dịch vụ (Backend FastAPI Gateway)
+- **API Endpoints ([`src/api/routes/query.py`](file:///d:/Text2SQL-AI-Agent/src/api/routes/query.py))**:
+  - `POST /api/v1/query/ask`: Tiếp nhận câu hỏi, điều phối qua Gatekeeper và kích hoạt quy trình phân tích v4.0.
+  - `POST /api/v1/query/approve`: Tiếp nhận phản hồi duyệt lệnh HITL của người dùng để tiếp tục (resume) đồ thị LangGraph.
+  - `GET /api/v1/query/history/{thread_id}`: Truy xuất lịch sử các gói Artifact và câu hỏi theo phiên.
+  - `GET /api/v1/query/metrics`: Báo cáo các chỉ số hiệu năng (Latency, Tỷ lệ thành công, Token tiêu thụ).
+- **Lifespan Warmup & Database Dependency ([`src/api/main.py`](file:///d:/Text2SQL-AI-Agent/src/api/main.py), [`src/api/dependencies.py`](file:///d:/Text2SQL-AI-Agent/src/api/dependencies.py))**: Tự động kiểm tra và khởi tạo dữ liệu mẫu TPC-DS (24 bảng) vào DuckDB thông qua [`tpcds_seeder.py`](file:///d:/Text2SQL-AI-Agent/src/utils/tpcds_seeder.py) ngay khi máy chủ khởi động.
 
-### 3.3. Tầng Trí tuệ nhân tạo (AI Agent - DeepAgents & LangGraph)
-- **Deep Agent Supervisor**:
-  - *Trách nhiệm*: Quản lý danh sách công việc (`write_todos`), ghi/đọc artifacts vào Virtual Filesystem theo phiên (`session://{thread_id}/`), điều phối các subagents chuyên trách.
-- **Clarification Loop**:
-  - *Trách nhiệm*: Đánh giá xem câu hỏi có thiếu entity (khu vực địa lý `r_name`, phân khúc khách hàng `c_mktsegment`, mốc năm đơn hàng) hay không. Nếu thiếu → hỏi lại ngay, không cho chạy tiếp.
-- **Schema & Value Retriever**:
-  - *Trách nhiệm*: Vector search DDL 8 bảng TPC-H + Categorical value indexing (`r_name`, `c_mktsegment`, `p_type`, `l_shipmode`) + dbt semantic metric formulas (Doanh thu thuần, tỷ lệ trễ hạn, giá trị tồn kho) → ghi vào `schema_context.md`.
-- **SQL Generator**:
-  - *Trách nhiệm*: Đọc context và sinh câu SQL chuẩn xác theo dialect của warehouse (DuckDB / BigQuery). Nhận thông tin lỗi phản hồi từ node `ERR` để tự sửa lại câu truy vấn.
-- **LangGraph Control Pipeline (CompiledSubAgent)**:
-  - *Trách nhiệm*: Thực hiện 6 bước kiểm duyệt bất biến:
-    1. *AST Sanitizer (`sqlglot`)*: Chặn đứng lệnh ghi, bắt buộc SELECT.
-    2. *RBAC Policy*: Chặn truy cập bảng cấm hoặc cột PII (`c_phone`, `c_acctbal`, `s_phone`, `s_acctbal`).
-    3. *Cost Guard*: Dry-run tính bytes scanned trên bảng `lineitem`, đối chiếu hạn mức.
-    4. *HITL Interrupt*: Tạm dừng phiên đợi duyệt.
-    5. *Warehouse Executor*: Thực thi an toàn (Timeout 30s + LIMIT 1000).
-    6. *Audit Logger*: Luôn luôn ghi log dù thành công hay thất bại.
-- **Response Synthesizer**:
-  - *Trách nhiệm*: Phân tích cấu trúc dữ liệu trả về, sinh schema JSON cho Recharts và soạn thảo đoạn văn phân tích insight ngắn gọn.
+### 3.3. Tầng Trí tuệ Tác tử (AI Agent Engine v4.0)
+- **Pre-flight Gatekeeper ([`preflight_gatekeeper.py`](file:///d:/Text2SQL-AI-Agent/src/agents/preflight_gatekeeper.py))**:
+  - *Tier 1*: Chốt chặn Regex cực nhanh (< 0.1ms) ngăn chặn các từ khóa can thiệp dữ liệu (`DROP`, `DELETE`, `UPDATE`, `ALTER`, `TRUNCATE`) và các mẫu SQL Injection kinh điển.
+  - *Tier 2*: Mô hình LLM phân tích nhanh độ mơ hồ (Ambiguity Check) và phạm vi bài toán. Nếu câu hỏi thiếu điều kiện mốc thời gian hoặc kênh bán $\to$ trả về danh sách gợi ý A, B, C để người dùng chọn nhanh.
+- **Analysis Planner ([`planner.py`](file:///d:/Text2SQL-AI-Agent/src/agents/analytics/planner.py))**:
+  - Phân rã câu hỏi lớn thành mục tiêu tổng quan, 1-2 giả thuyết và chuỗi nhiệm vụ truy vấn độc lập ($N \le 3$ tasks).
+- **Sequential Task Executor ([`task_executor.py`](file:///d:/Text2SQL-AI-Agent/src/agents/analytics/task_executor.py))**:
+  - Sử dụng các công cụ Active Metadata (`search_tables_and_columns`, `find_join_path` bằng thuật toán BFS, `get_column_samples_and_values`) để cung cấp chính xác ngữ cảnh cho LLM viết SQL.
+  - Đóng gói từng kết quả thực thi vào cấu trúc `QueryArtifact` và lưu vào `EvidenceStore`.
+- **Hàng rào Kiểm duyệt Tất định (Deterministic Control Pipeline - [`builder.py`](file:///d:/Text2SQL-AI-Agent/src/agents/control_pipeline/builder.py))**:
+  - *AST Sanitizer*: Kiểm tra cây cú pháp trừu tượng, bắt buộc Root Node là `exp.Select`, quét đệ quy triệt tiêu mọi node ghi dữ liệu. Tự động chèn `LIMIT 1000`.
+  - *RBAC Enforcer*: Kiểm tra danh sách bảng và cột với vai trò người dùng (`Analyst` vs `Admin`), chặn đứng các cột PII của khách hàng (`c_first_name`, `c_last_name`, `c_email_address`, `c_birth_country`).
+  - *Cost Guard*: Ước lượng dung lượng quét bytes trước khi thực thi bằng `EXPLAIN` (DuckDB) hoặc `dryRun` (BigQuery).
+  - *HITL Gate*: Tạm dừng luồng bằng `interrupt()` khi truy vấn tác động bảng lớn hoặc chi phí vượt hạn mức.
+  - *Error Diagnostic Agent*: Phân tích thông báo lỗi cú pháp hoặc lỗi cơ sở dữ liệu để đưa ra chỉ dẫn khắc phục chính xác cho lần retry tiếp theo (khống chế tối đa 3 lần).
+- **Evidence Analyzer ([`evidence_analyzer.py`](file:///d:/Text2SQL-AI-Agent/src/agents/analytics/evidence_analyzer.py))**:
+  - Thực hiện các phép tính toán học tất định: tỷ lệ tăng trưởng ($\Delta\%$), tỷ trọng đóng góp, tìm giá trị cực đại/cực tiểu. Kiểm chứng xem giả thuyết ban đầu là ĐÚNG hay SAI dựa trên bằng chứng thu thập được.
+- **Response Synthesizer ([`response_synthesizer.py`](file:///d:/Text2SQL-AI-Agent/src/agents/analytics/response_synthesizer.py))**:
+  - Cơ chế One-Shot Spec Selection + Deterministic Data Hydration: Chọn bố cục Artifacts phù hợp nhất (Cards, Charts, Tables, Callouts) và đưa dữ liệu thật vào cấu trúc mà không để LLM tự bịa số liệu.
 
 ---
 
-## 4. GIAO TIẾP VÀ DỮ LIỆU TRẠNG THÁI (STATE & COMMUNICATION)
+## 4. HỢP ĐỒNG DỮ LIỆU ĐỊNH KIỂU MẠNH (TYPED DATA CONTRACTS)
 
-### 4.1. LangGraph State Schema (`AgentState`)
-Toàn bộ dữ liệu truyền giữa các node trong đồ thị được chuẩn hóa qua schema Pydantic/TypedDict:
+Thay thế hoàn toàn cơ chế trích xuất regex từ văn bản thô, hệ thống chuẩn hóa toàn bộ cấu trúc dữ liệu bằng **Pydantic V2 Models** ([`src/models/artifacts.py`](file:///d:/Text2SQL-AI-Agent/src/models/artifacts.py)):
 
+### 4.1. Kế hoạch phân tích (`AnalysisPlan`)
 ```python
-from typing import Annotated, Any, Literal
-from typing_extensions import TypedDict
-import operator
-
-
-class AgentState(TypedDict):
-    # Định danh phiên & Người dùng
-    thread_id: str
-    user_id: str
-    user_role: Literal["Analyst", "Admin"]
-
-    # Hội thoại & Đầu vào
-    messages: Annotated[list[dict[str, Any]], operator.add]
-    current_question: str
-
-    # Trạng thái Clarification
-    is_ambiguous: bool
-    clarification_prompt: str | None
-
-    # Ngữ cảnh Schema & Value
-    schema_context_path: str  # Đường dẫn virtual file session://...
-
-    # Trạng thái SQL & Kiểm duyệt
-    draft_sql: str | None
-    sql_explanation: str | None
-    ast_valid: bool
-    rbac_passed: bool
-    estimated_bytes: int
-    is_cost_exceeded: bool
-
-    # Trạng thái Duyệt HITL
-    hitl_approved: bool | None
-
-    # Thực thi & Sửa lỗi
-    query_result: list[dict[str, Any]] | None
-    execution_error: str | None
-    retry_count: int
-
-    # Kết quả cuối cùng
-    chart_config: dict[str, Any] | None
-    insight_narrative: str | None
+class AnalysisPlan(BaseModel):
+    plan_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    original_question: str
+    goal: str  # Mục tiêu phân tích cốt lõi
+    hypotheses: list[str]  # 1-2 giả thuyết kinh doanh cần kiểm chứng
+    tasks: list[AnalysisTask]  # Danh sách tối đa 3 nhiệm vụ truy vấn
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 ```
 
-### 4.2. Giao thức Virtual Filesystem giữa các Subagents
-Để tránh việc nhét toàn bộ schema khổng lồ vào LLM context window gây chậm và tốn phí token, các subagent giao tiếp qua các tệp ảo được cô lập theo session:
-- `session://{thread_id}/schema_context.md`: Chứa thông tin DDL bảng, cột và các distinct values liên quan câu hỏi.
-- `session://{thread_id}/draft_sql.sql`: Chứa mã nguồn câu SQL do SQL Generator soạn thảo.
-- `session://{thread_id}/validation_report.json`: Chứa kết quả kiểm định AST, phân quyền RBAC và dung lượng bytes scanned từ Dry-run.
+### 4.2. Bằng chứng truy vấn (`QueryArtifact`)
+```python
+class QueryArtifact(BaseModel):
+    artifact_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str
+    sql: str
+    dialect: Literal["duckdb", "bigquery"] = "duckdb"
+    explanation: str
+    tables_used: list[str]  # Danh sách bảng TPC-DS tham gia truy vấn
+    columns_used: list[str]
+    status: Literal[
+        "SUCCESS",
+        "BLOCKED_AST",
+        "BLOCKED_RBAC",
+        "BLOCKED_COST",
+        "BLOCKED_HITL",
+        "DB_ERROR",
+        "TIMEOUT",
+    ]
+    row_count: int = 0
+    data_sample: list[dict[str, Any]] = Field(default_factory=list)
+    summary_stats: dict[str, Any] = Field(default_factory=dict)
+    bytes_scanned: int = 0
+    execution_time_ms: float = 0.0
+```
+
+### 4.3. Gói phản hồi hoàn chỉnh (`ResponsePackage`)
+```python
+class ResponsePackage(BaseModel):
+    package_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    thread_id: str
+    executive_summary: str  # Đoạn tóm tắt điều hành bằng tiếng Việt
+    artifacts: list[PresentationArtifact]  # Danh sách KPI Cards, Charts, Tables
+    plan_summary: PlanSummaryArtifact
+    query_lineage: list[QueryLineageItem]  # Minh chứng nguồn gốc dữ liệu
+    total_execution_time_ms: float
+    total_bytes_scanned: int
+```
 
 ---
 
 ## 5. BẢN GHI QUYẾT ĐỊNH KIẾN TRÚC (ARCHITECTURE DECISION RECORDS - ADR)
 
-### ADR 01: Lựa chọn Mô hình Hybrid (DeepAgents + LangGraph) thay vì chỉ dùng một Framework
-- **Bối cảnh**: Hệ thống cần vừa thông minh trong việc hiểu ngôn ngữ tự nhiên tiếng Việt, vừa phải tuân thủ nghiêm ngặt các quy tắc an ninh dữ liệu doanh nghiệp.
-- **Quyết định**: Sử dụng DeepAgents làm tầng suy luận linh hoạt bên ngoài (Outer Harness), và đóng gói pipeline kiểm duyệt bên trong bằng một Subgraph LangGraph tất định (`CompiledSubAgent`).
-- **Hệ quả**: Đảm bảo 100% các bước kiểm tra AST, RBAC, Dry-run cost và Audit log được thực thi bằng code thuần mà không phụ thuộc vào việc LLM có "nhớ" gọi tool hay không.
+### ADR-0001: Kiến trúc Tác tử Lai (Hybrid Agentic Governance)
+- **Quyết định**: Kết hợp DeepAgents làm khung điều phối tư duy (Outer Harness) và đóng gói toàn bộ quy trình kiểm duyệt an toàn bằng một Subgraph LangGraph tất định (`CompiledSubAgent`).
+- **Lý do**: Không bao giờ giao quyền kiểm soát an ninh cho LLM. AST check, RBAC, Cost check và Audit log phải chạy bằng mã nguồn Python tất định với độ tin cậy 100%.
 
-### ADR 02: Phân tầng Model (Model Tiering) để tối ưu chi phí vận hành
-- **Bối cảnh**: Gọi LLM cao cấp (Claude 3.5 Sonnet / GPT-4o) cho tất cả các bước là lãng phí và chậm.
-- **Quyết định**:
-  - **Tier 1 (Sonnet / GPT-4o)**: Dành riêng cho SQL Generator (bước then chốt quyết định Execution Accuracy).
-  - **Tier 2 (Haiku / GPT-4o-mini)**: Dành cho Schema Retriever, Clarification Check và Response Synthesizer.
-  - **Zero LLM Token**: Dành cho toàn bộ LangGraph Control Pipeline (chạy bằng AST parser và API database).
+### ADR-0002: Chuyển đổi toàn diện sang Chuẩn TPC-DS Benchmark (24 Bảng)
+- **Quyết định**: Nâng cấp từ bộ dữ liệu TPC-H (8 bảng đơn kênh) lên TPC-DS (24 bảng bán lẻ đa kênh: Store, Web, Catalog, Returns, Inventory).
+- **Lý do**: TPC-DS phản ánh chính xác cấu trúc Enterprise Data Warehouse hiện đại (Snowflake Schema), đặt ra các thách thức kỹ thuật có giá trị học thuật cao (tìm đường nối BFS, liên kết bảng thời gian `date_dim`, phân định doanh thu thuần Net Paid).
 
-### ADR 03: Dual-Warehouse Strategy với TPC-H Benchmark Schema
-- **Bối cảnh**: Cần bộ dữ liệu chuẩn doanh nghiệp (bán hàng, tồn kho, nhà cung cấp) có sẵn các câu benchmark phức tạp (TPC-H Q1-Q22) để đo lường độ chính xác thực thi (Execution Accuracy).
-- **Quyết định**: Hỗ trợ đồng thời 2 dialect qua adapter:
-  - **DuckDB**: Sinh dữ liệu tự động bằng extension `CALL dbgen(sf=0.1)` (khoảng 100MB) hoặc `sf=1` (1GB) lưu tại `data/tpch.duckdb` để chạy Unit Test, CI/CD và dev hàng ngày (chi phí 0 VNĐ).
-  - **Google BigQuery Sandbox**: Sử dụng dataset TPC-H mẫu hoặc nạp file Parquet từ DuckDB, tận dụng tính năng `dryRun` đo bytes scanned chuẩn xác trên bảng lớn `lineitem` cho buổi Demo Day và Benchmark Eval.
+### ADR-0003: Kiến trúc Phân tích Đa Nhiệm v4.0 (AnalysisPlan & Evidence Collection)
+- **Quyết định**: Thay thế mô hình "1 câu hỏi $\to$ 1 câu SQL" bằng quy trình phân rã kế hoạch đa bước tuần tự, tích lũy bằng chứng vào `EvidenceStore` trước khi tổng hợp.
+- **Lý do**: Các câu hỏi phân tích kinh doanh thực tế luôn có tính chất tìm kiếm nguyên nhân gốc rễ (Root Cause Analysis), không thể giải quyết bằng một câu SELECT đơn lẻ mà không làm bùng nổ độ phức tạp và lỗi của SQL.
+
+### ADR-0004: Định kiểu dữ liệu mạnh và Cơ chế Composable Hydration (Zero Regex Scraping)
+- **Quyết định**: Khai tử hoàn toàn việc parse JSON/SQL từ chuỗi Markdown bằng Regular Expression; chuẩn hóa 100% qua Pydantic V2 `ResponsePackage`.
+- **Lý do**: Loại bỏ hoàn toàn lỗi crash giao diện người dùng khi văn phong của LLM thay đổi; đảm bảo khả năng mở rộng và kiểm thử tự động của hệ thống.

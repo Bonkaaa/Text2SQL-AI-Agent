@@ -11,7 +11,7 @@
 ## 1. TỔNG QUAN & BỐI CẢNH NÂNG CẤP TỪ V3 LÊN V4
 
 ### 1.1. Tại sao kiến trúc v3.0 trở nên lỗi thời?
-Kiến trúc v3.0 được thiết kế quanh mô hình cổ điển **"1 câu hỏi $\to$ 1 câu SQL $\to$ 1 kết quả biểu đồ"**. Trong môi trường phân tích doanh nghiệp thực tế (TPC-H Supply Chain & Wholesale), mô hình này bộc lộ 3 điểm nghẽn nghiêm trọng:
+Kiến trúc v3.0 được thiết kế quanh mô hình cổ điển **"1 câu hỏi $\to$ 1 câu SQL $\to$ 1 kết quả biểu đồ"**. Trong môi trường phân tích doanh nghiệp thực tế (Enterprise Data Warehouse chuẩn TPC-DS 24 bảng - Bán lẻ đa kênh Omnichannel), mô hình này bộc lộ 3 điểm nghẽn nghiêm trọng:
 
 1. **Điểm nghẽn năng lực phân tích (The Single-Query Analytical Bottleneck)**:
    - Một câu hỏi kinh doanh thực tế như *"Tại sao doanh thu khu vực Châu Á giảm quý 3/1995 và do nhà cung cấp nào?"* không thể giải quyết bằng một câu SELECT duy nhất mà không biến câu lệnh thành một con quái vật SQL dài 100 dòng chứa nhiều subquery/CTE phức tạp, vượt quá khả năng suy luận tin cậy của LLM và khó debug.
@@ -68,7 +68,7 @@ Theo quy chuẩn tài liệu của dự án (sử dụng [documd-visuals](file:/
     <div class="arch-pipe-io">
       <div class="arch-pipe-source">Natural Language Query</div>
       <div class="arch-pipe-source">User Context & Role</div>
-      <div class="arch-pipe-source">TPC-H 8 Tables Schema</div>
+      <div class="arch-pipe-source">TPC-DS 24 Tables Schema</div>
       <div class="arch-pipe-source">Categorical Index (ChromaDB)</div>
     </div>
     <div class="arch-pipe-row">
@@ -122,8 +122,8 @@ Một quyết định kiến trúc then chốt trong v4.0 ([ADR-0003](file:///d:
   * Quản lý bộ nhớ đệm hội thoại, middleware tóm tắt, filesystem ảo (`StateBackend`) và danh sách việc cần làm (`TodoListMiddleware`).
   * **Tuyệt đối không trực tiếp ôm công cụ nghiệp vụ**: Supervisor chỉ có công cụ `write_todos` và `task()`.
   * Ủy quyền toàn bộ tác vụ thực thi cho 2 Subagents chuyên biệt qua công cụ `task()`:
-    1. **`consultation-agent`**: Chuyên gia giải đáp giao tiếp xã giao và tra cứu từ điển dữ liệu / lược đồ TPC-H mà không cần sinh SQL hay query database.
-    2. **`analytics-subagent`**: Chuyên gia phân tích dữ liệu toàn trình (CompiledSubAgent bọc LangGraph Analytics Subgraph) cho các yêu cầu tính toán số liệu TPC-H từ kho dữ liệu.
+    1. **`consultation-agent`**: Chuyên gia giải đáp giao tiếp xã giao và tra cứu từ điển dữ liệu / lược đồ TPC-DS mà không cần sinh SQL hay query database.
+    2. **`analytics-subagent`**: Chuyên gia phân tích dữ liệu toàn trình (CompiledSubAgent bọc LangGraph Analytics Subgraph) cho các yêu cầu tính toán số liệu TPC-DS từ kho dữ liệu.
 - Control Pipeline tiếp tục được lồng bên trong Subgraph phân tích như một lớp kiểm duyệt tất định cấp thấp (Nested Subgraph).
 
 ```mermaid
@@ -219,8 +219,8 @@ graph TD
   - Output: Phản hồi giải thích bằng tiếng Việt chuẩn mực hoặc kế hoạch phân tích chuyên sâu.
 
 ### 4.2. Schema & Categorical Value Retriever (`src/agents/schema_retriever.py`)
-- **Schema Linking**: Đối chiếu ngữ nghĩa câu hỏi với DDL và chú thích nghiệp vụ của 8 bảng TPC-H (`region`, `nation`, `supplier`, `customer`, `part`, `partsupp`, `orders`, `lineitem`) qua ChromaDB Vector Index.
-- **Categorical Indexing**: Trích xuất các giá trị danh mục đặc trưng trong TPC-H (ví dụ: `r_name = 'ASIA'`, `c_mktsegment = 'BUILDING'`, `l_shipmode = 'AIR'`) để gán chính xác literal vào context, tránh tình trạng LLM tự đoán sai case chữ hoa/thường.
+- **Schema Linking**: Đối chiếu ngữ nghĩa câu hỏi với DDL và chú thích nghiệp vụ của 24 bảng TPC-DS (`store_sales`, `web_sales`, `catalog_sales`, `store_returns`, `inventory`, `date_dim`, `item`, `customer`...) qua Vector Search và từ điển từ khóa tiếng Việt.
+- **Categorical Indexing**: Trích xuất các giá trị danh mục đặc trưng trong TPC-DS (ví dụ: ngành hàng `item.i_category = 'Electronics'`, tình trạng `cd_marital_status = 'M'`, phương thức vận chuyển `ship_mode.sm_type`) để gán chính xác literal vào context, tránh tình trạng LLM tự đoán sai literal.
 
 ### 4.3. Pre-Flight Security & Clarification Gatekeeper (`src/agents/preflight_gatekeeper.py`)
 - **Vị trí**: Đứng sừng sững tại cổng đón tiếp (Front-door Gatekeeper) trước khi kích hoạt Master Supervisor hoặc bất kỳ Subgraph nào.
@@ -514,4 +514,4 @@ Chi tiết thực thi mã nguồn được tổ chức theo 4 giai đoạn chu�
 - **Phase 1: Foundation & Contracts**: Xóa bỏ regex; bổ sung Pydantic models `AnalysisPlan`, `EvidenceStore`, `ArtifactBundle`.
 - **Phase 2: Core Analysis Engine**: Xây dựng `AnalysisPlanner`, `DataAnalyzer`, `PresentationSynthesizer`.
 - **Phase 3: Subgraph Assembly & Option B Mounting**: Tích hợp các node mới vào LangGraph Subgraph và gắn kết với DeepAgents Supervisor.
-- **Phase 4: Verification, Evaluation & Demo Delivery**: Chạy benchmark bộ 50 câu hỏi TPC-H tiếng Việt, đo lường độ chính xác EX, VSR và hoàn thiện Web UI.
+- **Phase 4: Verification, Evaluation & Demo Delivery**: Chạy benchmark bộ 50 câu hỏi TPC-DS tiếng Việt, đo lường độ chính xác EX, VSR và hoàn thiện Web UI.
