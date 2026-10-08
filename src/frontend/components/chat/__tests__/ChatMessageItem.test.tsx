@@ -238,4 +238,63 @@ describe("Component 5.3: ChatMessageItem (Message Item Composer)", () => {
     fireEvent.click(sqlTab);
     expect(screen.getByText(/Truy vấn SQL đã thực thi/i)).toBeInTheDocument();
   });
+
+  it("7. Khi phản hồi chứa response_package (Multi-Artifacts v4.0), render ArtifactRenderer với KPI, Biểu đồ, Bảng", () => {
+    const multiArtifactResponse: QueryResponse = {
+      session_id: "sess-v4",
+      status: "COMPLETED",
+      question: "Phân tích doanh số TPC-DS 2002",
+      is_ambiguous: false,
+      suggested_options: [],
+      execution_time_ms: 220,
+      requires_hitl: false,
+      response_package: {
+        session_id: "sess-v4",
+        direct_answer: "Doanh số năm 2002 ghi nhận mức tăng trưởng 14.2% so với cùng kỳ.",
+        detailed_insight: ["Store Sales chiếm ưu thế với 65% thị phần."],
+        layout: "stacked",
+        artifacts: [
+          {
+            type: "kpi",
+            title: "Tổng doanh thu thuần",
+            value: 14500000,
+            unit: "USD",
+            delta: 14.2,
+            delta_type: "increase",
+          },
+          {
+            type: "chart",
+            chart_type: "bar",
+            title: "Doanh số theo kênh bán hàng",
+            x_key: "channel",
+            y_keys: ["net_paid"],
+            data: [{ channel: "Store", net_paid: 9425000 }],
+          },
+        ],
+      },
+    };
+
+    const message: ChatMessage = {
+      id: "msg-v4",
+      role: "assistant",
+      content: "Doanh số năm 2002",
+      timestamp: new Date(),
+      status: "COMPLETED",
+      queryResponse: multiArtifactResponse,
+    };
+
+    render(<ChatMessageItem message={message} />);
+
+    // Kiểm tra Executive Summary
+    expect(
+      screen.getByText("Doanh số năm 2002 ghi nhận mức tăng trưởng 14.2% so với cùng kỳ.")
+    ).toBeInTheDocument();
+
+    // Kiểm tra KPI
+    expect(screen.getByText("Tổng doanh thu thuần")).toBeInTheDocument();
+    expect(screen.getByText("+14.2%")).toBeInTheDocument();
+
+    // Kiểm tra Chart
+    expect(screen.getByText("Doanh số theo kênh bán hàng")).toBeInTheDocument();
+  });
 });

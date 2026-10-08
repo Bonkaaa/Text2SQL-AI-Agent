@@ -16,7 +16,7 @@ describe("Component 4.1: InsightCard", () => {
     expect(screen.getByRole("region")).toBeInTheDocument();
     expect(screen.getByText("Nhận định kinh doanh")).toBeInTheDocument();
     expect(
-      screen.getByText("Tổng hợp từ dữ liệu TPC-H")
+      screen.getByText("Tổng hợp từ dữ liệu TPC-DS")
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Doanh thu khu vực ASIA đạt mức tăng trưởng cao nhất/i)

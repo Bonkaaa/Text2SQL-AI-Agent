@@ -15,13 +15,13 @@ describe("Component 2.1: QueryInputCard / ChatInput", () => {
     vi.clearAllMocks();
   });
 
-  it("1. Render đúng input, placeholder, model switcher và nút hành động", () => {
+  it("1. Render đúng textarea, placeholder, và nút chọn bảng TPC-DS", () => {
     render(<QueryInputCard onSubmit={vi.fn()} />);
 
     const input = screen.getByPlaceholderText("Ask Text2SQL...");
     expect(input).toBeInTheDocument();
-    expect(screen.getByText("TPC-H")).toBeInTheDocument();
-    expect(screen.getByTitle("Đính kèm tệp")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /bảng tpc-ds/i })).toBeInTheDocument();
+    expect(screen.getByTitle("Gửi câu hỏi")).toBeInTheDocument();
   });
 
   it("2. Hỗ trợ placeholder tùy chỉnh qua prop", () => {
