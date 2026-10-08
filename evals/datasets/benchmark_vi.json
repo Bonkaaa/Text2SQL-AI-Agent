@@ -1,7 +1,7 @@
 [
   {
     "id": "q01",
-    "question": "Có bao nhiêu khách hàng trong cơ sở dữ liệu?",
+    "question": "Có bao nhiêu khách hàng trong hệ thống bán lẻ?",
     "difficulty": "EASY",
     "category": "Aggregation",
     "tables": ["customer"],
@@ -9,394 +9,394 @@
   },
   {
     "id": "q02",
-    "question": "Tổng số đơn hàng đã được tạo trong hệ thống là bao nhiêu?",
+    "question": "Có bao nhiêu mặt hàng (item) có trong danh mục sản phẩm?",
     "difficulty": "EASY",
     "category": "Aggregation",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT count(*) AS total_orders FROM orders;"
+    "tables": ["item"],
+    "ground_truth_sql": "SELECT count(*) AS total_items FROM item;"
   },
   {
     "id": "q03",
-    "question": "Có bao nhiêu nhà cung cấp trong hệ thống?",
+    "question": "Tổng số giao dịch bán hàng tại cửa hàng (store sales) là bao nhiêu?",
     "difficulty": "EASY",
     "category": "Aggregation",
-    "tables": ["supplier"],
-    "ground_truth_sql": "SELECT count(*) AS total_suppliers FROM supplier;"
+    "tables": ["store_sales"],
+    "ground_truth_sql": "SELECT count(*) AS total_sales FROM store_sales;"
   },
   {
     "id": "q04",
-    "question": "Tổng số linh kiện (part) có trong danh mục là bao nhiêu?",
+    "question": "Giá bán lẻ hiện tại trung bình (current retail price) của các mặt hàng trong danh mục là bao nhiêu?",
     "difficulty": "EASY",
     "category": "Aggregation",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT count(*) AS total_parts FROM part;"
+    "tables": ["item"],
+    "ground_truth_sql": "SELECT avg(i_current_price) AS avg_retail_price FROM item;"
   },
   {
     "id": "q05",
-    "question": "Giá bán lẻ trung bình của các linh kiện là bao nhiêu?",
+    "question": "Tổng doanh thu ròng (net paid) từ kênh bán hàng tại cửa hàng (store sales) là bao nhiêu?",
     "difficulty": "EASY",
     "category": "Aggregation",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT avg(p_retailprice) AS avg_retail_price FROM part;"
+    "tables": ["store_sales"],
+    "ground_truth_sql": "SELECT sum(ss_net_paid) AS total_store_net_paid FROM store_sales;"
   },
   {
     "id": "q06",
-    "question": "Tổng giá trị đơn hàng (total price) của toàn bộ hệ thống là bao nhiêu?",
+    "question": "Tổng doanh thu ròng từ kênh bán hàng trực tuyến (web sales) là bao nhiêu?",
     "difficulty": "EASY",
     "category": "Aggregation",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT sum(o_totalprice) AS total_order_value FROM orders;"
+    "tables": ["web_sales"],
+    "ground_truth_sql": "SELECT sum(ws_net_paid) AS total_web_net_paid FROM web_sales;"
   },
   {
     "id": "q07",
-    "question": "Thống kê số lượng đơn hàng theo từng trạng thái đơn hàng (order status)?",
+    "question": "Thống kê số lượng nhân khẩu theo từng giới tính (gender) trong bảng customer_demographics?",
     "difficulty": "EASY",
     "category": "Group By",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT o_orderstatus, count(*) AS order_count FROM orders GROUP BY o_orderstatus ORDER BY order_count DESC;"
+    "tables": ["customer_demographics"],
+    "ground_truth_sql": "SELECT cd_gender, count(*) AS count FROM customer_demographics GROUP BY cd_gender ORDER BY count DESC;"
   },
   {
     "id": "q08",
-    "question": "Số lượng khách hàng theo từng phân khúc thị trường (mktsegment)?",
+    "question": "Thống kê số lượng mặt hàng theo từng ngành hàng (category) trong danh mục sản phẩm?",
     "difficulty": "EASY",
     "category": "Group By",
-    "tables": ["customer"],
-    "ground_truth_sql": "SELECT c_mktsegment, count(*) AS customer_count FROM customer GROUP BY c_mktsegment ORDER BY customer_count DESC;"
+    "tables": ["item"],
+    "ground_truth_sql": "SELECT i_category, count(*) AS item_count FROM item WHERE i_category IS NOT NULL GROUP BY i_category ORDER BY item_count DESC;"
   },
   {
     "id": "q09",
-    "question": "Thống kê số lượng đơn hàng theo mức độ ưu tiên (order priority)?",
+    "question": "Danh sách 10 khách hàng có năm sinh sớm nhất (lớn tuổi nhất)?",
     "difficulty": "EASY",
-    "category": "Group By",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT o_orderpriority, count(*) AS order_count FROM orders GROUP BY o_orderpriority ORDER BY order_count DESC;"
+    "category": "Ordering",
+    "tables": ["customer"],
+    "ground_truth_sql": "SELECT c_customer_id, c_first_name, c_last_name, c_birth_year FROM customer WHERE c_birth_year IS NOT NULL ORDER BY c_birth_year ASC, c_customer_id ASC LIMIT 10;"
   },
   {
     "id": "q10",
-    "question": "Danh sách 5 quốc gia có nhiều khách hàng nhất?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Top-N",
-    "tables": ["customer", "nation"],
-    "ground_truth_sql": "SELECT n.n_name, count(c.c_custkey) AS customer_count FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY customer_count DESC LIMIT 5;"
+    "question": "Liệt kê các lý do đổi trả hàng (reasons) có trong hệ thống?",
+    "difficulty": "EASY",
+    "category": "Selection",
+    "tables": ["reason"],
+    "ground_truth_sql": "SELECT r_reason_id, r_reason_desc FROM reason ORDER BY r_reason_id;"
   },
   {
     "id": "q11",
-    "question": "Top 5 khách hàng có tổng chi tiêu đơn hàng lớn nhất?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Top-N",
-    "tables": ["customer", "orders"],
-    "ground_truth_sql": "SELECT c.c_name, sum(o.o_totalprice) AS total_spent FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_name ORDER BY total_spent DESC LIMIT 5;"
+    "question": "Có bao nhiêu phương thức vận chuyển (ship mode) đang hoạt động trong hệ thống?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["ship_mode"],
+    "ground_truth_sql": "SELECT count(*) AS total_ship_modes FROM ship_mode;"
   },
   {
     "id": "q12",
-    "question": "Số lượng nhà cung cấp theo từng quốc gia?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Group By",
-    "tables": ["supplier", "nation"],
-    "ground_truth_sql": "SELECT n.n_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY supplier_count DESC;"
+    "question": "Có bao nhiêu chương trình khuyến mãi (promotion) có chi phí (cost) lớn hơn 0?",
+    "difficulty": "EASY",
+    "category": "Filter",
+    "tables": ["promotion"],
+    "ground_truth_sql": "SELECT count(*) AS active_promotions FROM promotion WHERE p_cost > 0;"
   },
   {
     "id": "q13",
-    "question": "Top 5 nhà cung cấp có số dư tài khoản (acctbal) cao nhất?",
+    "question": "Tổng số tiền hoàn trả tiền mặt cho khách hàng (refunded cash) trong kênh cửa hàng (store returns) là bao nhiêu?",
     "difficulty": "EASY",
-    "category": "Top-N",
-    "tables": ["supplier"],
-    "ground_truth_sql": "SELECT s_name, s_acctbal FROM supplier ORDER BY s_acctbal DESC LIMIT 5;"
+    "category": "Aggregation",
+    "tables": ["store_returns"],
+    "ground_truth_sql": "SELECT sum(sr_refunded_cash) AS total_refunded_cash FROM store_returns;"
   },
   {
     "id": "q14",
-    "question": "Tổng số lượng dòng mặt hàng (lineitem) theo từng phương thức vận chuyển (shipmode)?",
+    "question": "Liệt kê top 5 mặt hàng có giá niêm yết (i_current_price) đắt nhất?",
     "difficulty": "EASY",
-    "category": "Group By",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT l_shipmode, count(*) AS item_count FROM lineitem GROUP BY l_shipmode ORDER BY item_count DESC;"
+    "category": "Ordering",
+    "tables": ["item"],
+    "ground_truth_sql": "SELECT i_item_id, i_item_desc, i_current_price FROM item ORDER BY i_current_price DESC, i_item_id ASC LIMIT 5;"
   },
   {
     "id": "q15",
-    "question": "Top 5 đơn hàng có tổng giá trị lớn nhất trong năm 1995?",
-    "difficulty": "MEDIUM",
-    "category": "Filter & Top-N",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT o_orderkey, o_totalprice, o_orderdate FROM orders WHERE extract(year FROM o_orderdate) = 1995 ORDER BY o_totalprice DESC LIMIT 5;"
+    "question": "Tổng số lượng hàng tồn kho (quantity on hand) của toàn bộ hệ thống là bao nhiêu?",
+    "difficulty": "EASY",
+    "category": "Aggregation",
+    "tables": ["inventory"],
+    "ground_truth_sql": "SELECT sum(inv_quantity_on_hand) AS total_inventory_quantity FROM inventory;"
   },
   {
     "id": "q16",
-    "question": "Số lượng khách hàng tại từng khu vực (region)?",
+    "question": "Tổng doanh thu bán hàng tại cửa hàng (store sales) trong năm 2001 là bao nhiêu?",
     "difficulty": "MEDIUM",
-    "category": "Multi-Join",
-    "tables": ["customer", "nation", "region"],
-    "ground_truth_sql": "SELECT r.r_name, count(c.c_custkey) AS customer_count FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY customer_count DESC;"
+    "category": "Join & Filter",
+    "tables": ["store_sales", "date_dim"],
+    "ground_truth_sql": "SELECT sum(ss.ss_net_paid) AS total_sales_2001 FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001;"
   },
   {
     "id": "q17",
-    "question": "Số lượng nhà cung cấp tại từng khu vực (region)?",
+    "question": "Thống kê doanh thu kênh cửa hàng theo từng năm (d_year)?",
     "difficulty": "MEDIUM",
-    "category": "Multi-Join",
-    "tables": ["supplier", "nation", "region"],
-    "ground_truth_sql": "SELECT r.r_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY supplier_count DESC;"
+    "category": "Group By & Join",
+    "tables": ["store_sales", "date_dim"],
+    "ground_truth_sql": "SELECT d.d_year, sum(ss.ss_net_paid) AS total_net_paid FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk GROUP BY d.d_year ORDER BY d.d_year ASC;"
   },
   {
     "id": "q18",
-    "question": "Tổng doanh thu bán hàng (totalprice) theo từng năm?",
+    "question": "Doanh thu và số lượng bán của kênh cửa hàng theo từng danh mục sản phẩm (i_category)?",
     "difficulty": "MEDIUM",
-    "category": "Date & Aggregation",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT extract(year FROM o_orderdate) AS order_year, sum(o_totalprice) AS total_revenue FROM orders GROUP BY extract(year FROM o_orderdate) ORDER BY order_year;"
+    "category": "Group By & Join",
+    "tables": ["store_sales", "item"],
+    "ground_truth_sql": "SELECT i.i_category, sum(ss.ss_quantity) AS total_quantity, sum(ss.ss_net_paid) AS total_revenue FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk WHERE i.i_category IS NOT NULL GROUP BY i.i_category ORDER BY total_revenue DESC;"
   },
   {
     "id": "q19",
-    "question": "Top 5 linh kiện có số lượng bán ra (quantity) nhiều nhất?",
+    "question": "Top 5 bang (state) có số lượng khách hàng sinh sống nhiều nhất?",
     "difficulty": "MEDIUM",
-    "category": "Join & Top-N",
-    "tables": ["part", "lineitem"],
-    "ground_truth_sql": "SELECT p.p_name, sum(l.l_quantity) AS total_quantity FROM part p JOIN lineitem l ON p.p_partkey = l.l_partkey GROUP BY p.p_name ORDER BY total_quantity DESC, p.p_name ASC LIMIT 5;"
+    "category": "Join & Group By",
+    "tables": ["customer", "customer_address"],
+    "ground_truth_sql": "SELECT ca.ca_state, count(c.c_customer_sk) AS customer_count FROM customer c JOIN customer_address ca ON c.c_current_addr_sk = ca.ca_address_sk WHERE ca.ca_state IS NOT NULL GROUP BY ca.ca_state ORDER BY customer_count DESC, ca.ca_state ASC LIMIT 5;"
   },
   {
     "id": "q20",
-    "question": "Tổng doanh thu bán hàng cho khách hàng thuộc phân khúc 'BUILDING'?",
+    "question": "Doanh thu bán hàng trực tuyến (web sales) theo từng năm?",
     "difficulty": "MEDIUM",
-    "category": "Join & Filter",
-    "tables": ["customer", "orders"],
-    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS total_building_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey WHERE c.c_mktsegment = 'BUILDING';"
+    "category": "Join & Group By",
+    "tables": ["web_sales", "date_dim"],
+    "ground_truth_sql": "SELECT d.d_year, sum(ws.ws_net_paid) AS total_web_sales FROM web_sales ws JOIN date_dim d ON ws.ws_sold_date_sk = d.d_date_sk GROUP BY d.d_year ORDER BY d.d_year ASC;"
   },
   {
     "id": "q21",
-    "question": "Số lượng khách hàng có số dư tài khoản âm (acctbal < 0)?",
-    "difficulty": "EASY",
-    "category": "Filter",
-    "tables": ["customer"],
-    "ground_truth_sql": "SELECT count(*) AS negative_balance_customers FROM customer WHERE c_acctbal < 0;"
+    "question": "Doanh thu bán hàng qua catalog (catalog sales) trong năm 2001 là bao nhiêu?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Filter",
+    "tables": ["catalog_sales", "date_dim"],
+    "ground_truth_sql": "SELECT sum(cs.cs_net_paid) AS total_catalog_sales_2001 FROM catalog_sales cs JOIN date_dim d ON cs.cs_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001;"
   },
   {
     "id": "q22",
-    "question": "Top 5 thương hiệu linh kiện (brand) có nhiều sản phẩm nhất?",
-    "difficulty": "EASY",
-    "category": "Group By & Top-N",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT p_brand, count(*) AS part_count FROM part GROUP BY p_brand ORDER BY part_count DESC LIMIT 5;"
+    "question": "Thống kê số lượng đơn trả hàng qua kênh cửa hàng theo từng lý do trả hàng (r_reason_desc)?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Group By",
+    "tables": ["store_returns", "reason"],
+    "ground_truth_sql": "SELECT r.r_reason_desc, count(*) AS return_count, sum(sr.sr_return_amt) AS total_returned_amount FROM store_returns sr JOIN reason r ON sr.sr_reason_sk = r.r_reason_sk GROUP BY r.r_reason_desc ORDER BY total_returned_amount DESC;"
   },
   {
     "id": "q23",
-    "question": "Tổng doanh thu thuần (extendedprice * (1 - discount)) của toàn bộ hệ thống?",
+    "question": "Các danh mục sản phẩm (category) có tổng số lượng bán trên 1,000 sản phẩm tại kênh cửa hàng?",
     "difficulty": "MEDIUM",
-    "category": "Business Metric",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS total_net_revenue FROM lineitem;"
+    "category": "HAVING",
+    "tables": ["store_sales", "item"],
+    "ground_truth_sql": "SELECT i.i_category, sum(ss.ss_quantity) AS total_units FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk WHERE i.i_category IS NOT NULL GROUP BY i.i_category HAVING sum(ss.ss_quantity) > 1000 ORDER BY total_units DESC;"
   },
   {
     "id": "q24",
-    "question": "Tổng doanh thu thuần trong năm 1995 là bao nhiêu?",
+    "question": "Doanh thu bán hàng tại cửa hàng theo từng tháng (d_moy) trong năm 2001?",
     "difficulty": "MEDIUM",
-    "category": "Business Metric & Date",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS net_revenue_1995 FROM lineitem WHERE extract(year FROM l_shipdate) = 1995;"
+    "category": "Time Series",
+    "tables": ["store_sales", "date_dim"],
+    "ground_truth_sql": "SELECT d.d_year, d.d_moy, sum(ss.ss_net_paid) AS monthly_revenue FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_year, d.d_moy ORDER BY d.d_moy ASC;"
   },
   {
     "id": "q25",
-    "question": "Số lượng đơn hàng được đặt theo từng tháng trong năm 1995?",
+    "question": "Top 10 khách hàng có tổng chi tiêu cao nhất tại kênh bán hàng cửa hàng (store sales)?",
     "difficulty": "MEDIUM",
-    "category": "Date Aggregation",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT extract(month FROM o_orderdate) AS order_month, count(*) AS order_count FROM orders WHERE extract(year FROM o_orderdate) = 1995 GROUP BY extract(month FROM o_orderdate) ORDER BY order_month;"
+    "category": "Join & Top-N",
+    "tables": ["store_sales", "customer"],
+    "ground_truth_sql": "SELECT c.c_customer_id, c.c_first_name, c.c_last_name, sum(ss.ss_net_paid) AS total_spent FROM store_sales ss JOIN customer c ON ss.ss_customer_sk = c.c_customer_sk GROUP BY c.c_customer_id, c.c_first_name, c.c_last_name ORDER BY total_spent DESC, c.c_customer_id ASC LIMIT 10;"
   },
   {
     "id": "q26",
-    "question": "Doanh thu bán hàng theo từng khu vực (region)?",
-    "difficulty": "HARD",
-    "category": "Multi-Join & Aggregation",
-    "tables": ["customer", "orders", "nation", "region"],
-    "ground_truth_sql": "SELECT r.r_name, sum(o.o_totalprice) AS total_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey GROUP BY r.r_name ORDER BY total_revenue DESC;"
+    "question": "Số lượng mặt hàng độc nhất và tổng tồn kho theo từng kho hàng (warehouse)?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Aggregation",
+    "tables": ["inventory", "warehouse"],
+    "ground_truth_sql": "SELECT w.w_warehouse_name, count(distinct inv.inv_item_sk) AS unique_items, sum(inv.inv_quantity_on_hand) AS total_inventory FROM inventory inv JOIN warehouse w ON inv.inv_warehouse_sk = w.w_warehouse_sk GROUP BY w.w_warehouse_name ORDER BY total_inventory DESC;"
   },
   {
     "id": "q27",
-    "question": "Top 5 quốc gia có tổng doanh thu mua hàng lớn nhất?",
-    "difficulty": "HARD",
-    "category": "Multi-Join & Top-N",
-    "tables": ["customer", "orders", "nation"],
-    "ground_truth_sql": "SELECT n.n_name, sum(o.o_totalprice) AS nation_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey GROUP BY n.n_name ORDER BY nation_revenue DESC LIMIT 5;"
+    "question": "Thống kê doanh thu bán hàng tại cửa hàng theo tình trạng hôn nhân (cd_marital_status) của khách hàng?",
+    "difficulty": "MEDIUM",
+    "category": "Demographics Join",
+    "tables": ["store_sales", "customer_demographics"],
+    "ground_truth_sql": "SELECT cd.cd_marital_status, count(ss.ss_item_sk) AS transactions, sum(ss.ss_net_paid) AS total_revenue FROM store_sales ss JOIN customer_demographics cd ON ss.ss_cdemo_sk = cd.cd_demo_sk GROUP BY cd.cd_marital_status ORDER BY total_revenue DESC;"
   },
   {
     "id": "q28",
-    "question": "Số dòng mặt hàng bị hoàn trả (returnflag = 'R') là bao nhiêu?",
-    "difficulty": "EASY",
-    "category": "Filter",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT count(*) AS returned_items FROM lineitem WHERE l_returnflag = 'R';"
+    "question": "Top 5 phương thức vận chuyển (ship mode) được sử dụng nhiều nhất trong kênh catalog sales?",
+    "difficulty": "MEDIUM",
+    "category": "Join & Group By",
+    "tables": ["catalog_sales", "ship_mode"],
+    "ground_truth_sql": "SELECT sm.sm_type, sm.sm_carrier, count(*) AS shipment_count FROM catalog_sales cs JOIN ship_mode sm ON cs.cs_ship_mode_sk = sm.sm_ship_mode_sk GROUP BY sm.sm_type, sm.sm_carrier ORDER BY shipment_count DESC, sm.sm_type ASC LIMIT 5;"
   },
   {
     "id": "q29",
-    "question": "Tổng số tiền chiết khấu (extendedprice * discount) của các dòng mặt hàng?",
+    "question": "Doanh thu và lợi nhuận ròng (net profit) của các cửa hàng (store)?",
     "difficulty": "MEDIUM",
-    "category": "Business Metric",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * l_discount) AS total_discount_amount FROM lineitem;"
+    "category": "Store Analysis",
+    "tables": ["store_sales", "store"],
+    "ground_truth_sql": "SELECT s.s_store_name, s.s_state, sum(ss.ss_net_paid) AS revenue, sum(ss.ss_net_profit) AS profit FROM store_sales ss JOIN store s ON ss.ss_store_sk = s.s_store_sk GROUP BY s.s_store_name, s.s_state ORDER BY revenue DESC;"
   },
   {
     "id": "q30",
-    "question": "Số lượng đơn hàng bị trễ hạn giao (receiptdate > commitdate)?",
+    "question": "Thống kê doanh số bán hàng trên kênh web theo loại trang web (wp_type)?",
     "difficulty": "MEDIUM",
-    "category": "Date Filter",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT count(DISTINCT l_orderkey) AS delayed_orders FROM lineitem WHERE l_receiptdate > l_commitdate;"
+    "category": "Join & Group By",
+    "tables": ["web_sales", "web_page"],
+    "ground_truth_sql": "SELECT wp.wp_type, count(*) AS sales_count, sum(ws.ws_net_paid) AS total_sales FROM web_sales ws JOIN web_page wp ON ws.ws_web_page_sk = wp.wp_web_page_sk GROUP BY wp.wp_type ORDER BY total_sales DESC;"
   },
   {
     "id": "q31",
-    "question": "Giá bán lẻ trung bình của linh kiện theo từng nhà sản xuất (mfgr)?",
-    "difficulty": "MEDIUM",
-    "category": "Group By",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT p_mfgr, avg(p_retailprice) AS avg_price FROM part GROUP BY p_mfgr ORDER BY avg_price DESC;"
+    "question": "So sánh tổng doanh thu thuần giữa 3 kênh Store, Catalog và Web trong năm 2001?",
+    "difficulty": "HARD",
+    "category": "Cross-channel UNION",
+    "tables": ["store_sales", "catalog_sales", "web_sales", "date_dim"],
+    "ground_truth_sql": "SELECT 'Store' AS channel, sum(ss.ss_net_paid) AS total_revenue FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 UNION ALL SELECT 'Catalog' AS channel, sum(cs.cs_net_paid) AS total_revenue FROM catalog_sales cs JOIN date_dim d ON cs.cs_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 UNION ALL SELECT 'Web' AS channel, sum(ws.ws_net_paid) AS total_revenue FROM web_sales ws JOIN date_dim d ON ws.ws_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001;"
   },
   {
     "id": "q32",
-    "question": "Top 5 nhân viên (clerk) lập nhiều đơn hàng nhất?",
-    "difficulty": "EASY",
-    "category": "Group By & Top-N",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT o_clerk, count(*) AS orders_handled FROM orders GROUP BY o_clerk ORDER BY orders_handled DESC LIMIT 5;"
+    "question": "Tỷ lệ trả hàng (Return Rate %) trên doanh thu của kênh cửa hàng theo từng năm?",
+    "difficulty": "HARD",
+    "category": "Multi-CTE & Math",
+    "tables": ["store_sales", "store_returns", "date_dim"],
+    "ground_truth_sql": "WITH sales AS (SELECT d.d_year, sum(ss.ss_net_paid) AS sales_amt FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk GROUP BY d.d_year), returns AS (SELECT d.d_year, sum(sr.sr_return_amt) AS return_amt FROM store_returns sr JOIN date_dim d ON sr.sr_returned_date_sk = d.d_date_sk GROUP BY d.d_year) SELECT s.d_year, s.sales_amt, coalesce(r.return_amt, 0.0) AS return_amt, round(coalesce(r.return_amt, 0.0) * 100.0 / s.sales_amt, 2) AS return_pct FROM sales s LEFT JOIN returns r ON s.d_year = r.d_year ORDER BY s.d_year ASC;"
   },
   {
     "id": "q33",
-    "question": "Tổng số lượng linh kiện có sẵn (availqty) trong kho của tất cả nhà cung cấp?",
-    "difficulty": "EASY",
-    "category": "Aggregation",
-    "tables": ["partsupp"],
-    "ground_truth_sql": "SELECT sum(ps_availqty) AS total_available_stock FROM partsupp;"
+    "question": "Top 5 danh mục sản phẩm (category) có lợi nhuận ròng (net profit) cao nhất trên kênh cửa hàng trong năm 2001?",
+    "difficulty": "HARD",
+    "category": "3-way Join & Aggregation",
+    "tables": ["store_sales", "item", "date_dim"],
+    "ground_truth_sql": "SELECT i.i_category, sum(ss.ss_net_profit) AS total_profit FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 AND i.i_category IS NOT NULL GROUP BY i.i_category ORDER BY total_profit DESC LIMIT 5;"
   },
   {
     "id": "q34",
-    "question": "Top 5 nhà cung cấp có tổng giá trị hàng tồn kho (availqty * supplycost) lớn nhất?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Top-N",
-    "tables": ["supplier", "partsupp"],
-    "ground_truth_sql": "SELECT s.s_name, sum(ps.ps_availqty * ps.ps_supplycost) AS total_inventory_value FROM supplier s JOIN partsupp ps ON s.s_suppkey = ps.ps_suppkey GROUP BY s.s_name ORDER BY total_inventory_value DESC LIMIT 5;"
+    "question": "Doanh thu kênh cửa hàng của khách hàng theo trình độ học vấn (education_status) trong năm 2002?",
+    "difficulty": "HARD",
+    "category": "3-way Join & Demographics",
+    "tables": ["store_sales", "customer_demographics", "date_dim"],
+    "ground_truth_sql": "SELECT cd.cd_education_status, count(distinct ss.ss_customer_sk) AS customer_count, sum(ss.ss_net_paid) AS total_sales FROM store_sales ss JOIN customer_demographics cd ON ss.ss_cdemo_sk = cd.cd_demo_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2002 GROUP BY cd.cd_education_status ORDER BY total_sales DESC;"
   },
   {
     "id": "q35",
-    "question": "Số lượng linh kiện có kích thước (size) lớn hơn 40?",
-    "difficulty": "EASY",
-    "category": "Filter",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT count(*) AS large_parts FROM part WHERE p_size > 40;"
+    "question": "Top 10 khách hàng có tổng chi tiêu trên 10,000$ tại kênh Store nhưng chưa từng thực hiện đổi trả hàng (Store Returns)?",
+    "difficulty": "HARD",
+    "category": "NOT IN Subquery",
+    "tables": ["store_sales", "store_returns", "customer"],
+    "ground_truth_sql": "SELECT c.c_customer_id, c.c_first_name, c.c_last_name, sum(ss.ss_net_paid) AS total_bought FROM store_sales ss JOIN customer c ON ss.ss_customer_sk = c.c_customer_sk WHERE c.c_customer_sk NOT IN (SELECT distinct sr_customer_sk FROM store_returns WHERE sr_customer_sk IS NOT NULL) GROUP BY c.c_customer_id, c.c_first_name, c.c_last_name HAVING sum(ss.ss_net_paid) > 10000 ORDER BY total_bought DESC, c.c_customer_id ASC LIMIT 10;"
   },
   {
     "id": "q36",
-    "question": "Tổng doanh thu bán hàng cho khách hàng tại khu vực 'ASIA'?",
+    "question": "Doanh số bán hàng tại cửa hàng có áp dụng khuyến mãi (promotion) so với không áp dụng khuyến mãi trong năm 2001?",
     "difficulty": "HARD",
-    "category": "Multi-Join & Filter",
-    "tables": ["customer", "orders", "nation", "region"],
-    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS asia_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey WHERE r.r_name = 'ASIA';"
+    "category": "CASE WHEN & Left Join",
+    "tables": ["store_sales", "date_dim", "promotion"],
+    "ground_truth_sql": "SELECT CASE WHEN p.p_promo_sk IS NOT NULL AND p.p_channel_details IS NOT NULL THEN 'Promotional' ELSE 'Regular' END AS promo_type, count(*) AS transaction_count, sum(ss.ss_net_paid) AS total_revenue FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk LEFT JOIN promotion p ON ss.ss_promo_sk = p.p_promo_sk WHERE d.d_year = 2001 GROUP BY promo_type ORDER BY total_revenue DESC;"
   },
   {
     "id": "q37",
-    "question": "Tổng doanh thu thuần của các đơn hàng có mức ưu tiên '1-URGENT'?",
+    "question": "Top 5 bang có tổng chi tiêu của khách hàng lớn nhất tại kênh Store năm 2001?",
     "difficulty": "HARD",
-    "category": "Join & Filter",
-    "tables": ["orders", "lineitem"],
-    "ground_truth_sql": "SELECT sum(l.l_extendedprice * (1 - l.l_discount)) AS urgent_revenue FROM orders o JOIN lineitem l ON o.o_orderkey = l.l_orderkey WHERE o.o_orderpriority = '1-URGENT';"
+    "category": "3-way Join & Geo",
+    "tables": ["store_sales", "customer_address", "date_dim"],
+    "ground_truth_sql": "SELECT ca.ca_state, sum(ss.ss_net_paid) AS state_revenue FROM store_sales ss JOIN customer_address ca ON ss.ss_addr_sk = ca.ca_address_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 AND ca.ca_state IS NOT NULL GROUP BY ca.ca_state ORDER BY state_revenue DESC, ca.ca_state ASC LIMIT 5;"
   },
   {
     "id": "q38",
-    "question": "Số lượng đơn hàng theo từng năm đặt hàng?",
-    "difficulty": "MEDIUM",
-    "category": "Date & Group By",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT extract(year FROM o_orderdate) AS order_year, count(*) AS order_count FROM orders GROUP BY extract(year FROM o_orderdate) ORDER BY order_year;"
+    "question": "Phân tích doanh số theo từng khoảng giá bán lẻ (Price Bracket: Dưới 20$, 20$-50$, Trên 50$) của kênh Store?",
+    "difficulty": "HARD",
+    "category": "CASE WHEN Aggregation",
+    "tables": ["store_sales", "item"],
+    "ground_truth_sql": "SELECT CASE WHEN i.i_current_price < 20 THEN '1. Dưới $20' WHEN i.i_current_price BETWEEN 20 AND 50 THEN '2. $20 - $50' ELSE '3. Trên $50' END AS price_range, count(*) AS item_sales_count, sum(ss.ss_net_paid) AS total_revenue FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk WHERE i.i_current_price IS NOT NULL GROUP BY price_range ORDER BY price_range ASC;"
   },
   {
     "id": "q39",
-    "question": "Top 5 linh kiện có giá bán lẻ đắt nhất?",
-    "difficulty": "EASY",
-    "category": "Top-N",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT p_name, p_retailprice FROM part ORDER BY p_retailprice DESC LIMIT 5;"
+    "question": "Danh sách khách hàng đã thực hiện mua hàng trên cả 2 kênh Store và Web trong năm 2001?",
+    "difficulty": "HARD",
+    "category": "Intersect / Dual Subqueries",
+    "tables": ["customer", "store_sales", "web_sales", "date_dim"],
+    "ground_truth_sql": "SELECT c.c_customer_id, c.c_first_name, c.c_last_name FROM customer c WHERE c.c_customer_sk IN (SELECT ss.ss_customer_sk FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001) AND c.c_customer_sk IN (SELECT ws.ws_bill_customer_sk FROM web_sales ws JOIN date_dim d ON ws.ws_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001) ORDER BY c.c_customer_id ASC LIMIT 10;"
   },
   {
     "id": "q40",
-    "question": "Số lượng khách hàng ở quốc gia 'JAPAN'?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Filter",
-    "tables": ["customer", "nation"],
-    "ground_truth_sql": "SELECT count(*) AS japan_customers FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey WHERE n.n_name = 'JAPAN';"
+    "question": "So sánh tổng số tiền hoàn trả giữa 3 kênh Store Returns, Catalog Returns và Web Returns?",
+    "difficulty": "HARD",
+    "category": "Omnichannel Returns UNION",
+    "tables": ["store_returns", "catalog_returns", "web_returns"],
+    "ground_truth_sql": "SELECT 'Store Returns' AS return_channel, sum(sr_return_amt) AS total_refund FROM store_returns UNION ALL SELECT 'Catalog Returns' AS return_channel, sum(cr_return_amount) AS total_refund FROM catalog_returns UNION ALL SELECT 'Web Returns' AS return_channel, sum(wr_return_amt) AS total_refund FROM web_returns;"
   },
   {
     "id": "q41",
-    "question": "Doanh thu bán hàng trung bình trên mỗi đơn hàng theo từng phân khúc thị trường?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Aggregation",
-    "tables": ["customer", "orders"],
-    "ground_truth_sql": "SELECT c.c_mktsegment, avg(o.o_totalprice) AS avg_order_value FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_mktsegment ORDER BY avg_order_value DESC;"
+    "question": "Thống kê doanh thu và giá bán trung bình theo thương hiệu sản phẩm (i_brand) trong top 5 thương hiệu doanh thu cao nhất?",
+    "difficulty": "HARD",
+    "category": "Brand Aggregation",
+    "tables": ["store_sales", "item"],
+    "ground_truth_sql": "SELECT i.i_brand, sum(ss.ss_net_paid) AS brand_revenue, avg(ss.ss_sales_price) AS avg_sales_price FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk WHERE i.i_brand IS NOT NULL GROUP BY i.i_brand ORDER BY brand_revenue DESC, i.i_brand ASC LIMIT 5;"
   },
   {
     "id": "q42",
-    "question": "Tổng số tiền thuế (extendedprice * tax) đã thu từ các dòng đơn hàng?",
-    "difficulty": "MEDIUM",
-    "category": "Business Metric",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * l_tax) AS total_tax_amount FROM lineitem;"
+    "question": "Doanh số bán hàng kênh Catalog theo quý trong năm 2001?",
+    "difficulty": "HARD",
+    "category": "4-way Join",
+    "tables": ["catalog_sales", "date_dim", "customer", "customer_demographics"],
+    "ground_truth_sql": "SELECT d.d_year, d.d_qoy, count(*) AS sales_orders, sum(cs.cs_net_paid) AS quarterly_sales FROM catalog_sales cs JOIN date_dim d ON cs.cs_sold_date_sk = d.d_date_sk JOIN customer c ON cs.cs_bill_customer_sk = c.c_customer_sk JOIN customer_demographics cd ON c.c_current_cdemo_sk = cd.cd_demo_sk WHERE d.d_year = 2001 GROUP BY d.d_year, d.d_qoy ORDER BY d.d_year, d.d_qoy;"
   },
   {
     "id": "q43",
-    "question": "Top 5 quốc gia có số lượng nhà cung cấp nhiều nhất ở khu vực 'EUROPE'?",
-    "difficulty": "HARD",
-    "category": "Multi-Join & Top-N",
-    "tables": ["supplier", "nation", "region"],
-    "ground_truth_sql": "SELECT n.n_name, count(s.s_suppkey) AS supplier_count FROM supplier s JOIN nation n ON s.s_nationkey = n.n_nationkey JOIN region r ON n.n_regionkey = r.r_regionkey WHERE r.r_name = 'EUROPE' GROUP BY n.n_name ORDER BY supplier_count DESC LIMIT 5;"
+    "question": "Xếp hạng (DENSE_RANK) các danh mục sản phẩm theo doanh thu thuần trong từng năm (1999-2001) trên kênh Store?",
+    "difficulty": "EXTRA HARD",
+    "category": "Window Function DENSE_RANK",
+    "tables": ["store_sales", "item", "date_dim"],
+    "ground_truth_sql": "WITH cat_sales AS (SELECT d.d_year, i.i_category, sum(ss.ss_net_paid) AS total_sales FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year BETWEEN 1999 AND 2001 AND i.i_category IS NOT NULL GROUP BY d.d_year, i.i_category) SELECT d_year, i_category, total_sales, dense_rank() OVER (PARTITION BY d_year ORDER BY total_sales DESC) AS category_rank FROM cat_sales ORDER BY d_year ASC, category_rank ASC;"
   },
   {
     "id": "q44",
-    "question": "Số lượng đơn hàng có tổng giá trị lớn hơn 200,000?",
-    "difficulty": "EASY",
-    "category": "Filter",
-    "tables": ["orders"],
-    "ground_truth_sql": "SELECT count(*) AS high_value_orders FROM orders WHERE o_totalprice > 200000;"
+    "question": "Tính tốc độ tăng trưởng doanh thu (MoM Growth) theo từng tháng trong năm 2001 của kênh Store sử dụng LAG()?",
+    "difficulty": "EXTRA HARD",
+    "category": "Window Function LAG",
+    "tables": ["store_sales", "date_dim"],
+    "ground_truth_sql": "WITH monthly_sales AS (SELECT d.d_moy, sum(ss.ss_net_paid) AS monthly_rev FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_moy) SELECT d_moy, monthly_rev, lag(monthly_rev, 1) OVER (ORDER BY d_moy ASC) AS prev_month_rev, round((monthly_rev - lag(monthly_rev, 1) OVER (ORDER BY d_moy ASC)) * 100.0 / nullif(lag(monthly_rev, 1) OVER (ORDER BY d_moy ASC), 0), 2) AS growth_pct FROM monthly_sales ORDER BY d_moy ASC;"
   },
   {
     "id": "q45",
-    "question": "Tổng số lượng mặt hàng (quantity) bán ra theo từng phương thức giao hàng?",
-    "difficulty": "EASY",
-    "category": "Group By",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT l_shipmode, sum(l_quantity) AS total_qty FROM lineitem GROUP BY l_shipmode ORDER BY total_qty DESC;"
+    "question": "Top 3 mặt hàng bán chạy nhất (theo doanh thu) trong mỗi danh mục sản phẩm năm 2001 trên kênh Store?",
+    "difficulty": "EXTRA HARD",
+    "category": "ROW_NUMBER & Partition",
+    "tables": ["store_sales", "item", "date_dim"],
+    "ground_truth_sql": "WITH item_ranks AS (SELECT i.i_category, i.i_item_id, i.i_item_desc, sum(ss.ss_net_paid) AS item_revenue, row_number() OVER (PARTITION BY i.i_category ORDER BY sum(ss.ss_net_paid) DESC) AS rank_in_cat FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 AND i.i_category IS NOT NULL GROUP BY i.i_category, i.i_item_id, i.i_item_desc) SELECT i_category, i_item_id, i_item_desc, item_revenue, rank_in_cat FROM item_ranks WHERE rank_in_cat <= 3 ORDER BY i_category ASC, rank_in_cat ASC;"
   },
   {
     "id": "q46",
-    "question": "Top 5 khách hàng đặt nhiều đơn hàng nhất?",
-    "difficulty": "MEDIUM",
-    "category": "Join & Top-N",
-    "tables": ["customer", "orders"],
-    "ground_truth_sql": "SELECT c.c_name, count(o.o_orderkey) AS order_count FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey GROUP BY c.c_name ORDER BY order_count DESC LIMIT 5;"
+    "question": "Phân khúc khách hàng thành 4 nhóm tứ phân vị (NTILE 4) dựa trên tổng chi tiêu tích lũy qua kênh bán hàng tại cửa hàng?",
+    "difficulty": "EXTRA HARD",
+    "category": "Window Function NTILE",
+    "tables": ["store_sales", "customer"],
+    "ground_truth_sql": "WITH cust_totals AS (SELECT c.c_customer_id, c.c_first_name, c.c_last_name, sum(ss.ss_net_paid) AS total_spending FROM store_sales ss JOIN customer c ON ss.ss_customer_sk = c.c_customer_sk GROUP BY c.c_customer_id, c.c_first_name, c.c_last_name) SELECT c_customer_id, c_first_name, c_last_name, total_spending, ntile(4) OVER (ORDER BY total_spending DESC) AS spending_quartile FROM cust_totals ORDER BY spending_quartile ASC, total_spending DESC LIMIT 20;"
   },
   {
     "id": "q47",
-    "question": "Doanh thu thuần của các mặt hàng được giao bằng tàu (shipmode = 'SHIP')?",
-    "difficulty": "MEDIUM",
-    "category": "Filter & Aggregation",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS ship_revenue FROM lineitem WHERE l_shipmode = 'SHIP';"
+    "question": "Tìm những khách hàng có tổng giá trị đổi trả hàng (Store Returns) chiếm hơn 20% tổng chi tiêu mua hàng (Store Sales) trong cùng năm 2001?",
+    "difficulty": "EXTRA HARD",
+    "category": "Multi-CTE Return Ratio",
+    "tables": ["store_sales", "store_returns", "customer", "date_dim"],
+    "ground_truth_sql": "WITH sales AS (SELECT ss.ss_customer_sk, sum(ss.ss_net_paid) AS total_sales FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY ss.ss_customer_sk), returns AS (SELECT sr.sr_customer_sk, sum(sr.sr_return_amt) AS total_returns FROM store_returns sr JOIN date_dim d ON sr.sr_returned_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY sr.sr_customer_sk) SELECT c.c_customer_id, c.c_first_name, c.c_last_name, s.total_sales, r.total_returns, round(r.total_returns * 100.0 / s.total_sales, 2) AS return_ratio FROM sales s JOIN returns r ON s.ss_customer_sk = r.sr_customer_sk JOIN customer c ON s.ss_customer_sk = c.c_customer_sk WHERE s.total_sales > 100 AND r.total_returns * 100.0 / s.total_sales > 20.0 ORDER BY return_ratio DESC, c.c_customer_id ASC;"
   },
   {
     "id": "q48",
-    "question": "Số lượng linh kiện theo từng loại bao bì (container)?",
-    "difficulty": "EASY",
-    "category": "Group By",
-    "tables": ["part"],
-    "ground_truth_sql": "SELECT p_container, count(*) AS container_count FROM part GROUP BY p_container ORDER BY container_count DESC LIMIT 10;"
+    "question": "Tính doanh thu lũy kế cộng dồn (Cumulative Running Total) theo từng tháng năm 2001 cho kênh bán lẻ tại cửa hàng?",
+    "difficulty": "EXTRA HARD",
+    "category": "Window Function Cumulative Sum",
+    "tables": ["store_sales", "date_dim"],
+    "ground_truth_sql": "WITH monthly AS (SELECT d.d_moy, sum(ss.ss_net_paid) AS monthly_sales FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_moy) SELECT d_moy, monthly_sales, sum(monthly_sales) OVER (ORDER BY d_moy ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total_sales FROM monthly ORDER BY d_moy ASC;"
   },
   {
     "id": "q49",
-    "question": "Tổng doanh thu bán hàng của khách hàng tại quốc gia 'GERMANY'?",
-    "difficulty": "HARD",
-    "category": "Multi-Join & Filter",
-    "tables": ["customer", "orders", "nation"],
-    "ground_truth_sql": "SELECT sum(o.o_totalprice) AS germany_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN nation n ON c.c_nationkey = n.n_nationkey WHERE n.n_name = 'GERMANY';"
+    "question": "Phân tích tỷ trọng đóng góp doanh thu của từng ngành hàng vào tổng doanh thu toàn bộ hệ thống năm 2001?",
+    "difficulty": "EXTRA HARD",
+    "category": "Window Function OVER () Percentage",
+    "tables": ["store_sales", "item", "date_dim"],
+    "ground_truth_sql": "WITH cat_rev AS (SELECT i.i_category, sum(ss.ss_net_paid) AS category_revenue FROM store_sales ss JOIN item i ON ss.ss_item_sk = i.i_item_sk JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 AND i.i_category IS NOT NULL GROUP BY i.i_category) SELECT i_category, category_revenue, round(category_revenue * 100.0 / sum(category_revenue) OVER (), 2) AS revenue_share_pct FROM cat_rev ORDER BY category_revenue DESC;"
   },
   {
     "id": "q50",
-    "question": "Tổng doanh thu thuần của các đơn hàng trong quý 1 năm 1995 (tháng 1 đến tháng 3)?",
-    "difficulty": "MEDIUM",
-    "category": "Date Range & Aggregation",
-    "tables": ["lineitem"],
-    "ground_truth_sql": "SELECT sum(l_extendedprice * (1 - l_discount)) AS q1_1995_revenue FROM lineitem WHERE l_shipdate >= DATE '1995-01-01' AND l_shipdate <= DATE '1995-03-31';"
+    "question": "Ma trận so sánh tổng hợp doanh thu, số giao dịch và lợi nhuận ròng giữa 3 kênh Store, Catalog và Web theo từng quý năm 2001?",
+    "difficulty": "EXTRA HARD",
+    "category": "Omnichannel Quarterly Matrix",
+    "tables": ["store_sales", "catalog_sales", "web_sales", "date_dim"],
+    "ground_truth_sql": "WITH store_q AS (SELECT d.d_qoy, sum(ss.ss_net_paid) AS store_rev, count(*) AS store_tx, sum(ss.ss_net_profit) AS store_profit FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_qoy), cat_q AS (SELECT d.d_qoy, sum(cs.cs_net_paid) AS cat_rev, count(*) AS cat_tx, sum(cs.cs_net_profit) AS cat_profit FROM catalog_sales cs JOIN date_dim d ON cs.cs_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_qoy), web_q AS (SELECT d.d_qoy, sum(ws.ws_net_paid) AS web_rev, count(*) AS web_tx, sum(ws.ws_net_profit) AS web_profit FROM web_sales ws JOIN date_dim d ON ws.ws_sold_date_sk = d.d_date_sk WHERE d.d_year = 2001 GROUP BY d.d_qoy) SELECT s.d_qoy, s.store_rev, c.cat_rev, w.web_rev, (s.store_rev + c.cat_rev + w.web_rev) AS total_omnichannel_rev, (s.store_profit + c.cat_profit + w.web_profit) AS total_omnichannel_profit FROM store_q s JOIN cat_q c ON s.d_qoy = c.d_qoy JOIN web_q w ON s.d_qoy = w.d_qoy ORDER BY s.d_qoy ASC;"
   }
 ]

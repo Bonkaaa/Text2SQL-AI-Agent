@@ -198,7 +198,7 @@ async def run_benchmark(
     dataset_path: str,
     limit: int | None = None,
     output_path: str | None = None,
-    db_path: str = "data/tpch.duckdb",
+    db_path: str = "data/tpcds.duckdb",
     mock: bool = False,
 ) -> BenchmarkSummary:
     """Chạy toàn bộ quy trình benchmark trên tập dataset."""
@@ -306,8 +306,8 @@ def main() -> None:
     parser.add_argument(
         "--db-path",
         type=str,
-        default="data/tpch.duckdb",
-        help="Đường dẫn file DuckDB database",
+        default="data/tpcds.duckdb",
+        help="Đường dẫn file DuckDB database (mặc định: data/tpcds.duckdb)",
     )
     parser.add_argument(
         "--mock",
