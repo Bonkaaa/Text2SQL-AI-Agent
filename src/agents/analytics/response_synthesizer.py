@@ -81,14 +81,34 @@ class ResponseSynthesizer:
         hydrated_items: list[ArtifactItem] = []
 
         for spec in specs:
-            source = task_map.get(spec.target_task_id, default_artifact)
+            # P1 Fix: Không âm thầm fallback sang default_artifact nếu spec yêu cầu một task_id cụ thể
+            if spec.target_task_id:
+                source = task_map.get(spec.target_task_id)
+                if source is None:
+                    logger.warning(
+                        "Bỏ qua ArtifactSpec: task '%s' không tồn tại trong danh sách task thành công.",
+                        spec.target_task_id,
+                    )
+                    continue
+            else:
+                source = default_artifact
+
             if source is None or not source.data:
                 continue
 
+            # P2 Fix: Bộ phân giải tên cột không phân biệt chữ hoa/thường (Case-insensitive column lookup)
+            cols = source.columns or (
+                list(source.data[0].keys()) if source.data else []
+            )
+            col_lookup = {c.lower(): c for c in cols}
+
             if spec.artifact_type == "kpi":
-                # Trích xuất giá trị chỉ số từ dòng đầu tiên
                 first_row = source.data[0]
-                metric_col = spec.kpi_metric_column
+                metric_col = (
+                    col_lookup.get(spec.kpi_metric_column.lower())
+                    if spec.kpi_metric_column
+                    else None
+                )
                 val: Any = None
 
                 if metric_col and metric_col in first_row:
@@ -112,33 +132,47 @@ class ResponseSynthesizer:
                     )
 
             elif spec.artifact_type == "chart":
-                cols = source.columns or list(source.data[0].keys())
-                x_key = spec.x_axis_column or (cols[0] if cols else "x")
-                y_keys = spec.y_axis_columns or (
-                    [cols[1]] if len(cols) > 1 else [cols[0]]
-                )
+                # Phân giải x_key và y_keys qua col_lookup
+                x_key = (
+                    col_lookup.get(spec.x_axis_column.lower())
+                    if spec.x_axis_column
+                    else None
+                ) or (cols[0] if cols else "x")
+
+                resolved_y: list[str] = []
+                if spec.y_axis_columns:
+                    for y in spec.y_axis_columns:
+                        matched = col_lookup.get(y.lower())
+                        if matched and matched not in resolved_y:
+                            resolved_y.append(matched)
+
+                if not resolved_y:
+                    resolved_y = [cols[1]] if len(cols) > 1 else [cols[0]]
 
                 hydrated_items.append(
                     ChartArtifact(
                         chart_type=spec.chart_type or "bar",
                         title=spec.chart_title or "Biểu đồ phân tích số liệu",
                         x_key=x_key,
-                        y_keys=y_keys,
+                        y_keys=resolved_y,
                         series_labels=spec.series_labels or {},
                         data=source.data,
                     )
                 )
 
             elif spec.artifact_type == "table":
-                cols = (
-                    spec.display_columns
-                    or source.columns
-                    or list(source.data[0].keys())
-                )
+                resolved_cols: list[str] = []
+                if spec.display_columns:
+                    for c in spec.display_columns:
+                        matched = col_lookup.get(c.lower(), c)
+                        if matched not in resolved_cols:
+                            resolved_cols.append(matched)
+                display_cols = resolved_cols or cols
+
                 hydrated_items.append(
                     TableArtifact(
                         title=spec.table_title or "Bảng dữ liệu chi tiết",
-                        columns=cols,
+                        columns=display_cols,
                         rows=source.data,
                         total_row_count=len(source.data),
                     )

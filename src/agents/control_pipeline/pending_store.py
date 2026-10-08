@@ -261,6 +261,20 @@ class SQLitePendingApprovalStore:
                     None,
                 )
 
+            # Nếu là anonymous session của cùng user mà thiếu token (ví dụ client reload hoặc dev mode),
+            # cho phép khôi phục và cấp phát lại stored_token cho client
+            if (
+                owner_user_id == user_id
+                and bool(row["is_anonymous"])
+                and not session_token
+            ):
+                conn.execute(
+                    "UPDATE session_ownership SET last_accessed_at = ? WHERE session_id = ?",
+                    (now, session_id),
+                )
+                conn.commit()
+                return True, "", stored_token
+
             # Đúng user_id nhưng thiếu hoặc sai session_token
             return (
                 False,

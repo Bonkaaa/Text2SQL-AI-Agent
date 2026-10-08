@@ -297,3 +297,83 @@ async def test_synthesize_llm_failure_fallback(mock_successful_artifact):
     assert len(result.artifacts) >= 1
     assert isinstance(result.artifacts[0], TableArtifact)
     assert result.artifacts[0].rows == mock_successful_artifact.data
+
+
+@pytest.mark.asyncio
+async def test_synthesize_target_task_id_mismatch_no_silent_fallback(
+    mock_successful_artifact,
+):
+    """Kiểm tra P1 Fix: Nếu spec yêu cầu target_task_id không tồn tại, không được âm thầm gán sang task khác."""
+    decision = SynthesisDecision(
+        direct_answer="Báo cáo phân tích",
+        detailed_insight=[],
+        selected_artifacts=[
+            ArtifactSpec(
+                artifact_type="chart",
+                target_task_id="task_non_existent",  # Task không tồn tại
+                chart_type="bar",
+                chart_title="Biểu đồ task không tồn tại",
+                x_axis_column="l_shipmode",
+                y_axis_columns=["revenue"],
+            )
+        ],
+    )
+    mock_llm = MagicMock()
+    mock_structured = MagicMock()
+    mock_structured.ainvoke = AsyncMock(return_value=decision)
+    mock_llm.with_structured_output.return_value = mock_structured
+
+    synthesizer = ResponseSynthesizer(model=mock_llm)
+    result = await synthesizer.synthesize(
+        question="Test task mismatch",
+        artifacts=[mock_successful_artifact],
+        session_id="session_mismatch",
+    )
+
+    # Không được có Chart nào bị gán nhầm dữ liệu của task_1
+    chart_artifacts = [a for a in result.artifacts if isinstance(a, ChartArtifact)]
+    assert len(chart_artifacts) == 0
+
+
+@pytest.mark.asyncio
+async def test_synthesize_column_case_insensitivity(mock_successful_artifact):
+    """Kiểm tra P2 Fix: Tự động resolve cột không phân biệt chữ hoa/thường (L_SHIPMODE -> l_shipmode)."""
+    decision = SynthesisDecision(
+        direct_answer="Báo cáo phân tích doanh thu",
+        detailed_insight=[],
+        selected_artifacts=[
+            ArtifactSpec(
+                artifact_type="chart",
+                target_task_id="task_1",
+                chart_type="bar",
+                chart_title="Doanh thu theo hình thức vận chuyển",
+                x_axis_column="L_SHIPMODE",  # In hoa
+                y_axis_columns=["REVENUE"],  # In hoa
+            ),
+            ArtifactSpec(
+                artifact_type="kpi",
+                target_task_id="task_1",
+                kpi_title="Doanh thu đầu tiên",
+                kpi_metric_column="REVENUE",  # In hoa
+            ),
+        ],
+    )
+    mock_llm = MagicMock()
+    mock_structured = MagicMock()
+    mock_structured.ainvoke = AsyncMock(return_value=decision)
+    mock_llm.with_structured_output.return_value = mock_structured
+
+    synthesizer = ResponseSynthesizer(model=mock_llm)
+    result = await synthesizer.synthesize(
+        question="Test case-insensitive columns",
+        artifacts=[mock_successful_artifact],
+        session_id="session_case_insensitivity",
+    )
+
+    chart = next(a for a in result.artifacts if isinstance(a, ChartArtifact))
+    kpi = next(a for a in result.artifacts if isinstance(a, KpiArtifact))
+
+    # Đảm bảo đã resolve về đúng tên cột thực tế trong data (chữ thường)
+    assert chart.x_key == "l_shipmode"
+    assert chart.y_keys == ["revenue"]
+    assert kpi.value == 120500.0

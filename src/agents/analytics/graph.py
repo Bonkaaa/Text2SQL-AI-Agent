@@ -28,6 +28,7 @@ from src.agents.analytics.nodes import (
 )
 from src.models.rbac import UserContext, UserRole
 from src.models.state import AnalyticsState
+from src.utils.session_context import get_current_session_id, save_session_analytics
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,9 @@ def create_analytics_subagent_runnable(
             question = state.get("description", "")
 
         user_context = state.get("user_context")
-        session_id = state.get("session_id", "default_session")
+        session_id = (
+            state.get("session_id") or get_current_session_id() or "default_session"
+        )
 
         if not user_context:
             user_context = UserContext(
@@ -178,12 +181,14 @@ def create_analytics_subagent_runnable(
                 elif isinstance(item, dict):
                     output_artifacts_dump.append(item)
 
-        return {
-            **state,
-            "messages": [AIMessage(content=summary)],
-            "response_package": response_package.model_dump()
+        pkg_dump = (
+            response_package.model_dump()
             if response_package and hasattr(response_package, "model_dump")
-            else response_package,
+            else response_package
+        )
+
+        analytics_payload = {
+            "response_package": pkg_dump,
             "output_artifacts": output_artifacts_dump,
             "artifacts": artifacts,
             "plan": output.get("plan"),
@@ -193,6 +198,13 @@ def create_analytics_subagent_runnable(
             "data": primary_data,
             "columns": primary_columns,
             "status": output.get("status", "COMPLETED"),
+        }
+        save_session_analytics(session_id, analytics_payload)
+
+        return {
+            **state,
+            "messages": [AIMessage(content=summary)],
+            **analytics_payload,
         }
 
     def _sync_runner(state: dict[str, Any]) -> dict[str, Any]:

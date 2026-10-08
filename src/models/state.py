@@ -1,6 +1,6 @@
 from typing import Any, Literal, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src.models.artifacts import (
     AnalysisPlan,
@@ -163,7 +163,11 @@ class RechartsConfig(BaseModel):
 
 
 class SynthesizerResult(BaseModel):
-    """Kết quả phân tích dữ liệu, diễn giải insight và cấu hình biểu đồ từ Response Synthesizer Subagent."""
+    """Kết quả phân tích dữ liệu, diễn giải insight và cấu hình biểu đồ từ Response Synthesizer Subagent.
+
+    .. deprecated:: Architecture v4.0 (Phase 3)
+        Khuyến nghị sử dụng Composable ResponsePackage thay thế.
+    """
 
     chart_type: Literal["bar", "line", "pie", "area", "table"] = Field(
         default="table",
@@ -180,6 +184,16 @@ class SynthesizerResult(BaseModel):
         default_factory=dict,
         description="Các giá trị tổng hợp định lượng cốt lõi (ví dụ: total_revenue, top_segment, max_value, count)",
     )
+
+    @model_validator(mode="after")
+    def sync_chart_type(self) -> "SynthesizerResult":
+        """Đồng bộ chart_type vào recharts_config nhằm triệt tiêu mâu thuẫn hai thuộc tính."""
+        if (
+            isinstance(self.recharts_config, dict)
+            and "chart_type" not in self.recharts_config
+        ):
+            self.recharts_config["chart_type"] = self.chart_type
+        return self
 
 
 class ControlPipelineInput(TypedDict, total=False):

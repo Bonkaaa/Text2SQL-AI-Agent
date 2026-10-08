@@ -75,6 +75,10 @@ from src.models.artifacts import PreflightDecision, PreflightDecisionType
 from src.models.rbac import UserContext, UserRole
 from src.models.state import ClarificationResult
 from src.services import get_chat_model
+from src.utils.session_context import (
+    get_session_analytics,
+    set_current_session_id,
+)
 from src.utils.session_tracer import SessionTracer
 
 logger = logging.getLogger(__name__)
@@ -441,6 +445,7 @@ def run_supervisor(
     active_session_id = session_id or active_user_context.session_id
     active_thread_id = thread_id or active_session_id
     active_tracer = tracer or SessionTracer(session_id=active_session_id)
+    set_current_session_id(active_session_id)
 
     logger.info(
         f"Khởi chạy Deep Agent Supervisor cho session: {active_session_id}, user: {active_user_context.user_id}"
@@ -650,6 +655,7 @@ def run_supervisor(
             }
 
         active_tracer.log_summary(status="COMPLETED", question=question)
+        analytics_res = get_session_analytics(active_session_id) or {}
 
         return {
             "status": "COMPLETED",
@@ -660,14 +666,18 @@ def run_supervisor(
             "final_answer": final_answer,
             "files": files,
             "tracer": active_tracer,
-            "response_package": output_state.get("response_package"),
-            "output_artifacts": output_state.get("output_artifacts"),
-            "artifacts": output_state.get("artifacts"),
-            "plan": output_state.get("plan"),
-            "sql": output_state.get("sql"),
-            "data": output_state.get("data"),
-            "columns": output_state.get("columns"),
-            "visualization": output_state.get("visualization"),
+            "response_package": output_state.get("response_package")
+            or analytics_res.get("response_package"),
+            "output_artifacts": output_state.get("output_artifacts")
+            or analytics_res.get("output_artifacts"),
+            "artifacts": output_state.get("artifacts")
+            or analytics_res.get("artifacts"),
+            "plan": output_state.get("plan") or analytics_res.get("plan"),
+            "sql": output_state.get("sql") or analytics_res.get("sql"),
+            "data": output_state.get("data") or analytics_res.get("data"),
+            "columns": output_state.get("columns") or analytics_res.get("columns"),
+            "visualization": output_state.get("visualization")
+            or analytics_res.get("visualization"),
         }
 
     except Exception as exc:
@@ -713,6 +723,7 @@ async def arun_supervisor(
     active_session_id = session_id or active_user_context.session_id
     active_thread_id = thread_id or active_session_id
     active_tracer = tracer or SessionTracer(session_id=active_session_id)
+    set_current_session_id(active_session_id)
 
     logger.info(
         f"[Async] Khởi chạy Deep Agent Supervisor cho session: {active_session_id}"
@@ -922,6 +933,7 @@ async def arun_supervisor(
             }
 
         active_tracer.log_summary(status="COMPLETED", question=question)
+        analytics_res = get_session_analytics(active_session_id) or {}
 
         return {
             "status": "COMPLETED",
@@ -932,14 +944,18 @@ async def arun_supervisor(
             "final_answer": final_answer,
             "files": files,
             "tracer": active_tracer,
-            "response_package": output_state.get("response_package"),
-            "output_artifacts": output_state.get("output_artifacts"),
-            "artifacts": output_state.get("artifacts"),
-            "plan": output_state.get("plan"),
-            "sql": output_state.get("sql"),
-            "data": output_state.get("data"),
-            "columns": output_state.get("columns"),
-            "visualization": output_state.get("visualization"),
+            "response_package": output_state.get("response_package")
+            or analytics_res.get("response_package"),
+            "output_artifacts": output_state.get("output_artifacts")
+            or analytics_res.get("output_artifacts"),
+            "artifacts": output_state.get("artifacts")
+            or analytics_res.get("artifacts"),
+            "plan": output_state.get("plan") or analytics_res.get("plan"),
+            "sql": output_state.get("sql") or analytics_res.get("sql"),
+            "data": output_state.get("data") or analytics_res.get("data"),
+            "columns": output_state.get("columns") or analytics_res.get("columns"),
+            "visualization": output_state.get("visualization")
+            or analytics_res.get("visualization"),
         }
 
     except Exception as exc:

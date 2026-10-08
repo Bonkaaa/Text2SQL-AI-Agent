@@ -84,7 +84,7 @@ def test_create_text2sql_supervisor_graph_structure(fake_llm):
     agent = create_text2sql_supervisor(
         model=fake_llm,
         subagents=subagents,
-        skills=["skills/tpch-analytics", "skills/duckdb-sql"],
+        skills=["skills/analytics-orchestrator", "skills/tpcds-analytics"],
         memory=["AGENTS.md"],
     )
 

@@ -203,7 +203,18 @@ def execute_test(
     elif status == "ERROR":
         print(f"\n[-] THẤT BẠI: {result.get('error')}")
 
-    # 4. Lưu toàn bộ Output của Agent ra file JSON
+    # 4. Lưu toàn bộ Output của Agent ra file JSON theo chuẩn QueryResponse Schema
+    from src.utils.response_assembler import assemble_query_response
+
+    query_response = assemble_query_response(
+        result=result,
+        question=question,
+        session_id=user_context.session_id,
+        elapsed_ms=elapsed * 1000,
+        user_context=user_context,
+    )
+    qr_dict = query_response.model_dump(mode="json")
+
     serialized_messages = []
     for msg in result.get("messages", []):
         msg_type = getattr(msg, "type", type(msg).__name__)
@@ -221,17 +232,13 @@ def execute_test(
         serialized_messages.append(entry)
 
     final_payload = {
-        "session_id": user_context.session_id,
+        **qr_dict,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "question": question,
         "user_role": user_role.value,
         "provider": active_provider,
         "tier1_model": settings.tier1_model,
         "tier2_model": settings.tier2_model,
-        "status": status,
         "execution_time_seconds": elapsed,
-        "final_answer": extract_message_text(result.get("final_answer")),
-        "is_ambiguous": result.get("is_ambiguous", False),
         "clarification": {
             "question": result.get("clarification_question"),
             "options": result.get("suggested_options", []),
@@ -240,13 +247,15 @@ def execute_test(
         if status == "CLARIFICATION_REQUIRED"
         else None,
         "files": result.get("files", {}),
-        "error": result.get("error"),
         "messages": serialized_messages,
     }
 
     tracer = result.get("tracer")
     trace_dir = tracer.get_trace_dir() if tracer else None
     if tracer:
+        # Lưu file trace chuẩn Output Schema (100% khớp với API Response)
+        tracer.log_artifact("query_response.json", qr_dict)
+        # Lưu file trace tổng quan gồm cả telemetry & chuỗi suy luận messages
         tracer.log_artifact("final_agent_output.json", final_payload)
 
     dest_path = (
@@ -266,6 +275,7 @@ def execute_test(
     print("\n" + "=" * 70)
     if trace_dir:
         print(f"[*] Thư mục traces phiên    : {trace_dir}")
+        print(f"[*] File QueryResponse trace : {trace_dir / 'query_response.json'}")
         print(f"[*] File JSON trace phiên   : {trace_dir / 'final_agent_output.json'}")
     print(f"[*] File JSON output mới nhất: {dest_path.resolve()}")
     print("=" * 70 + "\n")
