@@ -52,7 +52,15 @@ class AskQueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    """Schema phản hồi kết quả truy vấn phân tích (Kiến trúc v4.0 Evolution)."""
+    """Schema phản hồi kết quả truy vấn phân tích (Kiến trúc v4.0 Evolution).
+
+    Cấu trúc phân lớp:
+    1. Single Source of Truth cho Frontend UI: `response_package` (chứa artifacts KPI, Chart, Table, Callout cùng insight).
+    2. Legacy Flat Compatibility: `sql`, `data`, `columns`, `recharts_config`, `output_artifacts` (phục vụ client cũ & CLI).
+    3. Pre-Flight Governance: `is_safe`, `safety_category`, `refusal_reason`, `is_ambiguous`, `clarification_question`.
+    4. Execution Provenance: `tasks`, `artifacts`, `metadata`.
+    5. Runtime Controls: `requires_hitl`, `estimated_cost_bytes`, `execution_time_ms`, `error`.
+    """
 
     session_id: str = Field(description="Mã phiên làm việc")
     status: Literal[
@@ -66,26 +74,56 @@ class QueryResponse(BaseModel):
     question: str = Field(description="Câu hỏi gốc của người dùng")
     final_answer: str | None = Field(
         default=None,
-        description="Câu trả lời tóm tắt cuối cùng từ Agent",
+        description="Câu trả lời tóm tắt trực diện cho người dùng (Direct Answer)",
+    )
+
+    # ==========================================================================
+    # Presentation & UI Layer (Single Source of Truth v4.0)
+    # ==========================================================================
+    response_package: dict[str, Any] | None = Field(
+        default=None,
+        description="Gói phản hồi đa chiều hoàn chỉnh (Single Source of Truth cho Frontend Component Registry)",
+    )
+
+    # ==========================================================================
+    # Legacy Flat Compatibility Layer (Phục vụ client v1-v3, CLI & Fallback)
+    # ==========================================================================
+    output_artifacts: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="[Legacy Compat] Danh sách ArtifactItem trích xuất từ response_package.artifacts",
     )
     sql: str | None = Field(
         default=None,
-        description="Câu lệnh SELECT SQL đã được sinh và kiểm duyệt",
+        description="[Legacy Compat] Câu lệnh SELECT SQL chính đã được sinh và kiểm duyệt",
     )
     data: list[dict[str, Any]] | None = Field(
         default=None,
-        description="Dữ liệu kết quả truy vấn trả về từ Data Warehouse",
+        description="[Legacy Compat] Dữ liệu kết quả truy vấn chính từ Data Warehouse",
     )
     columns: list[str] | None = Field(
         default=None,
-        description="Danh sách tên các cột dữ liệu trả về",
+        description="[Legacy Compat] Danh sách tên các cột dữ liệu chính trả về",
     )
     recharts_config: dict[str, Any] | None = Field(
         default=None,
-        description="Cấu hình biểu đồ Recharts JSON để vẽ chart ở frontend",
+        description="[Legacy Compat] Cấu hình Recharts JSON của biểu đồ chính",
+    )
+    insight: dict[str, Any] | str | None = Field(
+        default=None,
+        description="[Legacy Compat] Tóm tắt insight phân tích kinh doanh",
+    )
+    visualization: dict[str, Any] | None = Field(
+        default=None,
+        description="[Legacy Compat] Cấu hình trực quan hóa chính",
+    )
+    artifact_bundle: ArtifactBundle | None = Field(
+        default=None,
+        description="[Legacy Compat] Gói kết quả tương thích ngược",
     )
 
-    # Pre-Flight Security & Clarification Fields (v4 - Phase 2.5)
+    # ==========================================================================
+    # Pre-Flight Security & Clarification Layer (v4 - Phase 2.5)
+    # ==========================================================================
     is_safe: bool = Field(
         default=True,
         description="Đánh dấu câu hỏi an toàn (True) hay vi phạm an ninh/ngoài miền (False)",
@@ -111,7 +149,9 @@ class QueryResponse(BaseModel):
         description="Danh sách các phương án gợi ý A, B, C khi câu hỏi mơ hồ",
     )
 
-    # Analytics & Multi-Query Fields (v4 - Phase 2 & 3)
+    # ==========================================================================
+    # Analytics & Execution Provenance Layer
+    # ==========================================================================
     intent: Literal["CONVERSATION", "ANALYTICS"] | None = Field(
         default=None,
         description="Phân luồng ý định người dùng (CONVERSATION / METADATA vs ANALYTICS)",
@@ -124,32 +164,14 @@ class QueryResponse(BaseModel):
         default=None,
         description="Danh sách bằng chứng truy vấn đã thực thi (QueryArtifacts)",
     )
-    response_package: dict[str, Any] | None = Field(
-        default=None,
-        description="Gói phản hồi đa chiều hoàn chỉnh (ResponsePackage Phase 3)",
-    )
-    output_artifacts: list[dict[str, Any]] | None = Field(
-        default=None,
-        description="Danh sách các ArtifactItem (KPI, Chart, Table, Callout) cho Frontend Component Registry",
-    )
-    insight: dict[str, Any] | str | None = Field(
-        default=None,
-        description="Tóm tắt insight phân tích kinh doanh",
-    )
-    visualization: dict[str, Any] | None = Field(
-        default=None,
-        description="Cấu hình trực quan hóa chính (Primary chart)",
-    )
     metadata: dict[str, Any] | None = Field(
         default=None,
         description="Thông tin metadata thực thi (query_count, execution_time_ms,...)",
     )
-    artifact_bundle: ArtifactBundle | None = Field(
-        default=None,
-        description="Gói kết quả tương thích ngược",
-    )
 
-    # Runtime & Governance Fields
+    # ==========================================================================
+    # Runtime & Governance Controls
+    # ==========================================================================
     requires_hitl: bool = Field(
         default=False,
         description="Đánh dấu câu truy vấn có đang dừng chờ phê duyệt HITL hay không",
