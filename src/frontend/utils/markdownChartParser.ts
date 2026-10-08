@@ -10,6 +10,32 @@ export interface ExtractedChartData {
 }
 
 /**
+ * Phân tích và chuyển đổi chuỗi số học thông minh,
+ * hỗ trợ các ký hiệu tiền tệ ($ € £ ₫ USD VND), số phân cách dấu phẩy,
+ * và loại bỏ các chú thích phụ trong ngoặc đơn (vd: 89,806.08 (Lưu ý...)).
+ */
+export function parseNumericValue(valStr: string): number | null {
+  if (!valStr || typeof valStr !== "string") return null;
+  const trimmed = valStr.trim();
+  if (!trimmed) return null;
+
+  // Khớp số có dấu phẩy phân cách hàng nghìn và phần thập phân, có thể có ký hiệu tiền tệ phía trước
+  // Ví dụ: "$7,820,490.52", "89,806.08 (Lưu ý:...)", "14,383,665.02 VND", "123.45"
+  const match = trimmed.match(
+    /^[\$€£₫\s]*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)/i
+  );
+  if (match) {
+    const rawNum = match[1].replace(/,/g, "");
+    const parsed = Number(rawNum);
+    // Tránh nhận nhầm các mã định danh có số 0 ở đầu (vd: "000123") ngoại trừ số 0 đơn thuần hoặc số thập phân "0.xx"
+    if (!isNaN(parsed) && (!/^0\d+/.test(rawNum) || rawNum === "0")) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+/**
  * Trích xuất bảng Markdown (Markdown Table) thành danh sách các objects và tên cột.
  */
 export function parseMarkdownTable(text: string): {
@@ -81,13 +107,9 @@ export function parseMarkdownTable(text: string): {
       // Loại bỏ định dạng markdown trong ô dữ liệu như **in đậm** hoặc `code`
       const cleanCell = cell.replace(/[`*]/g, "").trim();
 
-      // Thử parse thành số thực nếu hợp lệ (loại bỏ dấu phẩy phân cách hàng nghìn)
-      const numericCandidate = cleanCell.replace(/,/g, "");
-      const parsedNum = Number(numericCandidate);
-      const isNum =
-        !isNaN(parsedNum) &&
-        numericCandidate !== "" &&
-        !/^0\d+/.test(numericCandidate);
+      // Thử parse thành số thực thông minh
+      const parsedNum = parseNumericValue(cleanCell);
+      const isNum = parsedNum !== null;
 
       const val = isNum ? parsedNum : cleanCell;
       const key = headerKeys[idx] || `col_${idx}`;
@@ -284,6 +306,140 @@ export function alignDataWithConfig(
 }
 
 /**
+ * Tự động suy luận cấu hình Recharts (RechartsConfig) từ dữ liệu bảng
+ * khi LLM không sinh ra khối JSON nhưng có dữ liệu bảng số liệu phân tích.
+ */
+export function inferRechartsConfig(
+  data: Record<string, any>[],
+  columns: string[],
+  title?: string
+): RechartsConfig | null {
+  if (!data || data.length === 0 || !columns || columns.length < 2) {
+    return null;
+  }
+
+  const sample = data[0];
+  const keys = Object.keys(sample);
+
+  // 1. Xác định cột phân loại / trục hoành (X-Axis)
+  // Ưu tiên cột thời gian, danh mục, tên: year, date, month, channel, category, name, brand...
+  const categoryKeywords = [
+    "year",
+    "d_year",
+    "năm",
+    "month",
+    "d_moy",
+    "tháng",
+    "channel",
+    "kênh",
+    "category",
+    "danh mục",
+    "item",
+    "mặt hàng",
+    "name",
+    "tên",
+    "c_name",
+    "brand",
+    "thương hiệu",
+    "state",
+    "bang",
+    "tỉnh",
+  ];
+
+  let xKey = keys.find((k) =>
+    categoryKeywords.some((kw) => k.toLowerCase().includes(kw))
+  );
+
+  // Nếu không thấy, lấy cột đầu tiên có kiểu string
+  if (!xKey) {
+    xKey = keys.find((k) => typeof sample[k] === "string");
+  }
+
+  // Nếu tất cả đều là số, lấy cột đầu tiên
+  if (!xKey) {
+    xKey = keys[0];
+  }
+
+  // 2. Xác định các cột số liệu đo lường / trục tung (Y-Axis)
+  // Loại bỏ các cột id, sk, mã
+  const isIdCol = (k: string) =>
+    /(_sk|_id|_key|stt|mã|^id$|^key$)/i.test(k);
+
+  const numericKeys = keys.filter(
+    (k) => k !== xKey && typeof sample[k] === "number" && !isIdCol(k)
+  );
+
+  // Nếu không có cột số phi-id nào, lấy các cột số bất kỳ khác xKey
+  const finalYKeys =
+    numericKeys.length > 0
+      ? numericKeys
+      : keys.filter((k) => k !== xKey && typeof sample[k] === "number");
+
+  if (finalYKeys.length === 0) {
+    return null;
+  }
+
+  // Giới hạn tối đa 3 chuỗi số liệu để biểu đồ không bị rối
+  const selectedYKeys = finalYKeys.slice(0, 3);
+
+  // Tạo series_labels thân thiện
+  const seriesLabels: Record<string, string> = {};
+  selectedYKeys.forEach((k) => {
+    // Viết hoa chữ cái đầu hoặc giữ nguyên
+    seriesLabels[k] = k
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  });
+
+  return {
+    chart_type: "bar",
+    title: title || "Biểu đồ trực quan hóa số liệu",
+    x_key: xKey,
+    x_axis: xKey,
+    y_keys: selectedYKeys,
+    y_axis: selectedYKeys,
+    series_labels: seriesLabels,
+    legend: selectedYKeys.length > 1,
+  };
+}
+
+/**
+ * Làm sạch văn bản Markdown, loại bỏ các khối Text Chart ASCII thô sơ
+ * (biểu đồ text thô vẽ bằng dấu gạch ngang, ký tự [████], ASCII pipes...)
+ * để giao diện chỉ giữ lại nhận định kinh doanh và nhường việc vẽ đồ thị cho Recharts.
+ */
+export function cleanInsightMarkdown(text: string): string {
+  if (!text || typeof text !== "string") return "";
+
+  let cleaned = text;
+
+  // 1. Loại bỏ các heading kèm khối text chart
+  // Ví dụ:
+  // ### 📊 Biểu đồ dạng cột (Text Chart)
+  // Năm | Doanh thu ($)
+  // ----+----------------------
+  // 2001 | [████████████] $7.8M
+  const headingWithAsciiPattern =
+    /(?:#{1,4}\s*(?:[^\n]*(?:Text Chart|Biểu đồ dạng cột|Biểu đồ cột|ASCII Chart|Biểu đồ minh họa)[^\n]*)\n+)(?:[^\n]*\n*)*?(?=(?:\n#{1,4}\s|\n---|\n\*\*|\Z))/gi;
+  cleaned = cleaned.replace(headingWithAsciiPattern, "");
+
+  // 2. Loại bỏ khối codeblock chứa text chart
+  const codeBlockAsciiPattern =
+    /```(?:text|ascii)?\s*\n[\s\S]*?(?:\[[█■#=*]+\]|----+[\-+]+)[\s\S]*?```/gi;
+  cleaned = cleaned.replace(codeBlockAsciiPattern, "");
+
+  // 3. Loại bỏ các đoạn text chart trần không có heading
+  const rawAsciiTablePattern =
+    /(?:\n|^)[^\n]+(?:\||\+)[^\n]+\n(?:[-+:| ]{4,}\n)(?:[^\n]*(?:\[[█■#=*]+\]|[█■]{2,})[^\n]*\n*)+/gi;
+  cleaned = cleaned.replace(rawAsciiTablePattern, "\n");
+
+  // Thu gọn các dòng trống liên tiếp
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+
+  return cleaned;
+}
+
+/**
  * Trích xuất toàn diện cả cấu hình biểu đồ và dữ liệu bảng từ Markdown Text.
  */
 export function extractChartAndDataFromMarkdown(markdownText: string): ExtractedChartData {
@@ -313,7 +469,12 @@ export function extractChartAndDataFromMarkdown(markdownText: string): Extracted
   // 2. Tìm bảng Markdown
   const { data, columns } = parseMarkdownTable(markdownText);
 
-  // 3. Nếu có cả config và data, căn chỉnh cho khớp
+  // 3. Nếu chưa có config từ JSON block nhưng có bảng số liệu, tự động suy luận RechartsConfig
+  if (!extractedConfig && data.length > 0) {
+    extractedConfig = inferRechartsConfig(data, columns);
+  }
+
+  // 4. Nếu có cả config và data, căn chỉnh cho khớp
   let alignedData = data;
   if (extractedConfig && data.length > 0) {
     alignedData = alignDataWithConfig(data, extractedConfig);
@@ -325,3 +486,4 @@ export function extractChartAndDataFromMarkdown(markdownText: string): Extracted
     columns,
   };
 }
+

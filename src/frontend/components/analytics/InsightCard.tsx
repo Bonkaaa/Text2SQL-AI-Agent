@@ -16,6 +16,8 @@ import { RechartsConfig } from "@/types/api";
 import { formatDurationSeconds } from "@/utils/formatters";
 import {
   alignDataWithConfig,
+  cleanInsightMarkdown,
+  extractChartAndDataFromMarkdown,
   extractRechartsConfig,
   parseMarkdownTable,
 } from "@/utils/markdownChartParser";
@@ -34,7 +36,7 @@ export interface InsightCardProps {
 export function InsightCard({
   insightText,
   title = "Nhận định kinh doanh",
-  subtitle = "Tổng hợp từ dữ liệu TPC-H",
+  subtitle = "Tổng hợp từ dữ liệu TPC-DS",
   executionTimeMs,
   data: externalData,
   className = "",
@@ -56,13 +58,34 @@ export function InsightCard({
     }
   };
 
+  // Làm sạch các đoạn ASCII Text Chart thô sơ từ LLM
+  const cleanedInsightText = useMemo(() => {
+    return cleanInsightMarkdown(insightText);
+  }, [insightText]);
+
+  // Trích xuất toàn diện biểu đồ và dữ liệu bảng từ Markdown Text
+  const extracted = useMemo(() => {
+    return extractChartAndDataFromMarkdown(insightText);
+  }, [insightText]);
+
+  // Kiểm tra xem đã có khối JSON Recharts được nhúng trong Markdown hay chưa
+  const hasEmbeddedChartInCode = useMemo(() => {
+    return (
+      insightText.includes("recharts_config") ||
+      (insightText.includes("chart_type") && insightText.includes("```"))
+    );
+  }, [insightText]);
+
   // Trích xuất sẵn dữ liệu bảng từ Markdown (nếu không có externalData truyền vào)
   const parsedTableData = useMemo(() => {
     if (externalData && externalData.length > 0) {
       return externalData;
     }
+    if (extracted.data && extracted.data.length > 0) {
+      return extracted.data;
+    }
     return parseMarkdownTable(insightText).data;
-  }, [externalData, insightText]);
+  }, [externalData, extracted.data, insightText]);
 
   // Bộ renderer tùy chỉnh cho ReactMarkdown
   const markdownComponents = useMemo(
@@ -311,9 +334,22 @@ export function InsightCard({
       </div>
 
       {/* Insight Content Body - Compiled Markdown */}
-      <div className="text-xs text-slate-200 leading-relaxed bg-surface/40 p-3.5 sm:p-4 rounded-xl border border-surface-border">
+      <div className="text-xs text-slate-200 leading-relaxed bg-surface/40 p-3.5 sm:p-4 rounded-xl border border-surface-border space-y-3">
+        {/* Tự động trực quan hóa Biểu đồ Recharts nếu bảng có số liệu phân tích và chưa có biểu đồ nhúng */}
+        {!hasEmbeddedChartInCode && extracted.config && extracted.data.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center gap-1.5 px-1 text-[11px] text-amber-300 font-semibold tracking-wide uppercase">
+              <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+              <span>{extracted.config.title || "Biểu đồ trực quan hóa dữ liệu"} ({extracted.config.chart_type.toUpperCase()})</span>
+            </div>
+            <div className="rounded-xl border border-surface-border bg-[#080d19]/90 p-2 shadow-inner">
+              <DynamicChart config={extracted.config} data={extracted.data} height={280} />
+            </div>
+          </div>
+        )}
+
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {insightText}
+          {cleanedInsightText}
         </ReactMarkdown>
       </div>
     </div>

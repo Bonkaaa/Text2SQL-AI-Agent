@@ -68,9 +68,13 @@ interface AppContextType {
     durationMs?: number
   ) => void;
   removeToast: (id: string) => void;
+
+  // 7. Giao diện Sáng / Tối (Theme Mode)
+  theme: "dark" | "light";
+  toggleTheme: () => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 function generateSessionId(): string {
   const timestamp = Date.now().toString(36);
@@ -104,9 +108,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // State 6: Toast notifications
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
+  // State 7: Theme (dark / light)
+  const [theme, setThemeState] = useState<"dark" | "light">("dark");
+
   // Đọc dữ liệu từ localStorage khi component mount phía client (an toàn Hydration)
   useEffect(() => {
     try {
+      const savedTheme = localStorage.getItem("text2sql_theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        setThemeState(savedTheme);
+      } else {
+        setThemeState("dark");
+      }
+
       const rawRole = localStorage.getItem("text2sql_user_role");
       if (rawRole) {
         if (rawRole.toLowerCase() === "admin") {
@@ -149,6 +163,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setCurrentSessionIdState(generateSessionId());
     }
+  }, []);
+
+  // Đồng bộ class "dark" trên <html> documentElement
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("text2sql_theme", next);
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
   }, []);
 
   const setCurrentRole = useCallback((role: UserRole) => {
@@ -322,6 +359,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         toasts,
         showToast,
         removeToast,
+        theme,
+        toggleTheme,
       }}
     >
       {children}

@@ -3,6 +3,8 @@
  * Khớp chuẩn 100% với Pydantic Schemas trong src/models/api_schemas.py và src/models/state.py.
  */
 
+import type { ResponsePackage, ArtifactItem } from "./artifacts";
+
 // ==============================================================================
 // 1. NGƯỜI DÙNG & PHÂN QUYỀN (RBAC)
 // ==============================================================================
@@ -31,7 +33,7 @@ export type QueryStatus =
 // 3. CẤU HÌNH TRỰC QUAN HÓA BIỂU ĐỒ (RECHARTS CONFIG)
 // ==============================================================================
 
-export type ChartType = "bar" | "line" | "area" | "pie" | "table";
+export type ChartType = "bar" | "line" | "area" | "pie" | "composed" | "table";
 
 export interface RechartsConfig {
   chart_type: ChartType;
@@ -54,6 +56,7 @@ export interface AskQueryRequest {
   session_id?: string | null;
   user_id?: string;
   role?: UserRole;
+  session_token?: string | null;
 }
 
 export interface QueryResponse {
@@ -74,6 +77,8 @@ export interface QueryResponse {
   error?: string | null;
   error_type?: string | null;
   retry_count?: number | null;
+  response_package?: ResponsePackage | null;
+  output_artifacts?: ArtifactItem[] | null;
 }
 
 // ==============================================================================

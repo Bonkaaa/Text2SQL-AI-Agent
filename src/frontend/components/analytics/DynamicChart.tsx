@@ -26,21 +26,25 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { ChartType, RechartsConfig } from "@/types/api";
+import type { ChartArtifact } from "@/types/artifacts";
 
-const PALETTE = [
-  "#6366f1", // Indigo
-  "#10b981", // Emerald
-  "#f59e0b", // Amber
-  "#06b6d4", // Cyan
-  "#ec4899", // Rose
-  "#8b5cf6", // Purple
-  "#14b8a6", // Teal
-  "#f97316", // Orange
+/**
+ * Bảng màu Accessible 6-Series Palette đạt chuẩn WCAG 2.1 AA (Tỷ lệ tương phản >= 4.5:1)
+ * Thay thế hoàn toàn các màu pastel/mờ nhạt của AI template.
+ */
+export const ACCESSIBLE_PALETTE = [
+  "#3B82F6", // Blue
+  "#10B981", // Emerald
+  "#F59E0B", // Amber
+  "#8B5CF6", // Violet
+  "#06B6D4", // Cyan
+  "#EC4899", // Rose
 ];
 
 export interface DynamicChartProps {
-  config: RechartsConfig;
-  data: Record<string, any>[];
+  artifact?: ChartArtifact;
+  config?: RechartsConfig;
+  data?: Record<string, any>[];
   className?: string;
   height?: number;
 }
@@ -59,18 +63,18 @@ function formatNumber(value: any): string {
     if (Math.abs(value) >= 1_000) {
       return `${(value / 1_000).toFixed(1)}K`;
     }
-    return value.toLocaleString("vi-VN");
+    return value.toLocaleString("en-US");
   }
   return String(value ?? "");
 }
 
 /**
- * Custom Dark Mode Tooltip cho Recharts
+ * Custom Dark Mode Glassmorphism Tooltip cho Recharts
  */
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl border border-slate-700/80 bg-[#0c1322]/95 p-3 shadow-2xl backdrop-blur-md text-xs space-y-1.5 z-50">
+      <div className="rounded-xl border border-slate-700/80 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md text-xs space-y-1.5 z-50">
         <p className="font-semibold text-slate-200 border-b border-slate-700/50 pb-1">
           {label}
         </p>
@@ -83,9 +87,9 @@ function CustomTooltip({ active, payload, label }: any) {
               />
               <span>{entry.name}:</span>
             </span>
-            <span className="font-mono font-semibold text-slate-100">
+            <span className="font-mono-data tabular-nums font-semibold text-slate-100">
               {typeof entry.value === "number"
-                ? entry.value.toLocaleString("vi-VN")
+                ? entry.value.toLocaleString("en-US")
                 : entry.value}
             </span>
           </div>
@@ -97,21 +101,34 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function DynamicChart({
+  artifact,
   config,
   data,
   className = "",
   height = 320,
 }: DynamicChartProps) {
+  // Chuẩn hóa props giữa ChartArtifact và config/data truyền thống
+  const effectiveData = artifact ? artifact.data : data || [];
+  const effectiveConfig: RechartsConfig = artifact
+    ? {
+        chart_type: artifact.chart_type,
+        title: artifact.title,
+        x_key: artifact.x_key,
+        y_keys: artifact.y_keys,
+        series_labels: artifact.series_labels,
+      }
+    : config || { chart_type: "bar" };
+
   // Trạng thái cho phép đổi loại biểu đồ tương tác
   const [currentType, setCurrentType] = useState<ChartType>(
-    config?.chart_type === "table" ? "bar" : config?.chart_type || "bar"
+    effectiveConfig.chart_type === "table" ? "bar" : effectiveConfig.chart_type || "bar"
   );
 
   // Kiểm tra dữ liệu rỗng
-  if (!data || data.length === 0) {
+  if (!effectiveData || effectiveData.length === 0) {
     return (
       <div
-        className={`rounded-2xl border border-surface-border bg-surface/30 p-8 text-center space-y-2 backdrop-blur-sm ${className}`}
+        className={`rounded-2xl border border-border-default/80 bg-surface-secondary/30 p-8 text-center space-y-2 backdrop-blur-sm ${className}`}
         role="region"
         aria-label="Biểu đồ không có dữ liệu"
       >
@@ -125,22 +142,22 @@ export function DynamicChart({
 
   // Xác định trục X và các chuỗi dữ liệu trục Y
   const xAxisKey =
-    config.x_key ||
-    config.x_axis ||
-    (data[0] ? Object.keys(data[0])[0] : "name");
+    effectiveConfig.x_key ||
+    effectiveConfig.x_axis ||
+    (effectiveData[0] ? Object.keys(effectiveData[0])[0] : "name");
 
   let yKeys: string[] = [];
-  if (config.y_keys && config.y_keys.length > 0) {
-    yKeys = config.y_keys;
-  } else if (config.y_axis) {
-    yKeys = Array.isArray(config.y_axis) ? config.y_axis : [config.y_axis];
-  } else if (data[0]) {
-    yKeys = Object.keys(data[0]).filter((k) => k !== xAxisKey);
+  if (effectiveConfig.y_keys && effectiveConfig.y_keys.length > 0) {
+    yKeys = effectiveConfig.y_keys;
+  } else if (effectiveConfig.y_axis) {
+    yKeys = Array.isArray(effectiveConfig.y_axis) ? effectiveConfig.y_axis : [effectiveConfig.y_axis];
+  } else if (effectiveData[0]) {
+    yKeys = Object.keys(effectiveData[0]).filter((k) => k !== xAxisKey);
   }
 
   // Lấy nhãn hiển thị thân thiện
   const getSeriesLabel = (key: string) => {
-    return config.series_labels?.[key] || key;
+    return effectiveConfig.series_labels?.[key] || key;
   };
 
   const chartTypes: { type: ChartType; label: string; icon: any }[] = [
@@ -152,28 +169,28 @@ export function DynamicChart({
 
   return (
     <div
-      className={`rounded-2xl border border-surface-border bg-gradient-to-br from-[#0c1322]/90 via-[#0a0f1d]/90 to-[#070b14]/90 p-4 sm:p-5 space-y-4 backdrop-blur-md shadow-card transition-all ${className}`}
+      className={`rounded-2xl border border-border-default/80 bg-surface-secondary/70 p-4 sm:p-5 space-y-4 backdrop-blur-md shadow-sm transition-all ${className}`}
       role="region"
       aria-label="Biểu đồ trực quan hóa dữ liệu TPC-H"
     >
       {/* Header & Chart Type Switcher Toolbar */}
-      <div className="flex items-start justify-between gap-3 flex-wrap border-b border-surface-border pb-3">
+      <div className="flex items-start justify-between gap-3 flex-wrap border-b border-border-default/50 pb-3">
         <div>
-          {config.title && (
+          {effectiveConfig.title && (
             <h4 className="text-xs font-bold text-slate-200 tracking-wide uppercase">
-              {config.title}
+              {effectiveConfig.title}
             </h4>
           )}
-          {config.description && (
+          {effectiveConfig.description && (
             <p className="text-[11px] text-slate-400 mt-0.5">
-              {config.description}
+              {effectiveConfig.description}
             </p>
           )}
         </div>
 
         {/* Switcher Buttons */}
         <div
-          className="flex items-center gap-1 bg-surface-subtle/80 p-1 rounded-xl border border-surface-border"
+          className="flex items-center gap-1 bg-surface-primary/80 p-1 rounded-xl border border-border-default/80"
           role="toolbar"
           aria-label="Chuyển đổi loại biểu đồ"
         >
@@ -188,8 +205,8 @@ export function DynamicChart({
                 aria-label={`Biểu đồ ${label}`}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? "bg-brand-500/20 text-brand-300 border border-brand-500/40 shadow-sm"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-surface/50 border border-transparent"
+                    ? "bg-primary-500/20 text-primary-300 border border-primary-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-surface-secondary/50 border border-transparent"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -205,7 +222,7 @@ export function DynamicChart({
         <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
           {currentType === "bar" ? (
             <BarChart
-              data={data}
+              data={effectiveData}
               margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
             >
               <CartesianGrid
@@ -228,7 +245,7 @@ export function DynamicChart({
                 tickFormatter={formatNumber}
               />
               <Tooltip content={<CustomTooltip />} />
-              {config.legend !== false && (
+              {effectiveConfig.legend !== false && (
                 <Legend
                   wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
                   formatter={(value) => (
@@ -241,7 +258,7 @@ export function DynamicChart({
                   key={key}
                   dataKey={key}
                   name={getSeriesLabel(key)}
-                  fill={PALETTE[idx % PALETTE.length]}
+                  fill={ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length]}
                   radius={[4, 4, 0, 0]}
                   maxBarSize={48}
                 />
@@ -249,7 +266,7 @@ export function DynamicChart({
             </BarChart>
           ) : currentType === "line" ? (
             <LineChart
-              data={data}
+              data={effectiveData}
               margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
             >
               <CartesianGrid
@@ -272,7 +289,7 @@ export function DynamicChart({
                 tickFormatter={formatNumber}
               />
               <Tooltip content={<CustomTooltip />} />
-              {config.legend !== false && (
+              {effectiveConfig.legend !== false && (
                 <Legend
                   wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
                   formatter={(value) => (
@@ -286,16 +303,16 @@ export function DynamicChart({
                   type="monotone"
                   dataKey={key}
                   name={getSeriesLabel(key)}
-                  stroke={PALETTE[idx % PALETTE.length]}
+                  stroke={ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length]}
                   strokeWidth={2.5}
-                  dot={{ fill: PALETTE[idx % PALETTE.length], r: 3.5 }}
+                  dot={{ fill: ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length], r: 3.5 }}
                   activeDot={{ r: 6 }}
                 />
               ))}
             </LineChart>
           ) : currentType === "area" ? (
             <AreaChart
-              data={data}
+              data={effectiveData}
               margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
             >
               <defs>
@@ -310,12 +327,12 @@ export function DynamicChart({
                   >
                     <stop
                       offset="5%"
-                      stopColor={PALETTE[idx % PALETTE.length]}
+                      stopColor={ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length]}
                       stopOpacity={0.4}
                     />
                     <stop
                       offset="95%"
-                      stopColor={PALETTE[idx % PALETTE.length]}
+                      stopColor={ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length]}
                       stopOpacity={0.02}
                     />
                   </linearGradient>
@@ -341,7 +358,7 @@ export function DynamicChart({
                 tickFormatter={formatNumber}
               />
               <Tooltip content={<CustomTooltip />} />
-              {config.legend !== false && (
+              {effectiveConfig.legend !== false && (
                 <Legend
                   wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
                   formatter={(value) => (
@@ -355,7 +372,7 @@ export function DynamicChart({
                   type="monotone"
                   dataKey={key}
                   name={getSeriesLabel(key)}
-                  stroke={PALETTE[idx % PALETTE.length]}
+                  stroke={ACCESSIBLE_PALETTE[idx % ACCESSIBLE_PALETTE.length]}
                   strokeWidth={2}
                   fillOpacity={1}
                   fill={`url(#areaGradient-${key})`}
@@ -365,7 +382,7 @@ export function DynamicChart({
           ) : (
             <PieChart>
               <Tooltip content={<CustomTooltip />} />
-              {config.legend !== false && (
+              {effectiveConfig.legend !== false && (
                 <Legend
                   wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
                   formatter={(value) => (
@@ -374,8 +391,8 @@ export function DynamicChart({
                 />
               )}
               <Pie
-                data={data}
-                dataKey={yKeys[0] || Object.keys(data[0] || {})[1]}
+                data={effectiveData}
+                dataKey={yKeys[0] || Object.keys(effectiveData[0] || {})[1]}
                 nameKey={xAxisKey}
                 cx="50%"
                 cy="50%"
@@ -383,10 +400,10 @@ export function DynamicChart({
                 outerRadius={85}
                 paddingAngle={3}
               >
-                {data.map((_, index) => (
+                {effectiveData.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={PALETTE[index % PALETTE.length]}
+                    fill={ACCESSIBLE_PALETTE[index % ACCESSIBLE_PALETTE.length]}
                   />
                 ))}
               </Pie>

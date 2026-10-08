@@ -8,56 +8,121 @@ import {
   Search,
   X,
   Download,
+  Copy,
+  Check,
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  SlidersHorizontal,
 } from "lucide-react";
 import { exportToCsv } from "@/services/exportCsv";
+import { copyMarkdownToClipboard } from "@/utils/tableExport";
 import { useOptionalAppContext } from "@/context/AppContext";
+import type { TableArtifact } from "@/types/artifacts";
 
 export interface DataTableProps {
-  columns: string[];
-  data: Record<string, any>[];
+  artifact?: TableArtifact;
+  columns?: string[];
+  data?: Record<string, any>[];
   initialPageSize?: number;
   tableName?: string;
   enableExport?: boolean;
+  enableCopyMarkdown?: boolean;
   enableSearch?: boolean;
   className?: string;
 }
 
 export function DataTable({
-  columns,
-  data,
+  artifact,
+  columns: propColumns,
+  data: propData,
   initialPageSize = 5,
   tableName = "query_result",
   enableExport = true,
+  enableCopyMarkdown = true,
   enableSearch = true,
   className = "",
 }: DataTableProps) {
   const appContext = useOptionalAppContext();
 
-  // Trạng thái tìm kiếm, sắp xếp và phân trang
+  // Chuẩn hóa props giữa TableArtifact và props độc lập
+  const columns = useMemo(() => {
+    if (artifact?.columns && artifact.columns.length > 0) {
+      return artifact.columns;
+    }
+    if (propColumns && propColumns.length > 0) {
+      return propColumns;
+    }
+    if (propData && propData.length > 0) {
+      return Object.keys(propData[0]);
+    }
+    return [];
+  }, [artifact, propColumns, propData]);
+
+  const rawData = useMemo(() => {
+    if (artifact?.rows) {
+      return artifact.rows;
+    }
+    if (propData) {
+      return propData;
+    }
+    return [];
+  }, [artifact, propData]);
+
+  const title = artifact?.title || tableName;
+
+  // Trạng thái tìm kiếm, sắp xếp, phân trang và mật độ hiển thị
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
-    null
-  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
+  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+  const [copied, setCopied] = useState(false);
+
+  // Nhận biết cột số để căn phải và định dạng font-mono-data
+  const numericColumns = useMemo(() => {
+    const set = new Set<string>();
+    if (!columns || columns.length === 0 || !rawData || rawData.length === 0) {
+      return set;
+    }
+    columns.forEach((col) => {
+      // Nếu có metadata format từ backend
+      if (
+        artifact?.column_formats &&
+        (artifact.column_formats[col] === "currency" ||
+          artifact.column_formats[col] === "integer" ||
+          artifact.column_formats[col] === "percentage" ||
+          artifact.column_formats[col] === "number")
+      ) {
+        set.add(col);
+        return;
+      }
+      // Kiểm tra mẫu 5 dòng đầu
+      const sample = rawData.slice(0, 5);
+      const isNum = sample.some(
+        (r) => typeof r[col] === "number" && !isNaN(r[col])
+      );
+      if (isNum) {
+        set.add(col);
+      }
+    });
+    return set;
+  }, [columns, rawData, artifact]);
 
   // 1. Lọc dữ liệu theo từ khóa tìm kiếm (Client-side Search)
   const filteredData = useMemo(() => {
-    if (!searchTerm.trim()) return data;
+    if (!searchTerm.trim()) return rawData;
     const term = searchTerm.toLowerCase().trim();
 
-    return data.filter((row) =>
+    return rawData.filter((row) =>
       columns.some((col) => {
         const val = row[col];
         if (val === null || val === undefined) return false;
         return String(val).toLowerCase().includes(term);
       })
     );
-  }, [data, columns, searchTerm]);
+  }, [rawData, columns, searchTerm]);
 
   // 2. Sắp xếp dữ liệu (Column Sorting)
   const sortedData = useMemo(() => {
@@ -114,20 +179,44 @@ export function DataTable({
 
   // 4. Xuất file CSV
   const handleExportCsv = () => {
-    const filename = `${tableName}_${new Date().getTime()}`;
-    exportToCsv(filename, columns, sortedData.length > 0 ? sortedData : data);
+    const filename = `${title.toLowerCase().replace(/[^a-z0-9]/gi, "_")}_${new Date().getTime()}`;
+    exportToCsv(filename, columns, sortedData.length > 0 ? sortedData : rawData);
     appContext?.showToast("Đã tải xuống tệp dữ liệu CSV", "success", 2000);
   };
 
+  // 5. Sao chép bảng Markdown vào Clipboard
+  const handleCopyMarkdown = async () => {
+    const success = await copyMarkdownToClipboard(
+      columns,
+      sortedData.length > 0 ? sortedData : rawData
+    );
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      appContext?.showToast("Đã sao chép bảng Markdown vào bộ nhớ tạm", "success", 2000);
+    }
+  };
+
+  const cellPadding = density === "comfortable" ? "py-2.5 px-3" : "py-1.5 px-2.5 text-[11px]";
+
   return (
     <div
-      className={`space-y-3 rounded-2xl border border-surface-border bg-[#0a0f1d]/80 p-4 sm:p-5 backdrop-blur-md transition-all shadow-card ${className}`}
+      className={`space-y-3 rounded-2xl border border-border-default/80 bg-surface-secondary/70 p-4 sm:p-5 backdrop-blur-md transition-all shadow-sm ${className}`}
       role="region"
       aria-label="Bảng dữ liệu phân tích TPC-H"
     >
-      {/* Top Toolbar: Search & Export CSV */}
+      {/* Top Toolbar: Title, Search & Action Buttons */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        {/* Search Bar */}
+        {/* Title (nếu có) */}
+        {title && title !== "query_result" && (
+          <div className="flex items-center gap-2 mr-2">
+            <span className="text-xs font-bold text-slate-200 tracking-wide uppercase">
+              {title}
+            </span>
+          </div>
+        )}
+
+        {/* Left: Search Bar */}
         {enableSearch && (
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -136,7 +225,7 @@ export function DataTable({
               value={searchTerm}
               onChange={handleSearchChange}
               placeholder="Tìm kiếm trong bảng..."
-              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-surface-subtle/80 border border-surface-border text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-surface-primary/80 border border-border-default/80 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
             />
             {searchTerm && (
               <button
@@ -154,48 +243,90 @@ export function DataTable({
           </div>
         )}
 
-        {/* Right Action: Export CSV Button */}
-        {enableExport && (
+        {/* Right Actions: Density, Copy Markdown, Export CSV */}
+        <div className="flex items-center gap-2">
+          {/* Density Toggle Button */}
           <button
             type="button"
-            onClick={handleExportCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-surface-subtle hover:bg-surface-subtle/80 hover:text-white transition-all border border-surface-border active:scale-[0.98]"
-            aria-label="Xuất CSV"
-            title="Tải xuống tệp CSV chuẩn UTF-8"
+            onClick={() =>
+              setDensity((d) => (d === "comfortable" ? "compact" : "comfortable"))
+            }
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-surface-primary hover:bg-surface-primary/80 transition-all border border-border-default/80 active:scale-[0.98]"
+            aria-label={`Mật độ ${density === "comfortable" ? "Comfortable" : "Compact"}`}
+            title="Chuyển đổi mật độ hiển thị dòng"
           >
-            <Download className="w-3.5 h-3.5 text-brand-400" />
-            <span>Xuất CSV</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hidden sm:inline">
+              {density === "comfortable" ? "Rộng" : "Gọn"}
+            </span>
           </button>
-        )}
+
+          {/* Copy Markdown Button */}
+          {enableCopyMarkdown && (
+            <button
+              type="button"
+              onClick={handleCopyMarkdown}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-surface-primary hover:bg-surface-primary/80 hover:text-white transition-all border border-border-default/80 active:scale-[0.98]"
+              aria-label="Sao chép Markdown"
+              title="Sao chép bảng dưới dạng Markdown"
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-slate-400" />
+              )}
+              <span className="hidden sm:inline">Sao chép</span>
+            </button>
+          )}
+
+          {/* Export CSV Button */}
+          {enableExport && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-surface-primary hover:bg-surface-primary/80 hover:text-white transition-all border border-border-default/80 active:scale-[0.98]"
+              aria-label="Xuất CSV"
+              title="Tải xuống tệp CSV chuẩn UTF-8"
+            >
+              <Download className="w-3.5 h-3.5 text-primary-400" />
+              <span>Xuất CSV</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Table Container */}
-      <div className="rounded-xl overflow-x-auto border border-surface-border custom-scrollbar bg-[#070b14]/60">
+      {/* Table Container with Sticky Header */}
+      <div className="relative max-h-[460px] overflow-auto rounded-xl border border-border-default/80 custom-scrollbar bg-surface-primary/60">
         <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-surface-subtle/80 border-b border-surface-border">
+          <thead className="sticky top-0 bg-surface-secondary/95 backdrop-blur-md z-10 border-b border-border-default shadow-sm">
+            <tr>
               {columns.map((col) => {
                 const isSorted = sortColumn === col;
+                const isNumeric = numericColumns.has(col);
                 return (
                   <th
                     key={col}
-                    className="py-2.5 px-3 font-semibold text-slate-300 whitespace-nowrap"
+                    className={`${cellPadding} font-semibold text-slate-300 whitespace-nowrap ${
+                      isNumeric ? "text-right" : "text-left"
+                    }`}
                   >
                     <button
                       type="button"
                       onClick={() => handleSort(col)}
-                      className="flex items-center gap-1.5 hover:text-brand-300 transition-colors focus:outline-none group"
+                      className={`inline-flex items-center gap-1.5 hover:text-primary-300 transition-colors focus:outline-none group ${
+                        isNumeric ? "flex-row-reverse" : ""
+                      }`}
                       aria-label={`Sắp xếp cột ${col}`}
                     >
                       <span>{col}</span>
                       {isSorted ? (
                         sortDirection === "asc" ? (
-                          <ArrowUp className="w-3.5 h-3.5 text-brand-400" />
+                          <ArrowUp className="w-3.5 h-3.5 text-primary-400 shrink-0" />
                         ) : (
-                          <ArrowDown className="w-3.5 h-3.5 text-brand-400" />
+                          <ArrowDown className="w-3.5 h-3.5 text-primary-400 shrink-0" />
                         )
                       ) : (
-                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
                       )}
                     </button>
                   </th>
@@ -203,26 +334,28 @@ export function DataTable({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-surface-border">
+          <tbody className="divide-y divide-border-default/50">
             {paginatedRows.length > 0 ? (
               paginatedRows.map((row, rowIdx) => (
                 <tr
                   key={rowIdx}
-                  className="hover:bg-surface-subtle/40 transition-colors"
+                  className="hover:bg-surface-secondary/40 transition-colors"
                 >
                   {columns.map((col) => {
                     const value = row[col];
-                    const isNumeric = typeof value === "number";
+                    const isNumeric = numericColumns.has(col);
                     return (
                       <td
                         key={col}
-                        className={`py-2 px-3 text-slate-200 whitespace-nowrap font-mono text-[11px] ${
-                          isNumeric ? "text-emerald-300/90" : ""
+                        className={`${cellPadding} text-slate-200 whitespace-nowrap ${
+                          isNumeric
+                            ? "text-right font-mono-data tabular-nums text-emerald-300/90"
+                            : "text-left text-slate-300"
                         }`}
                       >
                         {value !== null && value !== undefined
-                          ? isNumeric
-                            ? value.toLocaleString("vi-VN")
+                          ? typeof value === "number"
+                            ? value.toLocaleString("en-US")
                             : String(value)
                           : "-"}
                       </td>
@@ -233,7 +366,7 @@ export function DataTable({
             ) : (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={Math.max(1, columns.length)}
                   className="py-8 text-center text-slate-400 text-xs"
                 >
                   <FileSpreadsheet className="w-6 h-6 text-slate-500 mx-auto mb-1.5" />
@@ -262,7 +395,7 @@ export function DataTable({
                 setPageSize(Number(e.target.value));
                 setPage(1);
               }}
-              className="bg-surface-subtle border border-surface-border rounded-lg text-[11px] text-slate-300 px-2 py-0.5 focus:outline-none focus:border-brand-500/50"
+              className="bg-surface-primary border border-border-default/80 rounded-lg text-[11px] text-slate-300 px-2 py-0.5 focus:outline-none focus:border-primary-500/50"
             >
               <option value={5}>5</option>
               <option value={10}>10</option>
@@ -276,7 +409,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-subtle hover:bg-surface-subtle/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition-colors border border-surface-border"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-primary hover:bg-surface-primary/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition-colors border border-border-default/80"
               aria-label="Trang trước"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -286,7 +419,7 @@ export function DataTable({
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-subtle hover:bg-surface-subtle/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition-colors border border-surface-border"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-primary hover:bg-surface-primary/80 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition-colors border border-border-default/80"
               aria-label="Trang sau"
             >
               <span>Sau</span>
