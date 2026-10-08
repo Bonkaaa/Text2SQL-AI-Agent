@@ -16,21 +16,23 @@ import {
   Table,
   X,
 } from "lucide-react";
-import { useAppContext } from "@/context/AppContext";
 import {
-  SEMANTIC_METRICS,
   TableDefinition,
-  TPCH_TABLES,
-} from "@/data/tpchSchema";
+  TPCDS_TABLES,
+  TPCDS_METRICS,
+  TableCategory,
+} from "@/data/tpcdsSchema";
+import { useAppContext } from "@/context/AppContext";
 
 export function SchemaDrawer() {
   const { isSchemaDrawerOpen, setSchemaDrawerOpen, currentRole, showToast } =
     useAppContext();
 
   const [activeTab, setActiveTab] = useState<"tables" | "metrics">("tables");
+  const [categoryFilter, setCategoryFilter] = useState<"ALL" | TableCategory>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedTableName, setExpandedTableName] = useState<string | null>(
-    "lineitem"
+    "store_sales"
   );
 
   const isAnalyst = currentRole === "Analyst";
@@ -46,12 +48,16 @@ export function SchemaDrawer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSchemaDrawerOpen, setSchemaDrawerOpen]);
 
-  // Bộ lọc tìm kiếm bảng và cột
+  // Bộ lọc tìm kiếm bảng và cột TPC-DS
   const filteredTables = useMemo(() => {
-    if (!searchQuery.trim()) return TPCH_TABLES;
+    let tables = TPCDS_TABLES;
+    if (categoryFilter !== "ALL") {
+      tables = tables.filter((t) => t.category === categoryFilter);
+    }
+    if (!searchQuery.trim()) return tables;
     const query = searchQuery.toLowerCase().trim();
 
-    return TPCH_TABLES.filter(
+    return tables.filter(
       (t) =>
         t.name.toLowerCase().includes(query) ||
         t.displayName.toLowerCase().includes(query) ||
@@ -62,14 +68,14 @@ export function SchemaDrawer() {
             c.description.toLowerCase().includes(query)
         )
     );
-  }, [searchQuery]);
+  }, [searchQuery, categoryFilter]);
 
   // Bộ lọc tìm kiếm công thức chỉ số
   const filteredMetrics = useMemo(() => {
-    if (!searchQuery.trim()) return SEMANTIC_METRICS;
+    if (!searchQuery.trim()) return TPCDS_METRICS;
     const query = searchQuery.toLowerCase().trim();
 
-    return SEMANTIC_METRICS.filter(
+    return TPCDS_METRICS.filter(
       (m) =>
         m.name.toLowerCase().includes(query) ||
         m.businessMeaning.toLowerCase().includes(query) ||
@@ -114,13 +120,13 @@ export function SchemaDrawer() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>Lược đồ dữ liệu TPC-H</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-subtle text-slate-400 border border-surface-border">
-                  8 Bảng
+                <span>Lược đồ dữ liệu TPC-DS</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-300 border border-brand-500/20 font-semibold">
+                  24 Bảng
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Chuẩn TPC-H Wholesale & Supply Chain Benchmark
+                Chuẩn TPC-DS Omnichannel Retail (Store, Web, Catalog)
               </p>
             </div>
           </div>
@@ -143,7 +149,7 @@ export function SchemaDrawer() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm bảng, tên cột (ví dụ: revenue, phone)..."
+              placeholder="Tìm kiếm bảng, tên cột (ví dụ: store_sales, category)..."
               className="w-full pl-9 pr-8 py-2 bg-surface/80 border border-surface-border rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
             {searchQuery && (
@@ -167,7 +173,7 @@ export function SchemaDrawer() {
               }`}
             >
               <Table className="w-3.5 h-3.5" />
-              <span>8 Bảng Dữ Liệu</span>
+              <span>24 Bảng Dữ Liệu</span>
             </button>
 
             <button
@@ -182,13 +188,54 @@ export function SchemaDrawer() {
               <span>Chỉ Số Nghiệp Vụ</span>
             </button>
           </div>
+
+          {/* Category Filter Pills (Only on tables tab) */}
+          {activeTab === "tables" && (
+            <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("ALL")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                  categoryFilter === "ALL"
+                    ? "bg-slate-200 text-slate-900 font-semibold shadow-sm"
+                    : "bg-surface text-slate-400 hover:text-slate-200 border border-surface-border"
+                }`}
+              >
+                Tất cả (24)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("FACT")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 ${
+                  categoryFilter === "FACT"
+                    ? "bg-indigo-600 text-white font-semibold shadow-sm"
+                    : "bg-surface text-indigo-300 hover:bg-indigo-500/10 border border-indigo-500/20"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                Fact Bán & Trả (7)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("DIMENSION")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1.5 ${
+                  categoryFilter === "DIMENSION"
+                    ? "bg-emerald-600 text-white font-semibold shadow-sm"
+                    : "bg-surface text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20"
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Dimension (17)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* CONTENT SCROLL AREA */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
           {activeTab === "tables" ? (
             /* ============================================================= */
-            /* TAB 1: DANH SÁCH 8 BẢNG TPC-H */
+            /* TAB 1: DANH SÁCH 24 BẢNG TPC-DS */
             /* ============================================================= */
             filteredTables.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-500">
@@ -213,7 +260,11 @@ export function SchemaDrawer() {
                         className="w-full flex items-center justify-between p-3 text-left hover:bg-surface-subtle/80 transition-colors"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="p-1.5 rounded-lg bg-surface text-brand-400 border border-surface-border flex-shrink-0">
+                          <div className={`p-1.5 rounded-lg border flex-shrink-0 ${
+                            table.category === "FACT"
+                              ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          }`}>
                             <Table className="w-4 h-4" />
                           </div>
                           <div className="truncate">
@@ -221,6 +272,15 @@ export function SchemaDrawer() {
                               <span>{table.name}</span>
                               <span className="text-[10px] font-normal text-slate-400">
                                 ({table.displayName})
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded text-[9px] font-semibold border ${
+                                  table.category === "FACT"
+                                    ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                                    : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                }`}
+                              >
+                                {table.category}
                               </span>
                               {hasPii && (
                                 <span
@@ -393,7 +453,7 @@ export function SchemaDrawer() {
         <div className="p-3 border-t border-surface-border bg-surface-subtle/40 text-[11px] text-slate-400 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-success"></span>
-            <span>Kho dữ liệu DuckDB TPC-H Active</span>
+            <span>Kho dữ liệu DuckDB TPC-DS Active</span>
           </div>
           <span className="font-mono text-[10px] text-slate-400">
             Esc để đóng

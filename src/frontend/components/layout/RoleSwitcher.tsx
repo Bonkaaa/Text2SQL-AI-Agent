@@ -25,7 +25,7 @@ const ROLES: RoleOption[] = [
     label: "Analyst",
     personaName: "Nguyễn Văn An",
     title: "Supply Chain & Sales Analyst",
-    description: "Tra cứu báo cáo bán hàng & chuỗi cung ứng TPC-H. Bị chặn truy cập các trường PII (số điện thoại, số dư tài khoản).",
+    description: "Tra cứu báo cáo bán lẻ đa kênh TPC-DS (Store, Web, Catalog). Tự động bảo vệ và che giấu các trường PII nhạy cảm.",
     themeColor: "brand",
   },
   {
@@ -33,7 +33,7 @@ const ROLES: RoleOption[] = [
     label: "Admin",
     personaName: "Trần Thị Bình",
     title: "Data Lead & Governance Admin",
-    description: "Toàn quyền truy cập mọi bảng/cột. Mở khóa trang Nhật ký Kiểm toán (Audit Trail) và giám sát chi phí quét.",
+    description: "Toàn quyền truy cập 24 bảng TPC-DS. Mở khóa trang Nhật ký Kiểm toán (Audit Trail) và giám sát chi phí quét.",
     themeColor: "amber",
   },
 ];
@@ -109,8 +109,8 @@ export function RoleSwitcher() {
         onClick={() => setIsOpen((prev) => !prev)}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
           isAnalyst
-            ? "bg-brand-500/10 text-brand-300 border-brand-500/30 hover:bg-brand-500/20 hover:border-brand-500/50"
-            : "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50"
+            ? "bg-blue-50 dark:bg-brand-500/10 text-blue-700 dark:text-brand-300 border-blue-200 dark:border-brand-500/30 hover:bg-blue-100 dark:hover:bg-brand-500/20 hover:border-blue-300 dark:hover:border-brand-500/50"
+            : "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 hover:border-amber-300 dark:hover:border-amber-500/50"
         }`}
         title={`Đang đăng nhập vai trò: ${activeRoleConfig.label} (${activeRoleConfig.personaName})`}
         aria-haspopup="true"
@@ -118,18 +118,18 @@ export function RoleSwitcher() {
       >
         <span
           className={`h-2 w-2 rounded-full ${
-            isAnalyst ? "bg-brand-400" : "bg-amber-400"
+            isAnalyst ? "bg-blue-600 dark:bg-brand-400" : "bg-amber-600 dark:bg-amber-400"
           }`}
         ></span>
 
         <span className="flex items-center gap-1.5">
           {isAnalyst ? (
-            <TrendingUp className="w-3.5 h-3.5 text-brand-400" />
+            <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-brand-400" />
           ) : (
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
           )}
           <span>{activeRoleConfig.label}</span>
-          <span className="text-slate-400 font-normal hidden lg:inline">
+          <span className="text-slate-500 dark:text-slate-400 font-normal hidden lg:inline">
             ({activeRoleConfig.personaName.split(" ").slice(-1)[0]})
           </span>
         </span>
@@ -145,12 +145,12 @@ export function RoleSwitcher() {
       {/* DROPDOWN POPOVER MENU */}
       {/* ================================================================= */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl glass-card shadow-card p-2 z-50 border border-surface-border animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-2 border-b border-surface-border mb-1.5">
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#0d1527] shadow-2xl p-2 z-50 border border-slate-200 dark:border-slate-700/80 animate-in fade-in zoom-in-95 duration-150">
+          <div className="px-3 py-2 border-b border-slate-200 dark:border-surface-border mb-1.5">
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Mô phỏng Phân quyền (RBAC)
             </div>
-            <div className="text-xs text-slate-300 font-medium mt-0.5">
+            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium mt-0.5">
               Chọn vai trò để trải nghiệm cơ chế kiểm duyệt dữ liệu:
             </div>
           </div>
@@ -166,17 +166,17 @@ export function RoleSwitcher() {
                   className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-150 ${
                     isSelected
                       ? role.themeColor === "brand"
-                        ? "bg-brand-500/15 border border-brand-500/40 text-white"
-                        : "bg-amber-500/15 border border-amber-500/40 text-white"
-                      : "hover:bg-surface-subtle/80 text-slate-300 border border-transparent"
+                        ? "bg-blue-50 dark:bg-brand-500/15 border border-blue-200 dark:border-brand-500/40 text-blue-900 dark:text-white"
+                        : "bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/40 text-amber-900 dark:text-white"
+                      : "hover:bg-slate-100 dark:hover:bg-surface-subtle/80 text-slate-700 dark:text-slate-300 border border-transparent"
                   }`}
                 >
                   {/* Icon Avatar */}
                   <div
                     className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${
                       role.themeColor === "brand"
-                        ? "bg-brand-500/20 text-brand-300"
-                        : "bg-amber-500/20 text-amber-300"
+                        ? "bg-blue-100 dark:bg-brand-500/20 text-blue-600 dark:text-brand-300"
+                        : "bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300"
                     }`}
                   >
                     {role.id === "Analyst" ? (
@@ -189,25 +189,25 @@ export function RoleSwitcher() {
                   {/* Role Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-white">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white">
                         {role.label} • {role.personaName}
                       </span>
                       {isSelected && (
                         <Check
                           className={`w-4 h-4 ${
                             role.themeColor === "brand"
-                              ? "text-brand-400"
-                              : "text-amber-400"
+                              ? "text-blue-600 dark:text-brand-400"
+                              : "text-amber-600 dark:text-amber-400"
                           }`}
                         />
                       )}
                     </div>
 
-                    <div className="text-[11px] font-medium text-slate-400 mt-0.5">
+                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                       {role.title}
                     </div>
 
-                    <div className="text-[11px] text-slate-400/90 leading-relaxed mt-1 line-clamp-2">
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400/90 leading-relaxed mt-1 line-clamp-2">
                       {role.description}
                     </div>
                   </div>

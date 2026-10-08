@@ -4,37 +4,48 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   ChevronsUpDown,
+  Database,
   Home,
+  Layers,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   SquarePen,
   Trash2,
+  Undo2,
+  Users,
+  Warehouse,
+  Info,
 } from "lucide-react";
 import { SessionRecord, useAppContext } from "@/context/AppContext";
+import { TPCDS_DOMAINS, TOTAL_TPCDS_TABLES_COUNT } from "@/data/tpcdsCatalog";
+import { TableMetadataModal } from "../modal/TableMetadataModal";
 
 export const PROMPT_PRESETS = [
   {
-    id: "top_customers",
-    prompt: "Top 5 khách hàng có tổng chi tiêu lớn nhất năm 1995",
+    id: "omnichannel_sales",
+    prompt: "So sánh tổng doanh thu thuần (Net Paid) giữa 3 kênh store, web và catalog năm 2003",
     timeGroup: "today",
   },
   {
-    id: "revenue_by_region",
-    prompt: "Phân tích doanh thu thuần theo 5 khu vực địa lý",
+    id: "return_rate",
+    prompt: "Top 10 mặt hàng có tỷ lệ hoàn hàng cao nhất trong quý 3",
     timeGroup: "today",
   },
   {
-    id: "late_shipments",
-    prompt: "Tỷ lệ đơn hàng giao trễ theo phương thức vận chuyển (AIR, TRUCK, SHIP)",
+    id: "inventory_alerts",
+    prompt: "Cảnh báo tồn kho dưới 500 đơn vị tại các kho miền Tây",
     timeGroup: "past",
   },
   {
-    id: "discount_analysis",
-    prompt: "Mức chiết khấu trung bình của các dòng sản phẩm TPC-H",
+    id: "promotion_margin",
+    prompt: "Tác động của chiến dịch khuyến mãi đến lợi nhuận biên",
     timeGroup: "past",
   },
 ];
@@ -62,6 +73,9 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isRoleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [isLogoHovered, setIsLogoHovered] = useState(false);
+  const [isCatalogOpen, setIsCatalogOpen] = useState(true);
+  const [expandedDomain, setExpandedDomain] = useState<string | null>("sales");
+  const [inspectingTable, setInspectingTable] = useState<string | null>(null);
 
   const isAnalyst = currentRole === "Analyst";
   const isAdmin = currentRole === "Admin";
@@ -82,7 +96,7 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
     if (onResetToHome) {
       onResetToHome();
     }
-    showToast("Đã tạo phiên hội thoại mới", "info", 1500);
+    showToast("Đã tạo phiên phân tích mới", "info", 1500);
   };
 
   const handleHomeClick = () => {
@@ -91,12 +105,20 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
     } else {
       startNewSession();
     }
-    showToast("Đã chuyển về trang hội thoại chính", "info", 1500);
+    showToast("Đã chuyển về màn hình làm việc chính", "info", 1500);
   };
 
   const handlePromptClick = (promptText: string) => {
     if (onSelectPrompt) {
       onSelectPrompt(promptText);
+    }
+  };
+
+  const handleTableClick = (tableName: string) => {
+    if (onSelectPrompt) {
+      onSelectPrompt(`Phân tích tổng quan và cấu trúc dữ liệu của bảng ${tableName}`);
+    } else {
+      showToast(`Đã chọn bảng ${tableName}`, "info", 1500);
     }
   };
 
@@ -119,7 +141,8 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#0b0e17] border-r border-white/5 backdrop-blur-xl transition-all duration-300 ease-in-out lg:static lg:z-auto overflow-hidden ${
+        data-testid="sidebar-pane"
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-surface border-r border-surface-border transition-all duration-200 ease-in-out lg:static lg:z-auto overflow-hidden ${
           isSidebarOpen
             ? "w-64 translate-x-0"
             : "-translate-x-full lg:translate-x-0 lg:w-16"
@@ -128,46 +151,46 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
         {/* =============================================================== */}
         {/* TOP BRAND HEADER / LOGO HOVER EXPAND                            */}
         {/* =============================================================== */}
-        <div className="flex items-center justify-between p-3.5 border-b border-white/5 h-16 flex-shrink-0">
+        <div className="flex items-center justify-between p-3.5 border-b border-slate-200 dark:border-surface-border h-14 flex-shrink-0 bg-slate-50 dark:bg-surface-secondary/40">
           {isSidebarOpen ? (
             /* --- EXPANDED MODE: Logo + Brand + Collapse Button --- */
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 text-white shadow-glow flex-shrink-0">
-                  <Sparkles className="h-4 w-4" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm flex-shrink-0">
+                  <Database className="h-4 w-4" />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold tracking-tight text-white">
+                  <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-white font-sans-ui">
                     Text2SQL
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 font-semibold border border-brand-500/30">
-                    TPC-H
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-500/30">
+                    TPC-DS
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={toggleSidebar}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-surface-tertiary transition-colors"
                 title="Thu gọn thanh điều hướng"
               >
                 <PanelLeftClose className="w-4 h-4 hidden lg:block" />
               </button>
             </div>
           ) : (
-            /* --- COLLAPSED MODE: Logo hover to show expand icon (Image 1 style) --- */
+            /* --- COLLAPSED MODE: Logo hover to show expand icon --- */
             <div className="w-full flex items-center justify-center">
               <button
                 onClick={toggleSidebar}
                 onMouseEnter={() => setIsLogoHovered(true)}
                 onMouseLeave={() => setIsLogoHovered(false)}
-                className="h-10 w-10 rounded-2xl flex items-center justify-center bg-gradient-to-tr from-brand-600 to-indigo-500 text-white shadow-glow transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                className="h-9 w-9 rounded-xl flex items-center justify-center bg-brand-600 text-white shadow-sm transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer"
                 title="Mở rộng thanh điều hướng"
               >
                 {isLogoHovered ? (
-                  <PanelLeftOpen className="h-5 w-5 animate-in zoom-in-75 duration-150" />
+                  <PanelLeftOpen className="h-4 w-4" />
                 ) : (
-                  <Sparkles className="h-5 w-5" />
+                  <Database className="h-4 w-4" />
                 )}
               </button>
             </div>
@@ -175,29 +198,24 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
         </div>
 
         {/* =============================================================== */}
-        {/* COLLAPSED MODE: ONLY HOME ICON & EMPTY MIDDLE (Image 1 style)    */}
+        {/* COLLAPSED MODE: ONLY HOME ICON & EMPTY MIDDLE                   */}
         {/* =============================================================== */}
         {!isSidebarOpen && (
           <div className="flex-1 flex flex-col items-center justify-between py-4">
-            {/* Top: Home Icon (clicking returns to new chat screen) */}
             <button
               onClick={handleHomeClick}
-              className="h-10 w-10 rounded-2xl flex items-center justify-center bg-brand-500/20 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all shadow-sm"
-              title="Trang chủ (Cuộc trò chuyện mới)"
+              className="h-9 w-9 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-surface-secondary text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-surface-border hover:bg-slate-200 dark:hover:bg-surface-tertiary transition-all"
+              title="Trang chủ (Khởi động phân tích)"
             >
-              <Home className="w-5 h-5" />
+              <Home className="w-4 h-4" />
             </button>
 
-            {/* Middle: Empty space as requested (no chat bubbles!) */}
             <div className="flex-1" />
 
-            {/* Bottom: User Avatar (Persona NA / TB) */}
             <div
               onClick={handleHomeClick}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 cursor-pointer shadow-sm hover:scale-105 transition-transform ${
-                isAnalyst
-                  ? "bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500"
-                  : "bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500"
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold ring-1 ring-white/10 cursor-pointer hover:scale-105 transition-transform ${
+                isAnalyst ? "bg-blue-600" : "bg-amber-600"
               }`}
               title={`Tài khoản: ${persona.name} (${currentRole})`}
             >
@@ -211,31 +229,30 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
         {/* =============================================================== */}
         {isSidebarOpen && (
           <>
-            {/* 1. "New chat" button matching Image 2 style */}
+            {/* 1. New Chat Button */}
             <div className="p-3 pb-1">
               <button
                 onClick={handleNewChat}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#171922] hover:bg-[#1f2230] active:scale-98 text-white text-xs font-semibold border border-white/10 shadow-sm transition-all"
-                title="Khởi tạo cuộc trò chuyện mới"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-surface-secondary dark:hover:bg-surface-tertiary text-slate-800 dark:text-white text-xs font-semibold border border-slate-200 dark:border-surface-border shadow-xs transition-all"
+                title="Khởi tạo phân tích mới"
               >
-                <SquarePen className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                <span>New chat</span>
+                <SquarePen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <span>Phân tích mới</span>
               </button>
             </div>
 
             {/* 2. Home Navigation Link */}
-            <div className="px-3 pt-1 pb-1">
+            <div className="px-3 py-1">
               <button
                 onClick={handleHomeClick}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-all"
-                title="Về giao diện bắt đầu"
+                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-surface-tertiary transition-all"
               >
-                <Home className="w-4 h-4 text-brand-400 flex-shrink-0" />
-                <span>Home</span>
+                <Home className="w-3.5 h-3.5 text-slate-400" />
+                <span>Trang làm việc</span>
               </button>
             </div>
 
-            {/* 3. Search Box with ⌘K */}
+            {/* 3. Search Box */}
             <div className="px-3 py-1 flex-shrink-0">
               <div className="relative flex items-center">
                 <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400 pointer-events-none" />
@@ -243,191 +260,100 @@ export function Sidebar({ onSelectPrompt, onResetToHome }: SidebarProps) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-[#151824] border border-white/5 text-slate-200 text-xs rounded-xl pl-8 pr-8 py-1.5 outline-none focus:border-brand-400/40 transition-colors placeholder:text-slate-500"
+                  placeholder="Tìm kiếm session/bảng..."
+                  className="w-full bg-slate-100 dark:bg-surface-secondary/70 border border-slate-200 dark:border-surface-border text-slate-800 dark:text-slate-200 text-xs rounded-lg pl-8 pr-3 py-1.5 outline-none focus:border-brand-500/50 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
-                <kbd className="absolute right-2.5 text-[10px] text-slate-400 bg-[#0e111a] px-1.5 py-0.5 rounded border border-white/10 font-mono pointer-events-none">
-                  ⌘K
-                </kbd>
               </div>
             </div>
 
-            {/* 4. Chat History Feed (Grouped: Hôm nay, 7 ngày trước) */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-4">
-              {/* Group 1: Hôm nay */}
-              <div>
-                <div className="px-2 mb-1.5 text-[11px] font-medium text-slate-500">
-                  Hôm nay
-                </div>
+            {/* 4. Scrollable Middle: Session History (100% Focus) */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-2">
+              <div className="flex items-center justify-between px-2 pt-1 pb-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                <span>Lịch sử phân tích</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                  {filteredSessions.length} phiên
+                </span>
+              </div>
 
-                <div className="space-y-0.5">
-                  {filteredSessions.slice(0, 3).map((session) => {
+              {filteredSessions.length === 0 ? (
+                <div className="px-2 py-6 text-center text-xs text-slate-400 italic">
+                  Chưa có phiên phân tích nào.
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredSessions.map((session) => {
                     const isActive = session.id === currentSessionId;
                     return (
                       <div
                         key={session.id}
                         onClick={() => setCurrentSessionId(session.id)}
-                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
+                        className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-all ${
                           isActive
-                            ? "bg-white/10 text-white font-medium"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                            ? "bg-blue-50 dark:bg-brand-600/20 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-brand-500/30 shadow-xs"
+                            : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-surface-secondary/60"
                         }`}
                       >
                         <span className="truncate flex-1 pr-2">{session.title}</span>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteSession(session.id);
                           }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-opacity"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 rounded transition-all"
+                          title="Xóa phiên phân tích"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     );
                   })}
-
-                  {/* Sample presets */}
-                  {PROMPT_PRESETS.filter((p) => p.timeGroup === "today").map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handlePromptClick(item.prompt)}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all truncate block"
-                      title={item.prompt}
-                    >
-                      {item.prompt}
-                    </button>
-                  ))}
                 </div>
-              </div>
-
-              {/* Group 2: 7 ngày trước */}
-              <div>
-                <div className="px-2 mb-1.5 text-[11px] font-medium text-slate-500">
-                  7 ngày trước
-                </div>
-
-                <div className="space-y-0.5">
-                  {filteredSessions.slice(3, 7).map((session) => (
-                    <div
-                      key={session.id}
-                      onClick={() => setCurrentSessionId(session.id)}
-                      className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 cursor-pointer transition-all"
-                    >
-                      <span className="truncate flex-1 pr-2">{session.title}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteSession(session.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-500 hover:text-rose-400 transition-opacity"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-
-                  {PROMPT_PRESETS.filter((p) => p.timeGroup === "past").map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handlePromptClick(item.prompt)}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-all truncate block"
-                      title={item.prompt}
-                    >
-                      {item.prompt}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* 5. Bottom User Profile Card (Persona & Role Switcher) */}
-            <div className="p-2 border-t border-white/5 bg-[#090c14] flex-shrink-0 relative">
+            {/* 5. User Profile Card */}
+            <div className="p-2 border-t border-slate-200 dark:border-surface-border bg-slate-50 dark:bg-surface-secondary/40 flex-shrink-0">
               <div
                 onClick={() => setRoleDropdownOpen(!isRoleDropdownOpen)}
-                className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-surface-tertiary cursor-pointer transition-colors"
                 title="Bấm để đổi vai trò (Analyst / Admin)"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-white/10 flex-shrink-0 ${
-                      isAnalyst
-                        ? "bg-gradient-to-tr from-brand-500 via-indigo-500 to-purple-500"
-                        : "bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-500"
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold ${
+                      isAnalyst ? "bg-blue-600" : "bg-amber-600"
                     }`}
                   >
                     {persona.initials}
                   </div>
-                  <div className="truncate flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-slate-100 truncate">
+                  <div className="truncate">
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                       {persona.name}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
-                      <span>{currentRole}</span>
-                      <span>•</span>
-                      <span>{isAnalyst ? "Supply Chain" : "Governance"}</span>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                      {currentRole}
                     </div>
                   </div>
                 </div>
-
-                <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400" />
               </div>
-
-              {/* Role Dropdown */}
-              {isRoleDropdownOpen && (
-                <div className="absolute bottom-full left-2 right-2 mb-1 p-1 rounded-xl bg-[#171a25] border border-white/10 shadow-card z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-1 font-semibold">
-                    Đổi vai trò
-                  </div>
-                  <button
-                    onClick={() => {
-                      setCurrentRole("Analyst");
-                      setRoleDropdownOpen(false);
-                      showToast("Đã chuyển sang vai trò: Analyst (Nguyễn Văn An)", "info", 1500);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      currentRole === "Analyst"
-                        ? "bg-brand-500/20 text-brand-300 font-semibold"
-                        : "text-slate-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Analyst (Nguyễn Văn An)</span>
-                    {currentRole === "Analyst" && <Check className="w-3.5 h-3.5" />}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setCurrentRole("Admin");
-                      setRoleDropdownOpen(false);
-                      showToast("Đã chuyển sang vai trò: Admin (Trần Thị Bình)", "info", 1500);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                      currentRole === "Admin"
-                        ? "bg-amber-500/20 text-amber-300 font-semibold"
-                        : "text-slate-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Admin (Trần Thị Bình)</span>
-                    {currentRole === "Admin" && <Check className="w-3.5 h-3.5" />}
-                  </button>
-
-                  {isAdmin && (
-                    <div className="border-t border-white/10 mt-1 pt-1">
-                      <Link
-                        href="/audit"
-                        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-amber-300 hover:bg-amber-500/15 transition-colors font-medium"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Nhật ký Audit</span>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </>
         )}
       </aside>
+
+      {/* Table Metadata Detail Modal */}
+      <TableMetadataModal
+        isOpen={!!inspectingTable}
+        tableName={inspectingTable}
+        onClose={() => setInspectingTable(null)}
+        onSelectForPrompt={(tableName) => {
+          if (onSelectPrompt) {
+            onSelectPrompt(`Phân tích các chỉ số chính từ bảng ${tableName}`);
+          }
+        }}
+      />
     </>
   );
 }

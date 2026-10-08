@@ -10,10 +10,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#090d16", // Deep slate/zinc night
+        background: "#0B0F17", // Deep obsidian slate
         surface: {
-          DEFAULT: "#0f172a", // Slate-900
-          subtle: "#1e293b",  // Slate-800
+          DEFAULT: "#111827",  // Gray-900 (primary card surface)
+          secondary: "#1F2937",// Gray-800 (sidebar/header surface)
+          tertiary: "#374151", // Gray-700 (input/hover surface)
+          subtle: "#1e293b",   // Slate-800
           border: "rgba(255, 255, 255, 0.08)",
           hover: "rgba(255, 255, 255, 0.04)",
         },
@@ -23,11 +25,20 @@ const config: Config = {
           200: "#c7d2fe",
           300: "#a5b4fc",
           400: "#818cf8",
-          500: "#6366f1", // Main Indigo Accent
-          600: "#4f46e5",
-          700: "#4338ca",
-          800: "#3730a3",
-          900: "#312e81",
+          500: "#3B82F6", // Professional Electric Blue
+          600: "#2563EB",
+          700: "#1D4ED8",
+          800: "#1E40AF",
+          900: "#1E3A8A",
+        },
+        // Accessible 6-series Data Viz Palette
+        viz: {
+          1: "#3B82F6", // Electric Blue (Primary Metrics)
+          2: "#10B981", // Emerald Teal (Growth / Margin)
+          3: "#F59E0B", // Warm Amber (Returns / Cost)
+          4: "#8B5CF6", // Royal Violet (Secondary Channel)
+          5: "#06B6D4", // Bright Cyan (Volume / Orders)
+          6: "#EC4899", // Vibrant Coral (Benchmark / Target)
         },
         success: {
           DEFAULT: "#10b981", // Emerald
@@ -38,30 +49,31 @@ const config: Config = {
           subtle: "rgba(245, 158, 11, 0.15)",
         },
         danger: {
-          DEFAULT: "#f43f5e", // Rose
-          subtle: "rgba(244, 63, 94, 0.15)",
+          DEFAULT: "#ef4444", // Rose/Red
+          subtle: "rgba(239, 68, 68, 0.15)",
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "JetBrains Mono", "Fira Code", "monospace"],
+        sans: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "var(--font-inter)",
+          "Inter",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-jetbrains-mono)",
+          "JetBrains Mono",
+          "var(--font-mono)",
+          "Fira Code",
+          "monospace",
+        ],
       },
       boxShadow: {
-        card: "0 4px 20px -2px rgba(0, 0, 0, 0.5)",
-        glow: "0 0 25px -5px rgba(99, 102, 241, 0.3)",
-        orb: "0 0 50px 10px rgba(129, 140, 248, 0.25), 0 0 100px 30px rgba(192, 132, 252, 0.15)",
-        window: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)",
-        command: "0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1)",
-      },
-      animation: {
-        "float-subtle": "float 6s ease-in-out infinite",
-        "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-      },
-      keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
+        card: "0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3)",
+        elevated: "0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4)",
+        modal: "0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
       },
     },
   },

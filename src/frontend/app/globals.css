@@ -3,8 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --background: #090d16;
-  --foreground: #f8fafc;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+.dark {
+  --background: #0B0F17;
+  --foreground: #F9FAFB;
 }
 
 body {
@@ -13,9 +18,10 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom Scrollbar for smooth analytics view */
+/* Custom Scrollbar for data-dense analytics view */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -26,96 +32,159 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
 }
 
-/* Glassmorphism Card Utility */
+/* Typography utilities for Enterprise Analytics */
+.font-sans-ui {
+  font-family: var(--font-jakarta), var(--font-inter), system-ui, sans-serif;
+  letter-spacing: -0.011em;
+}
+
+.font-mono-data {
+  font-family: var(--font-jetbrains-mono), var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Enterprise Surface Card Utility */
+.enterprise-card {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+}
+
+.enterprise-card-hover {
+  transition: all 0.15s ease-in-out;
+}
+
+.enterprise-card-hover:hover {
+  background: #1F2937;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Backward-compatible glass card with clean slate aesthetics */
 .glass-card {
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(17, 24, 39, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-card-hover {
-  transition: all 0.2s ease-in-out;
+  transition: all 0.15s ease-in-out;
 }
 
 .glass-card-hover:hover {
-  background: rgba(30, 41, 59, 0.85);
-  border-color: rgba(99, 102, 241, 0.35);
-  transform: translateY(-1px);
+  background: rgba(31, 41, 55, 0.95);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 
-/* 3D Iridescent Holographic Orb (tái tạo orb phát sáng như trong ảnh mẫu) */
-.orb-3d {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #d8b4fe 25%, #818cf8 55%, #3b82f6 75%, #1e1b4b 100%);
-  box-shadow:
-    inset -8px -8px 20px rgba(15, 23, 42, 0.7),
-    inset 6px 6px 12px rgba(255, 255, 255, 0.9),
-    0 10px 30px rgba(129, 140, 248, 0.35),
-    0 0 60px rgba(192, 132, 252, 0.25);
-  filter: drop-shadow(0 4px 16px rgba(99, 102, 241, 0.4));
-}
-
-.orb-3d::before {
-  content: "";
-  position: absolute;
-  top: 12%;
-  left: 22%;
-  width: 20px;
-  height: 12px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 80%);
-  transform: rotate(-30deg);
-}
-
-.orb-3d::after {
-  content: "";
-  position: absolute;
-  inset: -12px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(59, 130, 246, 0.05) 60%, transparent 70%);
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* Desktop Command Input Box */
+/* Universal Command Input Container */
 .command-input-container {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease-in-out;
 }
 
 .command-input-container:focus-within {
-  border-color: rgba(129, 140, 248, 0.4);
-  box-shadow: 0 20px 45px -10px rgba(99, 102, 241, 0.2), 0 0 0 1px rgba(129, 140, 248, 0.3);
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 1px #3B82F6;
 }
 
-/* Pulse Glow Effect for reasoning timeline */
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 0.6;
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-  }
-  50% {
-    opacity: 1;
-    box-shadow: 0 0 25px rgba(99, 102, 241, 0.8);
-  }
+/* Light mode aesthetic adaptations (Clean Enterprise Slate) */
+html:not(.dark) body {
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+html:not(.dark) .bg-background {
+  background-color: #f8fafc !important;
+}
+
+html:not(.dark) .bg-surface {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .bg-surface-secondary {
+  background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) .bg-surface-tertiary {
+  background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .bg-surface-subtle {
+  background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) .border-surface-border {
+  border-color: #e2e8f0 !important;
+}
+
+/* Hardcoded dark backgrounds mapped to clean slate in light mode */
+html:not(.dark) .bg-\[\#0c1322\],
+html:not(.dark) .bg-\[\#0c1322\]\/95,
+html:not(.dark) .bg-\[\#0c1322\]\/98,
+html:not(.dark) .bg-\[\#0d1527\],
+html:not(.dark) .bg-\[\#0a0f1d\],
+html:not(.dark) .bg-\[\#0a0f1d\]\/80,
+html:not(.dark) .bg-\[\#0a0f1d\]\/90,
+html:not(.dark) .bg-\[\#080d19\],
+html:not(.dark) .bg-\[\#080d19\]\/90,
+html:not(.dark) .bg-\[\#070b14\],
+html:not(.dark) .bg-\[\#070b14\]\/90,
+html:not(.dark) .bg-\[\#0B0F17\] {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .border-slate-700,
+html:not(.dark) .border-slate-700\/80,
+html:not(.dark) .border-slate-800 {
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .enterprise-card,
+html:not(.dark) .glass-card,
+html:not(.dark) .command-input-container {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+html:not(.dark) .enterprise-card-hover:hover,
+html:not(.dark) .glass-card-hover:hover {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html:not(.dark) .text-slate-400 {
+  color: #475569 !important;
+}
+
+html:not(.dark) .text-slate-500 {
+  color: #64748b !important;
 }

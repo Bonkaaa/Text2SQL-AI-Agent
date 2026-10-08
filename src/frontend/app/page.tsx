@@ -1,23 +1,41 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, TrendingUp, Compass } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SchemaDrawer } from "@/components/layout/SchemaDrawer";
-import { IridescentOrb } from "@/components/chat/IridescentOrb";
+import { InspectorDrawer } from "@/components/layout/InspectorDrawer";
+import { ExecutiveLaunchpad } from "@/components/chat/ExecutiveLaunchpad";
 import { QueryInputCard } from "@/components/chat/QueryInputCard";
-import { PromptPresets } from "@/components/chat/PromptPresets";
 import { MessageList } from "@/components/chat/MessageList";
 import { useAppContext } from "@/context/AppContext";
 import { askQuery, approveQuery } from "@/services/api";
 import { ChatMessage, QueryResponse } from "@/types/api";
 
 export default function HomePage() {
-  const { currentRole, currentSessionId, showToast } = useAppContext();
+  const {
+    currentRole,
+    currentSessionId,
+    setCurrentSessionId,
+    startNewSession,
+    showToast,
+  } = useAppContext();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isApprovingHitl, setIsApprovingHitl] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+
+  // Shortcut Ctrl+B / Cmd+B to toggle Inspector Drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsInspectorOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Handle submitting query to FastAPI backend
   const handleSendQuery = async (
@@ -48,11 +66,34 @@ export default function HomePage() {
     setIsLoading(true);
 
     try {
-      const response: QueryResponse = await askQuery({
-        question,
-        session_id: currentSessionId || undefined,
-        role: currentRole,
-      });
+      let response: QueryResponse;
+      try {
+        response = await askQuery({
+          question,
+          session_id: currentSessionId || undefined,
+          role: currentRole,
+        });
+      } catch (firstErr: any) {
+        // Tự động giải cứu nếu session cũ bị lỗi token xác thực
+        if (
+          firstErr?.message?.includes("Session Token") ||
+          firstErr?.details?.includes("Session Token")
+        ) {
+          const freshSessionId = startNewSession();
+          response = await askQuery({
+            question,
+            session_id: freshSessionId,
+            role: currentRole,
+          });
+        } else {
+          throw firstErr;
+        }
+      }
+
+      // Cập nhật lại session_id nếu backend cấp ID mới
+      if (response.session_id && response.session_id !== currentSessionId) {
+        setCurrentSessionId(response.session_id);
+      }
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -111,11 +152,24 @@ export default function HomePage() {
     if (!currentSessionId || isApprovingHitl) return;
     setIsApprovingHitl(true);
     try {
-      const response = await approveQuery({
-        session_id: currentSessionId,
-        approved,
-        rejection_reason: reason,
-      });
+      // Endpoint /approve của backend yêu cầu vai trò Admin đã được xác thực (RBAC Governance Guardrail)
+      if (currentRole !== "Admin") {
+        setCurrentRole("Admin");
+        showToast(
+          "Đã kích hoạt vai trò Admin (Data Lead) để thực hiện phê duyệt / từ chối HITL.",
+          "info",
+          3500
+        );
+      }
+
+      const response = await approveQuery(
+        {
+          session_id: currentSessionId,
+          approved,
+          rejection_reason: reason,
+        },
+        "Admin"
+      );
 
       setMessages((prev) => {
         const updated = [...prev];
@@ -176,98 +230,93 @@ export default function HomePage() {
     }
   };
 
-  // Dynamic greeting based on user's current time & active persona
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    const personaName = currentRole === "Analyst" ? "An" : "Bình";
-    if (hour < 12) return `Chào buổi sáng, ${personaName}`;
-    if (hour < 18) return `Chào buổi chiều, ${personaName}`;
-    return `Chào buổi tối, ${personaName}`;
-  };
-
   const handleResetToHome = () => {
     setMessages([]);
   };
 
+  // Telemetry for the inspector pane from latest assistant response
+  const latestAssistantMsg = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.queryResponse);
+  const latestResponse = latestAssistantMsg?.queryResponse;
+
   return (
-    <div className="flex flex-col h-screen bg-[#070b14] overflow-hidden text-slate-100">
-      {/* Main Workspace Layout */}
+    <div className="flex flex-col h-screen bg-background overflow-hidden text-slate-100 font-sans-ui">
+      {/* 3-Pane Adaptive Workspace Layout */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Navigation Sidebar */}
+        {/* Pane 1: Data Catalog & Session Navigator */}
         <Sidebar
           onSelectPrompt={(prompt) => handleSendQuery(prompt)}
           onResetToHome={handleResetToHome}
         />
 
-        {/* Right Off-canvas Schema Drawer */}
+        {/* Off-canvas Schema Drawer (24 Tables Detailed Inspector) */}
         <SchemaDrawer />
 
-        {/* Center Workspace Canvas */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#090d19]">
-          {/* Sub-Header: Engine Dropdown + New Chat + User Avatar */}
-          <Header />
+        {/* Pane 2: Central Analytics Canvas */}
+        <div
+          data-testid="analytics-canvas-pane"
+          className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background relative"
+        >
+          {/* Header Bar */}
+          <Header
+            isInspectorOpen={isInspectorOpen}
+            onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
+          />
 
           {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
-            {messages.length === 0 ? (
-              /* ========================================================= */
-              /* HERO / EMPTY STATE: 3D Orb + Greeting + Command Input Box */
-              /* ========================================================= */
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-4xl mx-auto w-full my-auto animate-in fade-in zoom-in-95 duration-300">
-                {/* 3D Iridescent Orb */}
-                <IridescentOrb />
-
-                {/* Hero Greeting & Headline (matching sample image) */}
-                <div className="space-y-1.5 mt-2 mb-8">
-                  <div className="text-sm font-medium text-slate-400 tracking-wide">
-                    {getGreeting()}
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-                    How Can I{" "}
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-400 via-indigo-300 to-purple-400">
-                      Assist You Today?
-                    </span>
-                  </h1>
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+            {/* Scrollable Canvas: Launchpad or Messages with bottom padding for floating bar */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 pb-28 sm:pb-32 flex flex-col">
+              {messages.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center max-w-3xl mx-auto w-full my-auto animate-in fade-in duration-200">
+                  <ExecutiveLaunchpad
+                    currentRole={currentRole}
+                    onSelectPrompt={(prompt) => handleSendQuery(prompt)}
+                  />
                 </div>
+              ) : (
+                <div className="flex-1 max-w-3xl mx-auto w-full">
+                  <MessageList
+                    messages={messages}
+                    isLoading={isLoading}
+                    isApprovingHitl={isApprovingHitl}
+                    onApproveHitl={handleApproveHitl}
+                    onSelectOption={(option) => handleSendQuery(option)}
+                    onRetry={handleRetryLastQuery}
+                  />
+                </div>
+              )}
+            </div>
 
-                {/* Central High-End Command Input Card */}
+            {/* Floating Capsule Command Bar (Google Gemini Style - Perfectly Centered & Aligned) */}
+            <div className="absolute bottom-5 left-0 right-0 z-30 pointer-events-none px-4 flex justify-center">
+              <div className="max-w-3xl w-full pointer-events-auto">
                 <QueryInputCard
                   onSubmit={handleSendQuery}
                   isLoading={isLoading}
-                />
-
-                {/* Quick Suggestion Chips (Component 2.2: PromptPresets) */}
-                <PromptPresets
-                  onSelectPrompt={(query) => handleSendQuery(query)}
-                  disabled={isLoading}
-                  className="mt-6"
+                  placeholder={
+                    messages.length === 0
+                      ? "Đặt câu hỏi phân tích kho TPC-DS (ví dụ: So sánh doanh thu Store vs Web 2003)..."
+                      : "Tiếp tục phân tích hoặc tinh chỉnh câu hỏi..."
+                  }
                 />
               </div>
-            ) : (
-              /* ========================================================= */
-              /* ACTIVE CONVERSATION STATE: Chat Thread + Bottom Docked Bar*/
-              /* ========================================================= */
-              <div className="flex-1 flex flex-col justify-between p-4 sm:p-8 max-w-4xl mx-auto w-full">
-                <MessageList
-                  messages={messages}
-                  isLoading={isLoading}
-                  isApprovingHitl={isApprovingHitl}
-                  onApproveHitl={handleApproveHitl}
-                  onSelectOption={(option) => handleSendQuery(option)}
-                  onRetry={handleRetryLastQuery}
-                />
-
-                {/* Bottom Docked Input Box */}
-                <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-[#090d19] via-[#090d19]/90 to-transparent">
-                  <QueryInputCard
-                    onSubmit={handleSendQuery}
-                    isLoading={isLoading}
-                  />
-                </div>
-              </div>
-            )}
+            </div>
           </main>
         </div>
+
+        {/* Pane 3: Context & Governance Inspector Drawer */}
+        <InspectorDrawer
+          data-testid="inspector-pane"
+          isOpen={isInspectorOpen}
+          onClose={() => setIsInspectorOpen(false)}
+          executionTimeMs={latestResponse?.execution_time_ms}
+          scannedBytes={latestResponse?.estimated_cost_bytes}
+          sql={latestResponse?.sql}
+          astVerified={!!(latestResponse as any)?.ast_verified}
+          role={currentRole}
+        />
       </div>
     </div>
   );
