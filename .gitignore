@@ -10,6 +10,8 @@ tpch_csv/
 data/*.duckdb
 data/*.parquet
 data/*.sql
+data/*.sqlite
+*.sqlite
 data/logs
 outputs/*
 !outputs/.gitkeep
