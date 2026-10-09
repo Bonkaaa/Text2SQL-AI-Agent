@@ -10,13 +10,16 @@ import {
   RotateCcw,
   AlertTriangle,
   Layers,
+  Globe,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/hooks/useSettings";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { settings, updateSettings, resetSettings } = useSettings();
+  const { t, locale, setLocale } = useLanguage();
 
   const [saved, setSaved] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
@@ -203,6 +206,57 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Language & Localization Section */}
+        <section className="bg-surface border border-line rounded-xl p-4 md:p-5 shadow-panel space-y-4">
+          <div className="flex items-center gap-2 text-foreground font-bold text-sm">
+            <Globe className="w-4 h-4 text-primary" />
+            <h3>{t("settings.languageTitle")}</h3>
+          </div>
+          <p className="text-muted text-xs leading-relaxed">
+            {t("settings.languageDesc")}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setLocale("vi")}
+              className={`flex items-center justify-between p-3 rounded-lg border text-xs font-bold transition-all text-left ${
+                locale === "vi"
+                  ? "border-primary bg-primary-soft/40 text-foreground shadow-xs ring-1 ring-primary"
+                  : "border-line bg-surface-2 hover:bg-surface text-muted"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🇻🇳</span>
+                <div>
+                  <div className="font-bold text-foreground">Tiếng Việt</div>
+                  <div className="text-[10px] text-muted font-normal">Vietnamese</div>
+                </div>
+              </div>
+              {locale === "vi" && <Check className="w-4 h-4 text-primary shrink-0" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLocale("en")}
+              className={`flex items-center justify-between p-3 rounded-lg border text-xs font-bold transition-all text-left ${
+                locale === "en"
+                  ? "border-primary bg-primary-soft/40 text-foreground shadow-xs ring-1 ring-primary"
+                  : "border-line bg-surface-2 hover:bg-surface text-muted"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🇬🇧</span>
+                <div>
+                  <div className="font-bold text-foreground">English</div>
+                  <div className="text-[10px] text-muted font-normal">Tiếng Anh</div>
+                </div>
+              </div>
+              {locale === "en" && <Check className="w-4 h-4 text-primary shrink-0" />}
+            </button>
           </div>
         </section>
 

@@ -28,12 +28,15 @@ interface ResultCanvasProps {
   isLoading?: boolean;
 }
 
+import { useLanguage } from "@/context/LanguageContext";
+
 export function ResultCanvas({
   response,
   activeTab,
   onTabChange,
   isLoading = false,
 }: ResultCanvasProps) {
+  const { t } = useLanguage();
   const { isSaved, saveQuery } = useSavedQueries();
   const isBookmarked = response?.question ? isSaved(response.question) : false;
 
@@ -50,28 +53,28 @@ export function ResultCanvas({
   const tabs: { id: TabType; label: string; icon: React.ReactNode; badge?: number }[] = [
     {
       id: "answer",
-      label: "Answer",
+      label: t("workspace.tabAnswer", "Answer"),
       icon: <Sparkles className="w-3.5 h-3.5" />,
     },
     {
       id: "table",
-      label: "Table",
+      label: t("workspace.tabTable", "Table"),
       icon: <TableIcon className="w-3.5 h-3.5" />,
       badge: response?.data?.length,
     },
     {
       id: "chart",
-      label: "Chart",
+      label: t("workspace.tabChart", "Chart"),
       icon: <BarChart3 className="w-3.5 h-3.5" />,
     },
     {
       id: "sql",
-      label: "SQL",
+      label: t("workspace.tabSql", "SQL"),
       icon: <Code2 className="w-3.5 h-3.5" />,
     },
     {
       id: "trace",
-      label: "Trace",
+      label: t("workspace.tabTrace", "Trace"),
       icon: <Layers className="w-3.5 h-3.5" />,
       badge: response?.tasks?.length,
     },

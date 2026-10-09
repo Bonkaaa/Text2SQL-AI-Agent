@@ -1,7 +1,6 @@
-"use client";
-
 import React, { useState, useRef, KeyboardEvent } from "react";
 import { Send, Database, Loader2 } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface QueryComposerProps {
   onSubmit: (question: string) => void;
@@ -12,8 +11,15 @@ interface QueryComposerProps {
 export function QueryComposer({
   onSubmit,
   isLoading,
-  placeholder = "Ask a question about your data (e.g., Which 10 products generated the most revenue in 2003?)...",
+  placeholder,
 }: QueryComposerProps) {
+  const { t } = useLanguage();
+  const effectivePlaceholder =
+    placeholder ||
+    t(
+      "workspace.composerPlaceholder",
+      "Ask a question about your data (e.g., Which 10 products generated the most revenue in 2003?)..."
+    );
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -48,7 +54,7 @@ export function QueryComposer({
           onKeyDown={handleKeyDown}
           disabled={isLoading}
           rows={2}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           aria-label="Ask a question about your data"
           className="w-full bg-transparent border-0 outline-none resize-none text-xs text-foreground placeholder:text-faint leading-relaxed disabled:opacity-50"
         />

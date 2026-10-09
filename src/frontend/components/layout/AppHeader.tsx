@@ -3,19 +3,33 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { Search, HelpCircle, Bell } from "lucide-react";
-
-const pageTitles: Record<string, string> = {
-  "/workspace": "Workspace",
-  "/dashboard": "Dashboard",
-  "/saved-queries": "Saved queries",
-  "/history": "Query history",
-  "/data-sources": "Data sources",
-  "/settings": "Settings",
-};
+import { useLanguage } from "@/context/LanguageContext";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AppHeader() {
   const pathname = usePathname();
-  const currentTitle = pageTitles[pathname] || "Workspace";
+  const { t } = useLanguage();
+
+  const getPageTitle = (path: string): string => {
+    switch (path) {
+      case "/workspace":
+        return t("nav.workspace");
+      case "/dashboard":
+        return t("nav.dashboard");
+      case "/saved-queries":
+        return t("nav.savedQueries");
+      case "/history":
+        return t("nav.history");
+      case "/data-sources":
+        return t("nav.dataSources");
+      case "/settings":
+        return t("nav.settings");
+      default:
+        return t("nav.workspace");
+    }
+  };
+
+  const currentTitle = getPageTitle(pathname);
 
   return (
     <header className="h-16 px-4 md:px-8 bg-surface/90 backdrop-blur-sm border-b border-line flex items-center justify-between gap-4 sticky top-0 z-10 shrink-0">
@@ -34,7 +48,7 @@ export function AppHeader() {
           <Search className="w-3.5 h-3.5 shrink-0 text-faint" />
           <input
             type="text"
-            placeholder="Search queries, tables..."
+            placeholder={t("nav.searchPlaceholder")}
             className="w-full bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-faint"
           />
           <kbd className="text-[10px] border border-line-strong rounded px-1 text-faint shrink-0 font-mono">
@@ -42,9 +56,12 @@ export function AppHeader() {
           </kbd>
         </div>
 
+        {/* Bilingual Quick Toggle */}
+        <LanguageSwitcher />
+
         <button
           type="button"
-          title="Help & documentation"
+          title={t("nav.help")}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-surface-2 transition-colors border border-transparent hover:border-line"
         >
           <HelpCircle className="w-4 h-4" />
@@ -52,7 +69,7 @@ export function AppHeader() {
 
         <button
           type="button"
-          title="Notifications"
+          title={t("nav.notifications")}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-surface-2 transition-colors border border-transparent hover:border-line"
         >
           <Bell className="w-4 h-4" />

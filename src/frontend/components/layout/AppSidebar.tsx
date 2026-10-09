@@ -17,29 +17,23 @@ import {
 } from "lucide-react";
 import { DatabaseSwitcher } from "./DatabaseSwitcher";
 import { cn } from "@/lib/utils";
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tag?: string;
-}
-
-const workspaceNavItems: NavItem[] = [
-  { name: "Workspace", href: "/workspace", icon: Sparkles },
-  { name: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-  { name: "Saved queries", href: "/saved-queries", icon: Bookmark, tag: "3" },
-  { name: "Query history", href: "/history", icon: History },
-];
-
-const dataNavItems: NavItem[] = [
-  { name: "Data sources", href: "/data-sources", icon: Database },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { t } = useLanguage();
+
+  const workspaceNavItems = [
+    { name: t("nav.workspace"), href: "/workspace", icon: Sparkles },
+    { name: t("nav.dashboard"), href: "/dashboard", icon: LayoutGrid },
+    { name: t("nav.savedQueries"), href: "/saved-queries", icon: Bookmark, tag: "3" },
+    { name: t("nav.history"), href: "/history", icon: History },
+  ];
+
+  const dataNavItems = [
+    { name: t("nav.dataSources"), href: "/data-sources", icon: Database },
+    { name: t("nav.settings"), href: "/settings", icon: Settings },
+  ];
 
   return (
     <aside className="sticky top-0 h-screen flex flex-col p-3 md:p-3.5 bg-surface border-r border-line z-20 w-[66px] md:w-[238px] transition-all duration-200 shrink-0">
@@ -67,7 +61,7 @@ export function AppSidebar() {
       <div className="flex-1 overflow-y-auto space-y-4 pt-2">
         <div>
           <div className="hidden md:block text-faint text-[10px] tracking-wider font-bold uppercase px-3 pb-2">
-            Workspace
+            {t("nav.workspace")}
           </div>
           <nav className="grid gap-1" aria-label="Workspace navigation">
             {workspaceNavItems.map((item) => {
@@ -133,16 +127,16 @@ export function AppSidebar() {
           <HelpCircle className="w-4 h-4" />
         </div>
         <strong className="text-[11px] block font-bold text-foreground">
-          Need a hand?
+          {t("nav.helpCardTitle")}
         </strong>
         <p className="text-muted text-[10px] leading-relaxed my-1.5">
-          Ask questions in plain Vietnamese about retail sales and inventory.
+          {t("nav.helpCardDesc")}
         </p>
         <Link
           href="/data-sources"
           className="text-primary text-[10px] font-bold hover:underline inline-flex items-center gap-1"
         >
-          Explore schema →
+          {t("nav.docs")} →
         </Link>
       </div>
 
