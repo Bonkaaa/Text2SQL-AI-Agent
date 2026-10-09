@@ -1,174 +1,154 @@
-/**
- * TypeScript Interfaces & Types cho Frontend Text2SQL AI Agent.
- * Khớp chuẩn 100% với Pydantic Schemas trong src/models/api_schemas.py và src/models/state.py.
- */
-
-import type { ResponsePackage, ArtifactItem } from "./artifacts";
-
-// ==============================================================================
-// 1. NGƯỜI DÙNG & PHÂN QUYỀN (RBAC)
-// ==============================================================================
-
-export type UserRole = "Analyst" | "Admin";
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  role: UserRole;
-  avatarUrl?: string;
-}
-
-// ==============================================================================
-// 2. TRẠNG THÁI PHẢN HỒI CỦA AI AGENT
-// ==============================================================================
-
-export type QueryStatus =
-  | "COMPLETED"
-  | "CLARIFICATION_REQUIRED"
-  | "PENDING_APPROVAL"
-  | "ERROR"
-  | "EXECUTION_FAILED";
-
-// ==============================================================================
-// 3. CẤU HÌNH TRỰC QUAN HÓA BIỂU ĐỒ (RECHARTS CONFIG)
-// ==============================================================================
-
-export type ChartType = "bar" | "line" | "area" | "pie" | "composed" | "table";
-
-export interface RechartsConfig {
-  chart_type: ChartType;
-  title?: string;
-  x_key?: string;
-  x_axis?: string;
-  y_keys?: string[];
-  y_axis?: string[] | string;
-  series_labels?: Record<string, string>;
-  description?: string;
-  legend?: boolean;
-}
-
-// ==============================================================================
-// 4. API ENDPOINT: /api/v1/query/ask
-// ==============================================================================
+export type UserRole = "Analyst" | "Admin" | "Business_User";
 
 export interface AskQueryRequest {
   question: string;
-  session_id?: string | null;
+  session_id?: string;
   user_id?: string;
   role?: UserRole;
-  session_token?: string | null;
+  session_token?: string;
 }
-
-export interface QueryResponse {
-  session_id: string;
-  status: QueryStatus;
-  question: string;
-  is_ambiguous: boolean;
-  clarification_question?: string | null;
-  suggested_options: string[];
-  final_answer?: string | null;
-  sql?: string | null;
-  data?: Record<string, any>[] | null;
-  columns?: string[] | null;
-  recharts_config?: RechartsConfig | null;
-  requires_hitl: boolean;
-  estimated_cost_bytes?: number | null;
-  execution_time_ms: number;
-  error?: string | null;
-  error_type?: string | null;
-  retry_count?: number | null;
-  response_package?: ResponsePackage | null;
-  output_artifacts?: ArtifactItem[] | null;
-}
-
-// ==============================================================================
-// 5. API ENDPOINT: /api/v1/query/approve (HITL)
-// ==============================================================================
 
 export interface ApprovalRequest {
   session_id: string;
+  task_id?: string;
+  approval_id?: string;
+  session_token?: string;
   approved: boolean;
-  rejection_reason?: string | null;
+  rejection_reason?: string;
 }
 
 export interface ApprovalResponse {
   session_id: string;
+  approval_id?: string;
   approved: boolean;
   status: string;
   message: string;
-  data?: Record<string, any>[] | null;
-  columns?: string[] | null;
+  session_token?: string;
+  data?: Record<string, any>[];
+  columns?: string[];
 }
 
-// ==============================================================================
-// 6. API ENDPOINT: /api/v1/query/history
-// ==============================================================================
-
-export interface QueryHistoryItem {
-  session_id: string;
-  timestamp?: string | null;
-  status?: string | null;
-  question?: string | null;
-  artifacts: string[];
+export interface KpiArtifact {
+  type: "kpi";
+  title: string;
+  value: number | string;
+  unit?: string;
+  delta?: number;
+  delta_type?: "increase" | "decrease" | "neutral";
 }
 
-export interface QueryHistoryResponse {
-  session_id: string;
-  history: QueryHistoryItem[];
+export interface ChartArtifact {
+  type: "chart";
+  chart_type: "bar" | "line" | "area" | "pie" | "composed";
+  title: string;
+  x_key: string;
+  y_keys: string[];
+  series_labels?: Record<string, string>;
+  data: Record<string, any>[];
 }
 
-// ==============================================================================
-// 7. API ENDPOINT: /api/v1/audit/logs (ADMIN ONLY)
-// ==============================================================================
+export interface TableArtifact {
+  type: "table";
+  title: string;
+  columns: string[];
+  column_formats?: Record<string, string>;
+  rows: Record<string, any>[];
+  total_row_count?: number;
+}
 
-export interface AuditLogItem {
-  timestamp?: string;
-  created_at?: string;
-  query_id?: string;
-  trace_id?: string;
+export interface EvidenceArtifact {
+  type: "evidence";
+  task_id: string;
+  claim: string;
+  supporting_sql: string;
+  sample_values?: Record<string, any>[];
+}
+
+export interface CalloutArtifact {
+  type: "callout";
+  variant: "info" | "warning" | "error" | "no_data";
+  message: string;
+}
+
+export interface FileArtifact {
+  type: "file";
+  file_name: string;
+  file_type: string;
+  download_url: string;
+}
+
+export type ArtifactItem =
+  | KpiArtifact
+  | ChartArtifact
+  | TableArtifact
+  | EvidenceArtifact
+  | CalloutArtifact
+  | FileArtifact;
+
+export interface ResponsePackage {
   session_id: string;
-  user_id: string;
-  role: string;
-  event_type?: string;
-  question?: string;
-  sql?: string;
-  status: string;
-  execution_time_ms: number;
-  bytes_scanned?: number;
-  error_type?: string;
-  error_message?: string;
+  direct_answer: string;
+  detailed_insight?: string[];
+  layout?: "focus" | "stacked" | "dashboard_grid";
+  artifacts: ArtifactItem[];
+  executed_queries?: { task_id: string; sql: string }[];
+  total_execution_time_ms?: number;
+}
+
+export interface QueryArtifact {
+  artifact_id: string;
+  task_id: string;
+  sql: string;
+  dialect: string;
+  explanation?: string;
   tables_used?: string[];
   columns_used?: string[];
-}
-
-export interface AuditLogsResponse {
-  total: number;
-  limit: number;
-  offset: number;
-  logs: AuditLogItem[];
-}
-
-// ==============================================================================
-// 8. API ENDPOINT: /health & /api/v1/health
-// ==============================================================================
-
-export interface HealthResponse {
   status: string;
-  database: string;
-  version: string;
+  data?: Record<string, any>[];
+  columns?: string[];
+  row_count?: number;
+  execution_time_ms?: number;
+  error_message?: string;
 }
 
-// ==============================================================================
-// 9. CLIENT-SIDE CHAT STATE (MESSAGE FEED DATA STRUCTURE)
-// ==============================================================================
+export interface AnalysisTask {
+  task_id: string;
+  description: string;
+  status: string;
+  query_artifact?: QueryArtifact;
+  retry_count?: number;
+}
 
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  // Trạng thái mở rộng cho phản hồi của Assistant
-  status?: QueryStatus;
-  queryResponse?: QueryResponse;
-  isLoading?: boolean;
+export interface QueryResponse {
+  session_id: string;
+  status:
+    | "COMPLETED"
+    | "SUCCESS"
+    | "CLARIFICATION_REQUIRED"
+    | "SECURITY_BLOCKED"
+    | "PENDING_APPROVAL"
+    | "ERROR";
+  question: string;
+  final_answer?: string;
+  response_package?: ResponsePackage;
+  output_artifacts?: ArtifactItem[];
+  sql?: string;
+  data?: Record<string, any>[];
+  columns?: string[];
+  recharts_config?: any;
+  insight?: any;
+  visualization?: any;
+  is_safe?: boolean;
+  safety_category?: string;
+  refusal_reason?: string;
+  is_ambiguous?: boolean;
+  clarification_question?: string;
+  suggested_options?: string[];
+  tasks?: AnalysisTask[];
+  artifacts?: QueryArtifact[];
+  requires_hitl?: boolean;
+  estimated_cost_bytes?: number;
+  execution_time_ms?: number;
+  error?: string;
+  session_token?: string;
 }
