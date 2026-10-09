@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Search, Table as TableIcon, Filter, Layers } from "lucide-react";
+import { Search } from "lucide-react";
 import { TableMetadata, TableCategory } from "@/types/schema";
 import { TableDetailView } from "./TableDetailView";
 import { formatNumber } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface SchemaExplorerProps {
   tables: TableMetadata[];
@@ -21,29 +22,30 @@ export function SchemaExplorer({
   onSelectTable,
   onAskQuestion,
 }: SchemaExplorerProps) {
+  const { t } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<FilterCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories: { id: FilterCategory; label: string; count: number }[] = [
-    { id: "all", label: "All Tables", count: tables.length },
+    { id: "all", label: t("sources.allTables"), count: tables.length },
     {
       id: "sales",
-      label: "Sales Channels",
+      label: t("sources.catSales"),
       count: tables.filter((t) => t.category === "sales").length,
     },
     {
       id: "returns",
-      label: "Returns",
+      label: t("sources.catReturns"),
       count: tables.filter((t) => t.category === "returns").length,
     },
     {
       id: "inventory",
-      label: "Inventory",
+      label: t("sources.catInventory"),
       count: tables.filter((t) => t.category === "inventory").length,
     },
     {
       id: "dimensions",
-      label: "Dimensions",
+      label: t("sources.catDimensions"),
       count: tables.filter((t) => t.category === "dimensions").length,
     },
   ];
@@ -114,7 +116,7 @@ export function SchemaExplorer({
           <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search tables, columns..."
+            placeholder={t("sources.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-line bg-surface text-foreground placeholder:text-muted focus:outline-none focus:border-primary"
@@ -127,23 +129,27 @@ export function SchemaExplorer({
         {/* Left: Table List (4 cols) */}
         <div className="lg:col-span-4 bg-surface border border-line rounded-xl shadow-card overflow-hidden">
           <div className="p-3 border-b border-line bg-surface-2 flex items-center justify-between text-xs font-bold text-foreground">
-            <span>TPC-DS Tables ({filteredTables.length})</span>
-            <span className="text-[10px] text-muted font-normal">Click to inspect</span>
+            <span>
+              {t("sources.tablesHeader")} ({filteredTables.length})
+            </span>
+            <span className="text-[10px] text-muted font-normal">
+              {t("sources.clickToInspect")}
+            </span>
           </div>
 
           <div className="divide-y divide-line max-h-[620px] overflow-y-auto">
             {filteredTables.length === 0 ? (
               <div className="p-6 text-center text-xs text-muted">
-                No tables match your filter criteria.
+                {t("sources.noTablesMatch")}
               </div>
             ) : (
-              filteredTables.map((t) => {
-                const isSelected = currentSelected?.name === t.name;
+              filteredTables.map((tItem) => {
+                const isSelected = currentSelected?.name === tItem.name;
                 return (
                   <button
-                    key={t.name}
+                    key={tItem.name}
                     type="button"
-                    onClick={() => onSelectTable(t)}
+                    onClick={() => onSelectTable(tItem)}
                     className={`w-full text-left p-3 transition-colors flex items-start justify-between gap-2 ${
                       isSelected
                         ? "bg-primary-soft/40 border-l-4 border-l-primary"
@@ -153,20 +159,20 @@ export function SchemaExplorer({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-bold text-foreground truncate">
-                          {t.name}
+                          {tItem.name}
                         </span>
                       </div>
                       <span className="text-[11px] text-muted block truncate mt-0.5">
-                        {t.displayName}
+                        {tItem.displayName}
                       </span>
                     </div>
 
                     <div className="text-right shrink-0">
                       <span className="text-[10px] font-mono tabular-nums text-muted block">
-                        ~{formatNumber(t.rowCountEstimate)}
+                        ~{formatNumber(tItem.rowCountEstimate)}
                       </span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-2 text-muted border border-line mt-1 inline-block">
-                        {t.columns.length} cols
+                        {tItem.columns.length} {t("sources.cols")}
                       </span>
                     </div>
                   </button>
@@ -185,7 +191,7 @@ export function SchemaExplorer({
             />
           ) : (
             <div className="bg-surface border border-line rounded-xl p-12 text-center text-xs text-muted">
-              Select a table on the left to inspect columns and relationship constraints.
+              {t("sources.selectToInspect")}
             </div>
           )}
         </div>

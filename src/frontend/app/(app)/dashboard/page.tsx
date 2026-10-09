@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useQueryHistory } from "@/hooks/useQueryHistory";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { useLanguage } from "@/context/LanguageContext";
 
 const POPULAR_RECOMMENDED_QUERIES = [
   {
@@ -48,6 +49,7 @@ const POPULAR_RECOMMENDED_QUERIES = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { historyItems } = useQueryHistory();
   const { savedQueries } = useSavedQueries();
 
@@ -86,13 +88,13 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="text-primary text-[10px] font-extrabold uppercase tracking-widest mb-1.5">
-            Analytics at a glance
+            {t("dashboard.eyebrow")}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Workspace Dashboard
+            {t("dashboard.title")}
           </h1>
           <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl leading-relaxed">
-            A home for reusable insights, saved visualizations, and warehouse query telemetry.
+            {t("dashboard.description")}
           </p>
         </div>
 
@@ -101,7 +103,7 @@ export default function DashboardPage() {
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary-strong text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
         >
           <LayoutGrid className="w-4 h-4" />
-          Launch workspace
+          {t("dashboard.launchWorkspace")}
         </Link>
       </div>
 
@@ -109,7 +111,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface border border-line rounded-xl p-4 shadow-panel">
           <div className="flex items-center justify-between text-muted text-xs font-semibold">
-            <span>Total Queries Run</span>
+            <span>{t("dashboard.kpiTotalQueries")}</span>
             <div className="w-7 h-7 rounded-lg bg-primary-soft text-primary grid place-items-center">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -121,13 +123,13 @@ export default function DashboardPage() {
             {metrics.totalQueries}
           </div>
           <div className="text-[10px] text-muted mt-1.5">
-            <span className="text-emerald font-bold">Live telemetry</span> from session history
+            <span className="text-emerald font-bold">{t("dashboard.liveTelemetry")}</span>
           </div>
         </div>
 
         <div className="bg-surface border border-line rounded-xl p-4 shadow-panel">
           <div className="flex items-center justify-between text-muted text-xs font-semibold">
-            <span>Execution Success Rate</span>
+            <span>{t("dashboard.kpiSuccessRate")}</span>
             <div className="w-7 h-7 rounded-lg bg-emerald-soft text-emerald grid place-items-center">
               <CheckCircle2 className="w-4 h-4" />
             </div>
@@ -139,13 +141,13 @@ export default function DashboardPage() {
             {metrics.successRate}
           </div>
           <div className="text-[10px] text-muted mt-1.5">
-            AST validated & read-only enforced
+            {t("dashboard.astValidated")}
           </div>
         </div>
 
         <div className="bg-surface border border-line rounded-xl p-4 shadow-panel">
           <div className="flex items-center justify-between text-muted text-xs font-semibold">
-            <span>Avg. Execution Latency</span>
+            <span>{t("dashboard.kpiAvgLatency")}</span>
             <div className="w-7 h-7 rounded-lg bg-primary-soft text-primary grid place-items-center">
               <Clock className="w-4 h-4" />
             </div>
@@ -157,13 +159,13 @@ export default function DashboardPage() {
             {metrics.avgLatencyMs}
           </div>
           <div className="text-[10px] text-muted mt-1.5">
-            DuckDB in-process OLAP speed
+            {t("dashboard.olapSpeed")}
           </div>
         </div>
 
         <div className="bg-surface border border-line rounded-xl p-4 shadow-panel">
           <div className="flex items-center justify-between text-muted text-xs font-semibold">
-            <span>Saved Insights</span>
+            <span>{t("dashboard.kpiSavedInsights")}</span>
             <div className="w-7 h-7 rounded-lg bg-amber-soft text-amber grid place-items-center">
               <Bookmark className="w-4 h-4" />
             </div>
@@ -172,10 +174,10 @@ export default function DashboardPage() {
             data-testid="kpi-saved-queries"
             className="text-2xl font-extrabold text-foreground mt-3 tracking-tight font-mono tabular-nums"
           >
-            {metrics.savedCount} {metrics.savedCount === 1 ? "Query" : "Queries"}
+            {metrics.savedCount}
           </div>
           <div className="text-[10px] text-muted mt-1.5">
-            Pinned in saved queries library
+            {t("dashboard.pinnedQueries")}
           </div>
         </div>
       </div>
@@ -187,14 +189,14 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <strong className="text-xs font-bold text-foreground block">
-                7-Day Query Activity Volume
+                {t("dashboard.activityTitle")}
               </strong>
               <small className="text-[10px] text-muted">
-                Daily executed analytical requests
+                {t("dashboard.activitySubtitle")}
               </small>
             </div>
             <span className="text-[10px] border border-line rounded px-2 py-1 bg-surface-2 text-muted">
-              Last 7 Days
+              {t("dashboard.last7Days")}
             </span>
           </div>
 
@@ -207,10 +209,12 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between border-b border-line pb-2.5">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-primary" />
-                <strong className="text-xs font-bold text-foreground">Popular Queries</strong>
+                <strong className="text-xs font-bold text-foreground">
+                  {t("dashboard.recommendedTitle")}
+                </strong>
               </div>
               <Link href="/saved-queries" className="text-[10px] text-primary font-bold hover:underline">
-                View all library
+                {t("dashboard.viewAllLibrary")}
               </Link>
             </div>
 
@@ -225,7 +229,7 @@ export default function DashboardPage() {
                       {item.title}
                     </span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface border border-line text-muted font-mono shrink-0">
-                      {item.runs} runs
+                      {item.runs} {t("dashboard.runs")}
                     </span>
                   </div>
                   <p className="text-[11px] text-muted line-clamp-1 italic">
@@ -241,7 +245,7 @@ export default function DashboardPage() {
                       className="inline-flex items-center gap-1 bg-primary/10 hover:bg-primary text-primary hover:text-white px-2 py-1 rounded text-[11px] font-bold transition"
                     >
                       <Play className="w-3 h-3 fill-current" />
-                      Run in Workspace
+                      {t("dashboard.runInWorkspace")}
                     </button>
                   </div>
                 </div>
@@ -256,21 +260,21 @@ export default function DashboardPage() {
               className="p-2 rounded-lg bg-surface-2 hover:bg-surface border border-line text-muted hover:text-primary transition flex flex-col items-center gap-1"
             >
               <Database className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold">24 Tables</span>
+              <span className="text-[10px] font-bold">{t("nav.dbTables")}</span>
             </Link>
             <Link
               href="/history"
               className="p-2 rounded-lg bg-surface-2 hover:bg-surface border border-line text-muted hover:text-primary transition flex flex-col items-center gap-1"
             >
               <HistoryIcon className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold">Audit Log</span>
+              <span className="text-[10px] font-bold">{t("nav.history")}</span>
             </Link>
             <Link
               href="/settings"
               className="p-2 rounded-lg bg-surface-2 hover:bg-surface border border-line text-muted hover:text-primary transition flex flex-col items-center gap-1"
             >
               <Settings className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold">Settings</span>
+              <span className="text-[10px] font-bold">{t("nav.settings")}</span>
             </Link>
           </div>
         </div>

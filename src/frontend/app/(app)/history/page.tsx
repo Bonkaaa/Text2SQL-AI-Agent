@@ -3,47 +3,45 @@
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  History,
   Search,
   RotateCw,
-  Play,
   Copy,
   Check,
-  ShieldCheck,
   ShieldAlert,
   AlertTriangle,
   Clock,
-  Database,
   Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useQueryHistory } from "@/hooks/useQueryHistory";
 import { HistoryItem } from "@/lib/storage";
+import { useLanguage } from "@/context/LanguageContext";
 
 type StatusFilter = "ALL" | "SUCCESS" | "BLOCKED" | "ERROR";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { historyItems, refresh } = useQueryHistory();
+  const { t } = useLanguage();
+  const { historyItems } = useQueryHistory();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const statusTabs: { id: StatusFilter; label: string; count: number }[] = [
-    { id: "ALL", label: "All Runs", count: historyItems.length },
+    { id: "ALL", label: t("history.allRuns"), count: historyItems.length },
     {
       id: "SUCCESS",
-      label: "Success",
+      label: t("history.statusSuccess"),
       count: historyItems.filter((h) => h.status === "SUCCESS").length,
     },
     {
       id: "BLOCKED",
-      label: "Blocked",
+      label: t("history.blocked"),
       count: historyItems.filter((h) => h.status === "BLOCKED").length,
     },
     {
       id: "ERROR",
-      label: "Errors",
+      label: t("history.errors"),
       count: historyItems.filter((h) => h.status === "ERROR").length,
     },
   ];
@@ -84,13 +82,13 @@ export default function HistoryPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="text-primary text-[10px] font-extrabold uppercase tracking-widest mb-1.5">
-            Audit & telemetry trail
+            {t("history.eyebrow")}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Query history
+            {t("history.title")}
           </h1>
           <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl leading-relaxed">
-            Review past agent runs, inspect generated SQL queries, and rerun analyses.
+            {t("history.description")}
           </p>
         </div>
 
@@ -99,7 +97,7 @@ export default function HistoryPage() {
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary-strong text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          <span>New query in Workspace</span>
+          <span>{t("history.newQuery")}</span>
         </Link>
       </div>
 
@@ -147,7 +145,7 @@ export default function HistoryPage() {
           <Search className="w-3.5 h-3.5 text-muted shrink-0" />
           <input
             type="text"
-            placeholder="Search questions or SQL..."
+            placeholder={t("history.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted"
@@ -161,19 +159,19 @@ export default function HistoryPage() {
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead className="bg-surface-2 text-muted text-[10px] font-bold uppercase border-b border-line">
               <tr>
-                <th className="p-3">Natural Question & SQL</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Rows</th>
-                <th className="p-3 text-right">Duration</th>
-                <th className="p-3">Timestamp</th>
-                <th className="p-3 text-right">Action</th>
+                <th className="p-3">{t("history.colQuestion")}</th>
+                <th className="p-3">{t("history.colStatus")}</th>
+                <th className="p-3 text-right">{t("history.colRows")}</th>
+                <th className="p-3 text-right">{t("history.colTime")}</th>
+                <th className="p-3">{t("history.colTimestamp")}</th>
+                <th className="p-3 text-right">{t("history.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {filteredHistory.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-xs text-muted">
-                    No execution history records found for this filter.
+                    {t("history.empty")}
                   </td>
                 </tr>
               ) : (
@@ -191,7 +189,7 @@ export default function HistoryPage() {
                           <button
                             type="button"
                             onClick={() => handleCopySQL(item)}
-                            title="Copy SQL"
+                            title={t("workspace.copySql")}
                             className="p-1 rounded text-muted hover:text-foreground shrink-0"
                           >
                             {copiedId === item.id ? (
@@ -252,7 +250,7 @@ export default function HistoryPage() {
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-primary font-bold text-xs transition shadow-xs"
                       >
                         <RotateCw className="w-3 h-3 text-primary" />
-                        <span>Rerun</span>
+                        <span>{t("history.rerun")}</span>
                       </button>
                     </td>
                   </tr>

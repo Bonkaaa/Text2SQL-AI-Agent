@@ -3,22 +3,22 @@
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bookmark,
   Search,
   ArrowUpRight,
   Trash2,
   Copy,
   Check,
-  Code2,
   Tag,
   Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { SavedQueryItem } from "@/lib/storage";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function SavedQueriesPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { savedQueries, removeQuery } = useSavedQueries();
   const [search, setSearch] = useState("");
   const [selectedTag, setSelectedTag] = useState<string>("All");
@@ -68,13 +68,13 @@ export default function SavedQueriesPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="text-primary text-[10px] font-extrabold uppercase tracking-widest mb-1.5">
-            Reusable analytics library
+            {t("saved.eyebrow")}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Saved queries
+            {t("saved.title")}
           </h1>
           <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl leading-relaxed">
-            Keep verified business questions and their SQL close at hand. Rerun them whenever data updates.
+            {t("saved.description")}
           </p>
         </div>
 
@@ -83,7 +83,7 @@ export default function SavedQueriesPage() {
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary-strong text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
         >
           <Plus className="w-4 h-4" />
-          <span>New query in Workspace</span>
+          <span>{t("saved.newQuery")}</span>
         </Link>
       </div>
 
@@ -102,7 +102,7 @@ export default function SavedQueriesPage() {
                   : "bg-surface border border-line text-muted hover:text-foreground hover:bg-surface-2"
               }`}
             >
-              {tag}
+              {tag === "All" ? t("common.all") : tag}
             </button>
           ))}
         </div>
@@ -112,7 +112,7 @@ export default function SavedQueriesPage() {
           <Search className="w-3.5 h-3.5 text-muted shrink-0" />
           <input
             type="text"
-            placeholder="Search saved queries..."
+            placeholder={t("saved.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted"
@@ -126,18 +126,18 @@ export default function SavedQueriesPage() {
           <table className="w-full text-left text-xs whitespace-nowrap">
             <thead className="bg-surface-2 text-muted text-[10px] font-bold uppercase border-b border-line">
               <tr>
-                <th className="p-3">Query Title & Question</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Saved Date</th>
-                <th className="p-3">Owner</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-3">{t("saved.colTitle")}</th>
+                <th className="p-3">{t("saved.colFormat")}</th>
+                <th className="p-3">{t("saved.colDate")}</th>
+                <th className="p-3">{t("saved.colOwner")}</th>
+                <th className="p-3 text-right">{t("saved.colActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {filteredQueries.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-xs text-muted">
-                    No saved queries found. You can bookmark queries directly from Workspace.
+                    {t("saved.empty")}
                   </td>
                 </tr>
               ) : (
@@ -177,7 +177,7 @@ export default function SavedQueriesPage() {
                           <button
                             type="button"
                             onClick={() => handleCopySQL(item)}
-                            title="Copy SQL"
+                            title={t("workspace.copySql")}
                             className="p-1.5 rounded-lg border border-line hover:bg-surface-2 text-muted hover:text-foreground transition"
                           >
                             {copiedId === item.id ? (
@@ -193,14 +193,14 @@ export default function SavedQueriesPage() {
                           onClick={() => handleOpen(item)}
                           className="inline-flex items-center gap-1 bg-primary-soft hover:bg-primary-soft/80 text-primary border border-primary/20 px-2.5 py-1.5 rounded-lg text-xs font-bold transition"
                         >
-                          <span>Open</span>
+                          <span>{t("saved.openInWorkspace")}</span>
                           <ArrowUpRight className="w-3 h-3" />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => removeQuery(item.id)}
-                          title="Delete saved query"
+                          title={t("saved.deleteModalTitle")}
                           className="p-1.5 rounded-lg border border-line hover:bg-rose-soft/40 text-muted hover:text-rose transition"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

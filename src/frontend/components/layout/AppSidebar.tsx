@@ -94,7 +94,7 @@ export function AppSidebar() {
 
         <div>
           <div className="hidden md:block text-faint text-[10px] tracking-wider font-bold uppercase px-3 pb-2 pt-2">
-            Data
+            {t("nav.dataSection")}
           </div>
           <nav className="grid gap-1" aria-label="Data navigation">
             {dataNavItems.map((item) => {
@@ -148,6 +148,7 @@ export function AppSidebar() {
 
 function SidebarProfile() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -198,14 +199,14 @@ function SidebarProfile() {
             onClick={() => setProfileOpen(false)}
             className="w-full text-left px-2.5 py-1.5 text-xs rounded hover:bg-surface-2 text-foreground block"
           >
-            Preferences
+            {t("nav.preferences")}
           </Link>
           <button
             type="button"
             onClick={handleSignOut}
             className="w-full text-left px-2.5 py-1.5 text-xs rounded hover:bg-surface-2 text-rose"
           >
-            Sign out
+            {t("nav.signOut")}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@
 import React, { useRef, useEffect } from "react";
 import { Sparkles, MessageSquare, ArrowRight } from "lucide-react";
 import { WorkspaceMessage } from "@/hooks/useWorkspace";
+import { useLanguage } from "@/context/LanguageContext";
 import { MessageItem } from "./MessageItem";
 import { QueryComposer } from "./QueryComposer";
 import { ClarificationChips } from "./ClarificationChips";
@@ -18,10 +19,16 @@ interface ConversationPanelProps {
   onResetConversation: () => void;
 }
 
-const samplePrompts = [
+const samplePromptsEn = [
   "Which 10 products generated the most revenue in 2003?",
   "Compare monthly sales between store channel and web channel in 2002.",
   "Which customer income demographics show the highest item return rate?",
+];
+
+const samplePromptsVi = [
+  "10 sản phẩm nào mang lại doanh thu cao nhất năm 2003?",
+  "So sánh doanh số hàng tháng giữa kênh cửa hàng và kênh web năm 2002.",
+  "Phân khúc thu nhập khách hàng nào có tỷ lệ trả hàng cao nhất?",
 ];
 
 export function ConversationPanel({
@@ -33,7 +40,9 @@ export function ConversationPanel({
   onSelectOption,
   onResetConversation,
 }: ConversationPanelProps) {
+  const { t, locale } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const samplePrompts = locale === "vi" ? samplePromptsVi : samplePromptsEn;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -61,10 +70,10 @@ export function ConversationPanel({
           </div>
           <div>
             <strong className="block text-xs font-bold text-foreground">
-              Conversation Thread
+              {t("workspace.conversationThread")}
             </strong>
             <small className="block text-[10px] text-muted">
-              Active analytical session · DuckDB TPC-DS
+              {t("workspace.activeSession")}
             </small>
           </div>
         </div>
@@ -74,7 +83,7 @@ export function ConversationPanel({
           onClick={onResetConversation}
           className="text-[11px] text-primary hover:underline font-bold"
         >
-          New conversation
+          {t("workspace.newConversation")}
         </button>
       </div>
 
@@ -87,16 +96,16 @@ export function ConversationPanel({
                 <MessageSquare className="w-5 h-5" />
               </div>
               <h2 className="text-sm font-bold text-foreground">
-                Ask anything about your enterprise data
+                {t("workspace.emptyPromptTitle")}
               </h2>
               <p className="text-xs text-muted max-w-sm mx-auto leading-relaxed">
-                I can translate your business questions into DuckDB SQL, verify read-only safety, and present tables, charts, and insights.
+                {t("workspace.emptyPromptDesc")}
               </p>
             </div>
 
             <div className="space-y-2 pt-2">
               <span className="text-[10px] uppercase font-bold tracking-wider text-faint block">
-                Suggested Prompts
+                {t("workspace.suggestedPrompts")}
               </span>
               {samplePrompts.map((prompt, idx) => (
                 <button
@@ -114,7 +123,7 @@ export function ConversationPanel({
         ) : (
           <>
             <div className="text-center text-[10px] uppercase font-bold tracking-wider text-faint">
-              Session Activity
+              {t("workspace.sessionActivity")}
             </div>
 
             {messages.map((msg) => (
@@ -125,7 +134,7 @@ export function ConversationPanel({
               <ClarificationChips
                 question={
                   lastAssistantMsg.queryResponse?.clarification_question ||
-                  "Vui lòng chọn hướng phân tích cụ thể:"
+                  t("workspace.clarificationTitle")
                 }
                 options={lastAssistantMsg.queryResponse!.suggested_options!}
                 onSelectOption={onSelectOption}

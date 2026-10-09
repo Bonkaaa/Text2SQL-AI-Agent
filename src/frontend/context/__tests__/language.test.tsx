@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, renderHook, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
 import { LanguageProvider, useLanguage } from "../LanguageContext";
 
 describe("LanguageContext & Bilingual Support (Ponytail i18n)", () => {
@@ -16,10 +16,14 @@ describe("LanguageContext & Bilingual Support (Ponytail i18n)", () => {
     expect(result.current.locale).toBe("en");
     expect(result.current.t("nav.workspace")).toBe("Workspace");
     expect(result.current.t("workspace.tabAnswer")).toBe("Answer");
+    expect(result.current.t("workspace.tabTable")).toBe("Table");
+    expect(result.current.t("workspace.tabChart")).toBe("Chart");
+    expect(result.current.t("workspace.tabSql")).toBe("SQL");
+    expect(result.current.t("workspace.tabTrace")).toBe("Trace");
     expect(result.current.t("settings.title")).toBe("Workspace Settings");
   });
 
-  it("should switch to Vietnamese locale and return Vietnamese translations", () => {
+  it("should switch to Vietnamese locale and return Vietnamese translations across all tabs", () => {
     const { result } = renderHook(() => useLanguage(), {
       wrapper: ({ children }) => <LanguageProvider>{children}</LanguageProvider>,
     });
@@ -30,7 +34,17 @@ describe("LanguageContext & Bilingual Support (Ponytail i18n)", () => {
 
     expect(result.current.locale).toBe("vi");
     expect(result.current.t("nav.workspace")).toBe("Không gian làm việc");
+    // Workspace tabs
     expect(result.current.t("workspace.tabAnswer")).toBe("Câu trả lời");
+    expect(result.current.t("workspace.tabTable")).toBe("Bảng dữ liệu");
+    expect(result.current.t("workspace.tabChart")).toBe("Biểu đồ");
+    expect(result.current.t("workspace.tabSql")).toBe("Mã SQL");
+    expect(result.current.t("workspace.tabTrace")).toBe("Tiến trình");
+    // Inner view content
+    expect(result.current.t("workspace.executiveSummary")).toBe("Tóm tắt điều hành");
+    expect(result.current.t("workspace.astVerified")).toBe("Đã kiểm duyệt AST");
+    expect(result.current.t("workspace.provenanceTitle")).toBe("Tiến trình thực thi & Truy vết Agent");
+    expect(result.current.t("sources.columnsAndTypes")).toBe("Cột & Kiểu dữ liệu");
     expect(result.current.t("settings.title")).toBe("Cài đặt không gian làm việc");
     expect(localStorage.getItem("querypilot_locale")).toBe("vi");
   });

@@ -86,9 +86,11 @@ export function ResultCanvas({
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-surface rounded-2xl border border-line h-full min-h-[460px] text-center space-y-3">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
         <div className="space-y-1">
-          <h4 className="text-sm font-bold text-foreground">Executing Query & Synthesizing Results</h4>
+          <h4 className="text-sm font-bold text-foreground">
+            {t("workspace.executingTitle")}
+          </h4>
           <p className="text-xs text-muted max-w-sm">
-            Retrieving TPC-DS schema, validating AST syntax with sqlglot, and executing DuckDB analytics...
+            {t("workspace.executingDesc")}
           </p>
         </div>
       </div>
@@ -103,9 +105,11 @@ export function ResultCanvas({
           <Database className="w-8 h-8 text-primary" />
         </div>
         <div className="space-y-1 max-w-sm">
-          <h4 className="text-sm font-bold text-foreground">Ready for Analytics Exploration</h4>
+          <h4 className="text-sm font-bold text-foreground">
+            {t("workspace.emptyTitle")}
+          </h4>
           <p className="text-xs text-muted leading-relaxed">
-            Enter a natural language question on the left to generate SQL, view tabular results, and explore interactive Recharts visualizations.
+            {t("workspace.emptyDesc")}
           </p>
         </div>
       </div>
@@ -172,12 +176,12 @@ export function ResultCanvas({
             {isBookmarked ? (
               <>
                 <BookmarkCheck className="w-3.5 h-3.5 text-primary" />
-                <span>Saved</span>
+                <span>{t("workspace.saved")}</span>
               </>
             ) : (
               <>
                 <Bookmark className="w-3.5 h-3.5 text-muted" />
-                <span>Save query</span>
+                <span>{t("workspace.saveQuery")}</span>
               </>
             )}
           </button>

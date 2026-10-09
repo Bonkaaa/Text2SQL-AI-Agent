@@ -21,6 +21,7 @@ import {
 import { BarChart3, LineChart as LineIcon, AreaChart as AreaIcon, PieChart as PieIcon } from "lucide-react";
 import { QueryResponse, ChartArtifact } from "@/types/api";
 import { formatNumber, formatCurrency } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface ChartViewProps {
   response: QueryResponse;
@@ -29,6 +30,7 @@ interface ChartViewProps {
 const PALETTE = ["#5B5BD6", "#17845D", "#A86812", "#8B5CF6", "#06B6D4", "#EC4899"];
 
 export function ChartView({ response }: ChartViewProps) {
+  const { t } = useLanguage();
   const [isMounted, setIsMounted] = useState(false);
   const [chartTypeOverride, setChartTypeOverride] = useState<"bar" | "line" | "area" | "pie" | null>(null);
 
@@ -55,13 +57,13 @@ export function ChartView({ response }: ChartViewProps) {
     data = chartArtifact.data || [];
     xKey = chartArtifact.x_key;
     yKeys = chartArtifact.y_keys || [];
-    title = chartArtifact.title || "Data Visualization";
+    title = chartArtifact.title || t("workspace.chartTitleFallback");
     baseType = (chartArtifact.chart_type === "composed" ? "bar" : chartArtifact.chart_type) || "bar";
   } else if (legacyConfig) {
     data = legacyConfig.data || response.data || [];
     xKey = legacyConfig.x_axis || "";
     yKeys = (legacyConfig.series || []).map((s: any) => (typeof s === "string" ? s : s.key));
-    title = legacyConfig.title || "Data Visualization";
+    title = legacyConfig.title || t("workspace.chartTitleFallback");
     baseType = legacyConfig.type || "bar";
   } else if (response.data && response.data.length > 0 && response.columns && response.columns.length > 1) {
     data = response.data;
@@ -69,7 +71,7 @@ export function ChartView({ response }: ChartViewProps) {
     yKeys = response.columns.slice(1).filter((col) => {
       return data.some((r) => typeof r[col] === "number");
     });
-    title = "Query Result Chart";
+    title = t("workspace.chartTitleFallback");
     baseType = "bar";
   }
 
@@ -78,7 +80,7 @@ export function ChartView({ response }: ChartViewProps) {
   if (!data || data.length === 0 || !xKey || yKeys.length === 0) {
     return (
       <div className="bg-surface border border-line rounded-xl p-8 text-center text-muted text-xs">
-        No numeric series found to construct visualization. Switch to Table view to inspect raw data.
+        {t("workspace.noChart")}
       </div>
     );
   }
@@ -86,7 +88,7 @@ export function ChartView({ response }: ChartViewProps) {
   if (!isMounted) {
     return (
       <div className="h-[360px] bg-surface border border-line rounded-xl flex items-center justify-center text-xs text-muted">
-        Loading chart container...
+        {t("workspace.loadingChart")}
       </div>
     );
   }
@@ -221,7 +223,7 @@ export function ChartView({ response }: ChartViewProps) {
                 ? "bg-surface shadow-xs text-primary font-bold"
                 : "text-muted hover:text-foreground"
             }`}
-            title="Bar Chart"
+            title={t("workspace.chartBar")}
           >
             <BarChart3 className="w-3.5 h-3.5" />
           </button>
@@ -233,7 +235,7 @@ export function ChartView({ response }: ChartViewProps) {
                 ? "bg-surface shadow-xs text-primary font-bold"
                 : "text-muted hover:text-foreground"
             }`}
-            title="Line Chart"
+            title={t("workspace.chartLine")}
           >
             <LineIcon className="w-3.5 h-3.5" />
           </button>
@@ -245,7 +247,7 @@ export function ChartView({ response }: ChartViewProps) {
                 ? "bg-surface shadow-xs text-primary font-bold"
                 : "text-muted hover:text-foreground"
             }`}
-            title="Area Chart"
+            title={t("workspace.chartArea")}
           >
             <AreaIcon className="w-3.5 h-3.5" />
           </button>
@@ -257,7 +259,7 @@ export function ChartView({ response }: ChartViewProps) {
                 ? "bg-surface shadow-xs text-primary font-bold"
                 : "text-muted hover:text-foreground"
             }`}
-            title="Pie Chart"
+            title={t("workspace.chartPie")}
           >
             <PieIcon className="w-3.5 h-3.5" />
           </button>

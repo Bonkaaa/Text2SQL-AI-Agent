@@ -4,12 +4,14 @@ import React from "react";
 import { CheckCircle2, Clock, Database, Layers, Timer } from "lucide-react";
 import { QueryResponse } from "@/types/api";
 import { formatDuration } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface TraceViewProps {
   response: QueryResponse;
 }
 
 export function TraceView({ response }: TraceViewProps) {
+  const { t } = useLanguage();
   const tasks = response.tasks || [];
   const artifacts = response.artifacts || [];
   const totalDuration = response.execution_time_ms
@@ -22,7 +24,7 @@ export function TraceView({ response }: TraceViewProps) {
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-2 border border-line rounded-xl">
         <div className="flex items-center gap-2 text-xs text-foreground font-semibold">
           <Layers className="w-4 h-4 text-primary" />
-          <span>Execution Provenance & Agent Trace</span>
+          <span>{t("workspace.provenanceTitle")}</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted">
           <span className="inline-flex items-center gap-1">
@@ -32,7 +34,9 @@ export function TraceView({ response }: TraceViewProps) {
             </span>
           </span>
           <span>•</span>
-          <span>{tasks.length} sub-tasks</span>
+          <span>
+            {tasks.length} {t("workspace.subTasks")}
+          </span>
           {response.session_id && (
             <>
               <span>•</span>
@@ -65,7 +69,7 @@ export function TraceView({ response }: TraceViewProps) {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono text-muted uppercase">
-                        Step {idx + 1}
+                        {t("workspace.step")} {idx + 1}
                       </span>
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-2 text-muted border border-line">
                         {task.status}
@@ -102,7 +106,7 @@ export function TraceView({ response }: TraceViewProps) {
                         <strong className="text-foreground font-mono tabular-nums">
                           {linkedArtifact.row_count}
                         </strong>{" "}
-                        rows returned
+                        {t("workspace.rowsReturned")}
                       </span>
                     </>
                   )}
@@ -130,7 +134,7 @@ export function TraceView({ response }: TraceViewProps) {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">
-                    Query Execution
+                    {t("workspace.queryExecution")}
                   </span>
                   {artifact.execution_time_ms !== undefined && (
                     <span className="text-xs font-mono tabular-nums text-muted">
@@ -140,7 +144,7 @@ export function TraceView({ response }: TraceViewProps) {
                 </div>
                 {artifact.tables_used && (
                   <div className="text-xs text-muted">
-                    Tables:{" "}
+                    {t("workspace.tables")}:{" "}
                     <span className="text-foreground font-mono">
                       {artifact.tables_used.join(", ")}
                     </span>
@@ -153,7 +157,7 @@ export function TraceView({ response }: TraceViewProps) {
 
         {tasks.length === 0 && artifacts.length === 0 && (
           <div className="bg-surface border border-line rounded-xl p-6 text-center text-xs text-muted">
-            No execution trace steps recorded for this query.
+            {t("workspace.noTrace")}
           </div>
         )}
       </div>

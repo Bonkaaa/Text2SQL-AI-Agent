@@ -7,11 +7,13 @@ import Link from "next/link";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ConversationPanel } from "@/components/workspace/ConversationPanel";
 import { ResultCanvas } from "@/components/workspace/ResultCanvas";
+import { useLanguage } from "@/context/LanguageContext";
 
 function WorkspaceInner() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams?.get("q") || null;
   const triggeredRef = useRef(false);
+  const { t } = useLanguage();
 
   const {
     messages,
@@ -39,13 +41,13 @@ function WorkspaceInner() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <div className="text-primary text-[10px] font-extrabold uppercase tracking-widest mb-1">
-            Natural Language Analytics Engine
+            {t("workspace.eyebrow")}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Ask your data.
+            {t("workspace.title")}
           </h1>
           <p className="text-muted text-xs md:text-sm mt-0.5 max-w-2xl leading-relaxed">
-            Turn business questions into SQL, insights, and visualizations — in one unified workspace.
+            {t("workspace.description")}
           </p>
         </div>
 
@@ -56,7 +58,7 @@ function WorkspaceInner() {
             className="inline-flex items-center gap-2 bg-surface hover:bg-surface-2 text-foreground border border-line-strong px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
           >
             <Plus className="w-4 h-4 text-primary" />
-            New conversation
+            {t("workspace.newConversation")}
           </button>
         </div>
       </div>
@@ -89,12 +91,12 @@ function WorkspaceInner() {
 
       {/* Footer Navigation Link */}
       <div className="flex items-center justify-between text-xs text-muted pt-2 border-t border-line">
-        <span>DuckDB TPC-DS (24 tables) Connected · Least-Privilege Read-Only</span>
+        <span>{t("workspace.footerStatus")}</span>
         <Link
           href="/data-sources"
           className="text-primary font-bold hover:underline inline-flex items-center gap-1"
         >
-          Explore 24 tables in schema explorer <ArrowUpRight className="w-3.5 h-3.5" />
+          {t("workspace.footerExplore")} <ArrowUpRight className="w-3.5 h-3.5" />
         </Link>
       </div>
     </div>

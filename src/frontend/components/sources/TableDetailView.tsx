@@ -5,12 +5,12 @@ import {
   Sparkles,
   Key,
   Link as LinkIcon,
-  HelpCircle,
   Table as TableIcon,
   ArrowRight,
 } from "lucide-react";
 import { TableMetadata } from "@/types/schema";
 import { formatNumber } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface TableDetailViewProps {
   table: TableMetadata;
@@ -21,8 +21,8 @@ interface TableDetailViewProps {
 export function TableDetailView({
   table,
   onAskQuestion,
-  onClose,
 }: TableDetailViewProps) {
+  const { t } = useLanguage();
   const primaryQuestion =
     table.sampleQuestions[0] || `Phân tích dữ liệu trong bảng ${table.name}`;
 
@@ -45,7 +45,7 @@ export function TableDetailView({
           <div className="text-xs font-semibold text-muted mt-1">
             {table.displayName} •{" "}
             <span className="font-mono tabular-nums">
-              ~{formatNumber(table.rowCountEstimate)} rows
+              ~{formatNumber(table.rowCountEstimate)} {t("common.rows")}
             </span>
           </div>
           <p className="text-xs text-foreground mt-2 leading-relaxed max-w-2xl">
@@ -57,10 +57,11 @@ export function TableDetailView({
         <button
           type="button"
           onClick={() => onAskQuestion(primaryQuestion)}
+          aria-label="Hỏi về bảng này"
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary-strong text-white text-xs font-bold transition shadow-sm shrink-0"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Hỏi về bảng này</span>
+          <span>{t("sources.askAboutTable")}</span>
         </button>
       </div>
 
@@ -69,7 +70,7 @@ export function TableDetailView({
         <div className="p-3 rounded-lg bg-surface-2 border border-line space-y-2">
           <div className="flex items-center gap-1 text-[11px] font-bold text-muted">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span>Câu hỏi gợi ý phân tích</span>
+            <span>{t("sources.suggestedPrompts")}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {table.sampleQuestions.map((q, idx) => (
@@ -91,7 +92,7 @@ export function TableDetailView({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <strong className="text-xs font-bold text-foreground">
-            Columns & Data Types ({table.columns.length} columns)
+            {t("sources.columnsAndTypes")} ({table.columns.length} {t("sources.cols")})
           </strong>
         </div>
 
@@ -99,10 +100,10 @@ export function TableDetailView({
           <table className="w-full text-xs text-left">
             <thead className="bg-surface-2 border-b border-line text-[10px] text-muted font-bold uppercase">
               <tr>
-                <th className="px-3 py-2">Column Name</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Constraints</th>
-                <th className="px-3 py-2">Description</th>
+                <th className="px-3 py-2">{t("sources.columnName")}</th>
+                <th className="px-3 py-2">{t("sources.type")}</th>
+                <th className="px-3 py-2">{t("sources.constraints")}</th>
+                <th className="px-3 py-2">{t("sources.descriptionCol")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/70">

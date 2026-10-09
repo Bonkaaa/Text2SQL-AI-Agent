@@ -4,7 +4,6 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { Search, HelpCircle, Bell } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -55,9 +54,6 @@ export function AppHeader() {
             ⌘K
           </kbd>
         </div>
-
-        {/* Bilingual Quick Toggle */}
-        <LanguageSwitcher />
 
         <button
           type="button"

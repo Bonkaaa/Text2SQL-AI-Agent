@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { formatNumber } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface DataTableViewProps {
   data: Record<string, any>[];
@@ -27,6 +28,7 @@ export function DataTableView({
   columns = [],
   totalRowCount,
 }: DataTableViewProps) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export function DataTableView({
   if (!data || data.length === 0) {
     return (
       <div className="bg-surface border border-line rounded-xl p-8 text-center text-muted text-xs">
-        No tabular data returned for this query.
+        {t("workspace.noData")}
       </div>
     );
   }
@@ -149,11 +151,11 @@ export function DataTableView({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 text-xs text-muted">
           <span className="font-semibold text-foreground">
-            {totalRowCount || data.length} rows
+            {totalRowCount || data.length} {t("common.rows")}
           </span>
-          {searchTerm && <span>({sortedData.length} filtered)</span>}
+          {searchTerm && <span>({sortedData.length} {t("common.rows")})</span>}
           <span>•</span>
-          <span>{columns.length} columns</span>
+          <span>{columns.length} {t("sources.cols")}</span>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -162,7 +164,7 @@ export function DataTableView({
             <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Filter rows..."
+              placeholder={t("workspace.filterRowsPlaceholder")}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -177,17 +179,17 @@ export function DataTableView({
             type="button"
             onClick={copyToClipboard}
             className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-foreground transition-colors"
-            title="Copy as TSV"
+            title={t("workspace.copyTable")}
           >
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald" />
-                <span className="text-emerald">Copied</span>
+                <span className="text-emerald">{t("workspace.copied")}</span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5 text-muted" />
-                <span>Copy</span>
+                <span>{t("common.copy")}</span>
               </>
             )}
           </button>
@@ -199,7 +201,7 @@ export function DataTableView({
             className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-foreground transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-primary" />
-            <span>Export CSV</span>
+            <span>{t("workspace.exportCsv")}</span>
           </button>
         </div>
       </div>
@@ -291,7 +293,7 @@ export function DataTableView({
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-3 py-2 border-t border-line bg-surface-2/60 text-xs text-muted">
             <span>
-              Page {currentPage} of {totalPages}
+              {t("workspace.pageOf")} {currentPage} {t("workspace.of")} {totalPages}
             </span>
             <div className="flex items-center gap-1">
               <button

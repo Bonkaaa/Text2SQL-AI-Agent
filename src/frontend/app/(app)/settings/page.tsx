@@ -8,7 +8,6 @@ import {
   User,
   Check,
   RotateCcw,
-  AlertTriangle,
   Layers,
   Globe,
 } from "lucide-react";
@@ -50,13 +49,13 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="text-primary text-[10px] font-extrabold uppercase tracking-widest mb-1.5">
-            Preferences & Controls
+            {t("settings.eyebrow")}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-            Workspace Settings
+            {t("settings.title")}
           </h1>
           <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl leading-relaxed">
-            Manage your analyst profile, query safety defaults, row limits, and developer telemetry modes.
+            {t("settings.description")}
           </p>
         </div>
 
@@ -66,7 +65,7 @@ export default function SettingsPage() {
           className="inline-flex items-center gap-2 bg-primary hover:bg-primary-strong text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm"
         >
           {saved ? <Check className="w-4 h-4 text-emerald" /> : <Settings className="w-4 h-4" />}
-          {saved ? "Changes saved" : "Save changes"}
+          {saved ? t("settings.saved") : t("settings.saveChanges")}
         </button>
       </div>
 
@@ -83,7 +82,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-foreground font-bold text-sm">
               <User className="w-4 h-4 text-primary" />
-              <h3>Analyst Profile</h3>
+              <h3>{t("settings.profileTitle")}</h3>
             </div>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-primary-soft text-primary uppercase tracking-wider">
               {user.role}
@@ -93,7 +92,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label htmlFor="user-display-name" className="text-muted text-[11px] font-bold block mb-1">
-                Display Name
+                {t("settings.displayName")}
               </label>
               <input
                 id="user-display-name"
@@ -104,7 +103,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label htmlFor="user-email-address" className="text-muted text-[11px] font-bold block mb-1">
-                Email Address
+                {t("settings.emailAddress")}
               </label>
               <input
                 id="user-email-address"
@@ -120,22 +119,22 @@ export default function SettingsPage() {
         <section className="bg-surface border border-line rounded-xl p-4 md:p-5 shadow-panel space-y-4">
           <div className="flex items-center gap-2 text-foreground font-bold text-sm">
             <Shield className="w-4 h-4 text-emerald" />
-            <h3>Query Governance & Safety Defaults</h3>
+            <h3>{t("settings.safetyTitle")}</h3>
           </div>
 
           <div className="divide-y divide-line text-xs">
             {/* Strict Read-Only Mode */}
             <div className="flex items-center justify-between py-3">
               <div>
-                <strong className="text-foreground block">Strict Read-Only SELECT Mode</strong>
+                <strong className="text-foreground block">{t("settings.readOnlyTitle")}</strong>
                 <span className="text-muted text-[11px]">
-                  Automatically block INSERT, UPDATE, DELETE, DROP and any mutation statements via AST.
+                  {t("settings.readOnlyDesc")}
                 </span>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-label="Strict Read-Only SELECT Mode"
+                aria-label={t("settings.readOnlyTitle")}
                 aria-checked={settings.readOnly}
                 onClick={() => updateSettings({ readOnly: !settings.readOnly })}
                 className={`w-10 h-6 rounded-full transition-colors relative p-0.5 ${
@@ -153,15 +152,15 @@ export default function SettingsPage() {
             {/* Require HITL Review */}
             <div className="flex items-center justify-between py-3">
               <div>
-                <strong className="text-foreground block">Require HITL Review for Large Queries</strong>
+                <strong className="text-foreground block">{t("settings.hitlTitle")}</strong>
                 <span className="text-muted text-[11px]">
-                  Pause execution and prompt for administrator approval when estimated cost exceeds budget.
+                  {t("settings.hitlDesc")}
                 </span>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-label="Require HITL Review for Large Queries"
+                aria-label={t("settings.hitlTitle")}
                 aria-checked={settings.requireHitlApproval}
                 onClick={() =>
                   updateSettings({ requireHitlApproval: !settings.requireHitlApproval })
@@ -181,28 +180,28 @@ export default function SettingsPage() {
             {/* Row Limit Dropdown */}
             <div className="flex items-center justify-between py-3">
               <div>
-                <strong className="text-foreground block">Default Row Limit</strong>
+                <strong className="text-foreground block">{t("settings.rowLimitTitle")}</strong>
                 <span className="text-muted text-[11px]">
-                  Maximum number of rows returned by exploratory analytical queries.
+                  {t("settings.rowLimitDesc")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="default-row-limit-select" className="sr-only">
-                  Default Row Limit
+                  {t("settings.rowLimitTitle")}
                 </label>
                 <select
                   id="default-row-limit-select"
-                  aria-label="Default Row Limit"
+                  aria-label={t("settings.rowLimitTitle")}
                   value={settings.defaultRowLimit}
                   onChange={(e) =>
                     updateSettings({ defaultRowLimit: Number(e.target.value) })
                   }
                   className="bg-surface-2 border border-line text-foreground text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none focus:border-primary cursor-pointer"
                 >
-                  <option value="50">50 rows</option>
-                  <option value="100">100 rows</option>
-                  <option value="250">250 rows</option>
-                  <option value="500">500 rows</option>
+                  <option value="50">50 {t("common.rows")}</option>
+                  <option value="100">100 {t("common.rows")}</option>
+                  <option value="250">250 {t("common.rows")}</option>
+                  <option value="500">500 {t("common.rows")}</option>
                 </select>
               </div>
             </div>
@@ -264,23 +263,23 @@ export default function SettingsPage() {
         <section className="bg-surface border border-line rounded-xl p-4 md:p-5 shadow-panel space-y-4">
           <div className="flex items-center gap-2 text-foreground font-bold text-sm">
             <Sliders className="w-4 h-4 text-primary" />
-            <h3>Developer Mode & Execution Trace</h3>
+            <h3>{t("settings.developerTitle")}</h3>
           </div>
 
           <div className="divide-y divide-line text-xs">
             <div className="flex items-center justify-between py-2">
               <div>
                 <strong className="text-foreground block">
-                  Show Agent Execution Trace in Workspace
+                  {t("settings.showTraceTitle")}
                 </strong>
                 <span className="text-muted text-[11px]">
-                  Expose latency breakdowns, schema match tokens, and subagent invocation steps.
+                  {t("settings.showTraceDesc")}
                 </span>
               </div>
               <button
                 type="button"
                 role="switch"
-                aria-label="Show Agent Execution Trace in Workspace"
+                aria-label={t("settings.showTraceTitle")}
                 aria-checked={settings.showTrace}
                 onClick={() => updateSettings({ showTrace: !settings.showTrace })}
                 className={`w-10 h-6 rounded-full transition-colors relative p-0.5 ${
@@ -301,10 +300,10 @@ export default function SettingsPage() {
         <section className="bg-surface border border-line rounded-xl p-4 md:p-5 shadow-panel space-y-3">
           <div className="flex items-center gap-2 text-foreground font-bold text-sm">
             <Layers className="w-4 h-4 text-amber" />
-            <h3>Data Cache & Diagnostics</h3>
+            <h3>{t("settings.cacheTitle")}</h3>
           </div>
           <p className="text-muted text-xs leading-relaxed">
-            Clear stored local browser cache, reset preset queries, and restore initial configuration state.
+            {t("settings.cacheDesc")}
           </p>
 
           <div className="pt-2">
@@ -314,7 +313,7 @@ export default function SettingsPage() {
               className="inline-flex items-center gap-2 bg-surface-2 hover:bg-red-50 text-foreground hover:text-red-600 border border-line hover:border-red-200 px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-xs"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset Demo Data / Clear Cache
+              {t("settings.resetCacheBtn")}
             </button>
           </div>
         </section>

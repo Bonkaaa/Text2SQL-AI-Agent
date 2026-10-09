@@ -66,7 +66,7 @@ export function QueryComposer({
               AdventureWorks · TPC-DS (DuckDB)
             </span>
             <span>·</span>
-            <span className="text-faint">↵ Enter to send</span>
+            <span className="text-faint">{t("workspace.enterToSend")}</span>
           </div>
 
           <button
@@ -85,7 +85,7 @@ export function QueryComposer({
       </form>
 
       <div className="text-[9px] text-faint mt-1.5 px-1">
-        AI-generated SQL can be imperfect. Review queries before using critical data.
+        {t("workspace.aiDisclaimer")}
       </div>
     </div>
   );

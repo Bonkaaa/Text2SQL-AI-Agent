@@ -4,12 +4,15 @@ import React from "react";
 import { Sparkles, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { WorkspaceMessage } from "@/hooks/useWorkspace";
 import { formatCurrency, formatDuration } from "@/lib/formatters";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface MessageItemProps {
   message: WorkspaceMessage;
 }
 
 export function MessageItem({ message }: MessageItemProps) {
+  const { t } = useLanguage();
+
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -40,7 +43,7 @@ export function MessageItem({ message }: MessageItemProps) {
             <span>·</span>
             <span className="inline-flex items-center gap-1 font-mono text-faint">
               <Clock className="w-2.5 h-2.5" />
-              {formatDuration(queryResponse.execution_time_ms)} total
+              {formatDuration(queryResponse.execution_time_ms)} {t("workspace.totalTime")}
             </span>
           </>
         ) : null}
@@ -51,7 +54,7 @@ export function MessageItem({ message }: MessageItemProps) {
         {message.isLoading ? (
           <div className="flex items-center gap-2 text-muted py-2">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span>Analyzing question & generating AST-verified SQL...</span>
+            <span>{t("workspace.analyzingLoading")}</span>
           </div>
         ) : (
           <p className="text-foreground whitespace-pre-line leading-relaxed m-0">
@@ -72,9 +75,9 @@ export function MessageItem({ message }: MessageItemProps) {
             </div>
             {queryResponse?.data && queryResponse.data.length > 0 && (
               <div className="bg-surface border border-line rounded-lg p-2.5">
-                <span className="block text-[10px] text-muted">Returned Records</span>
+                <span className="block text-[10px] text-muted">{t("workspace.returnedRecords")}</span>
                 <strong className="block text-base font-bold text-foreground mt-0.5 font-mono tabular-nums">
-                  {queryResponse.data.length} Rows
+                  {queryResponse.data.length} {t("common.rows")}
                 </strong>
               </div>
             )}
@@ -86,17 +89,17 @@ export function MessageItem({ message }: MessageItemProps) {
           <div className="border border-line rounded-lg p-2.5 bg-surface/70 space-y-1.5 text-[10px] text-muted">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald shrink-0" />
-              <span>Schema & categorical context verified</span>
+              <span>{t("workspace.schemaVerified")}</span>
               <span className="ml-auto font-mono text-faint">✓</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald shrink-0" />
-              <span>SQL authoring: AST root checked (Read-only SELECT)</span>
+              <span>{t("workspace.astCheckPassed")}</span>
               <span className="ml-auto font-mono text-faint">✓</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald shrink-0" />
-              <span>DuckDB engine execution completed</span>
+              <span>{t("workspace.engineCompleted")}</span>
               <span className="ml-auto font-mono text-faint">
                 {formatDuration(queryResponse.execution_time_ms)}
               </span>
