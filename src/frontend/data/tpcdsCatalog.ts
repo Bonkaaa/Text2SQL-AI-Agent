@@ -1,355 +1,458 @@
-export interface TPCDSTableMeta {
-  name: string;
-  label: string;
-  description: string;
-  category: "sales" | "returns" | "inventory" | "customer" | "dimension";
-  primaryKey: string[];
-  dateKey?: string;
-  commonJoins?: string[];
-}
+import { TableMetadata, TableCategory } from "@/types/schema";
 
-export interface TPCDSDomainCategory {
-  id: "sales" | "returns" | "inventory" | "customer" | "dimension";
-  name: string;
-  iconName: string;
-  description: string;
-  tables: TPCDSTableMeta[];
-}
+export const TPCDS_TABLES: TableMetadata[] = [
+  // 1. Fact Sales (3)
+  {
+    name: "store_sales",
+    displayName: "Store Sales (Bán lẻ tại cửa hàng)",
+    category: "sales",
+    categoryLabel: "Kênh Bán hàng",
+    rowCountEstimate: 2880000,
+    description: "Lưu trữ toàn bộ giao dịch bán lẻ tại chuỗi cửa hàng vật lý, bao gồm doanh thu thuần, chiết khấu và lợi nhuận.",
+    primaryKey: ["ss_item_sk", "ss_ticket_number"],
+    sampleQuestions: [
+      "Top 10 sản phẩm có doanh thu thuần cao nhất tại cửa hàng năm 2003?",
+      "Doanh thu bán lẻ tại cửa hàng theo từng quý năm 2002?",
+      "Tổng lợi nhuận ròng của kênh cửa hàng theo từng phân loại sản phẩm?",
+    ],
+    columns: [
+      { name: "ss_sold_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Khóa ngoại ngày bán hàng" },
+      { name: "ss_sold_time_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "time_dim.t_time_sk", description: "Khóa ngoại giờ bán hàng" },
+      { name: "ss_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa mặt hàng" },
+      { name: "ss_customer_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "customer.c_customer_sk", description: "Khóa khách hàng" },
+      { name: "ss_store_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "store.s_store_sk", description: "Khóa cửa hàng" },
+      { name: "ss_promo_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "promotion.p_promo_sk", description: "Khóa chương trình khuyến mãi" },
+      { name: "ss_ticket_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã hóa đơn bán hàng" },
+      { name: "ss_quantity", type: "INTEGER", nullable: true, description: "Số lượng sản phẩm bán" },
+      { name: "ss_wholesale_cost", type: "DECIMAL(7,2)", nullable: true, description: "Giá bán buôn" },
+      { name: "ss_list_price", type: "DECIMAL(7,2)", nullable: true, description: "Giá niêm yết" },
+      { name: "ss_sales_price", type: "DECIMAL(7,2)", nullable: true, description: "Giá bán thực tế" },
+      { name: "ss_ext_discount_amt", type: "DECIMAL(7,2)", nullable: true, description: "Tổng số tiền chiết khấu" },
+      { name: "ss_net_paid", type: "DECIMAL(7,2)", nullable: true, description: "Doanh thu thuần khách trả" },
+      { name: "ss_net_profit", type: "DECIMAL(7,2)", nullable: true, description: "Lợi nhuận ròng" },
+    ],
+  },
+  {
+    name: "catalog_sales",
+    displayName: "Catalog Sales (Đặt hàng qua bưu thiếp/Catalog)",
+    category: "sales",
+    categoryLabel: "Kênh Bán hàng",
+    rowCountEstimate: 1440000,
+    description: "Giao dịch đặt hàng qua danh mục in (Catalog) và trung tâm liên lạc điện thoại (Call Center).",
+    primaryKey: ["cs_item_sk", "cs_order_number"],
+    sampleQuestions: [
+      "Doanh thu đặt hàng qua catalog theo năm từ 2001 đến 2003?",
+      "Hiệu quả doanh số của các trung tâm Call Center trong năm 2003?",
+    ],
+    columns: [
+      { name: "cs_sold_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Khóa ngoại ngày bán" },
+      { name: "cs_catalog_page_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "catalog_page.cp_catalog_page_sk", description: "Trang catalog phát sinh" },
+      { name: "cs_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa mặt hàng" },
+      { name: "cs_order_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã đơn hàng catalog" },
+      { name: "cs_quantity", type: "INTEGER", nullable: true, description: "Số lượng bán" },
+      { name: "cs_net_paid", type: "DECIMAL(7,2)", nullable: true, description: "Doanh thu thuần" },
+      { name: "cs_net_profit", type: "DECIMAL(7,2)", nullable: true, description: "Lợi nhuận ròng" },
+    ],
+  },
+  {
+    name: "web_sales",
+    displayName: "Web Sales (Thương mại điện tử Web)",
+    category: "sales",
+    categoryLabel: "Kênh Bán hàng",
+    rowCountEstimate: 720000,
+    description: "Giao dịch thương mại điện tử qua website, ghi nhận lượt mua hàng online và trang đích.",
+    primaryKey: ["ws_item_sk", "ws_order_number"],
+    sampleQuestions: [
+      "So sánh doanh thu bán hàng giữa kênh Web và Store trong năm 2002?",
+      "Trang web nào mang lại doanh thu chuyển đổi cao nhất?",
+    ],
+    columns: [
+      { name: "ws_sold_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Khóa ngoại ngày bán web" },
+      { name: "ws_web_page_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "web_page.wp_web_page_sk", description: "Khóa trang web đích" },
+      { name: "ws_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa sản phẩm" },
+      { name: "ws_order_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã đơn hàng web" },
+      { name: "ws_quantity", type: "INTEGER", nullable: true, description: "Số lượng bán online" },
+      { name: "ws_net_paid", type: "DECIMAL(7,2)", nullable: true, description: "Doanh thu thuần online" },
+      { name: "ws_net_profit", type: "DECIMAL(7,2)", nullable: true, description: "Lợi nhuận ròng online" },
+    ],
+  },
 
-export const TPCDS_DOMAINS: TPCDSDomainCategory[] = [
+  // 2. Fact Returns (3)
   {
-    id: "sales",
-    name: "Kênh Bán Hàng (Sales Facts)",
-    iconName: "ShoppingBag",
-    description: "Các bảng sự kiện giao dịch bán hàng đa kênh Omnichannel",
-    tables: [
-      {
-        name: "store_sales",
-        label: "Bán tại Cửa hàng",
-        description: "Giao dịch bán lẻ trực tiếp tại các cửa hàng vật lý",
-        category: "sales",
-        primaryKey: ["ss_item_sk", "ss_ticket_number"],
-        dateKey: "ss_sold_date_sk",
-        commonJoins: ["date_dim", "store", "item", "customer"],
-      },
-      {
-        name: "web_sales",
-        label: "Bán qua Web/Online",
-        description: "Giao dịch bán lẻ qua sàn thương mại điện tử trực tuyến",
-        category: "sales",
-        primaryKey: ["ws_item_sk", "ws_order_number"],
-        dateKey: "ws_sold_date_sk",
-        commonJoins: ["date_dim", "web_site", "web_page", "item", "customer"],
-      },
-      {
-        name: "catalog_sales",
-        label: "Bán qua Catalog",
-        description: "Giao dịch bán hàng qua thư chào hàng/catalog giấy",
-        category: "sales",
-        primaryKey: ["cs_item_sk", "cs_order_number"],
-        dateKey: "cs_sold_date_sk",
-        commonJoins: ["date_dim", "catalog_page", "call_center", "item", "customer"],
-      },
+    name: "store_returns",
+    displayName: "Store Returns (Đổi trả tại cửa hàng)",
+    category: "returns",
+    categoryLabel: "Kênh Đổi trả",
+    rowCountEstimate: 288000,
+    description: "Ghi nhận các đơn hàng khách đem trả lại tại quầy cửa hàng kèm lý do hoàn trả và tiền hoàn.",
+    primaryKey: ["sr_item_sk", "sr_ticket_number"],
+    sampleQuestions: [
+      "Lý do hàng đầu khiến khách hàng đổi trả tại cửa hàng trong năm 2003?",
+      "Tỷ lệ đổi trả hàng theo nhóm sản phẩm tại kênh cửa hàng?",
+    ],
+    columns: [
+      { name: "sr_returned_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Ngày khách trả hàng" },
+      { name: "sr_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa mặt hàng bị trả" },
+      { name: "sr_customer_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "customer.c_customer_sk", description: "Khách hàng trả" },
+      { name: "sr_ticket_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã hóa đơn hoàn trả" },
+      { name: "sr_return_quantity", type: "INTEGER", nullable: true, description: "Số lượng trả lại" },
+      { name: "sr_return_amt", type: "DECIMAL(7,2)", nullable: true, description: "Số tiền hoàn lại cho khách" },
+      { name: "sr_reason_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "reason.r_reason_sk", description: "Khóa lý do trả" },
     ],
   },
   {
-    id: "returns",
-    name: "Kênh Hoàn Hàng (Returns Facts)",
-    iconName: "Undo2",
-    description: "Sự kiện trả hàng và hoàn tiền đa kênh",
-    tables: [
-      {
-        name: "store_returns",
-        label: "Hoàn hàng Cửa hàng",
-        description: "Giao dịch khách hàng trả hàng tại cửa hàng",
-        category: "returns",
-        primaryKey: ["sr_item_sk", "sr_ticket_number"],
-        dateKey: "sr_returned_date_sk",
-        commonJoins: ["date_dim", "store", "item", "customer", "reason"],
-      },
-      {
-        name: "web_returns",
-        label: "Hoàn hàng Web",
-        description: "Giao dịch hoàn trả đơn mua qua website",
-        category: "returns",
-        primaryKey: ["wr_item_sk", "wr_order_number"],
-        dateKey: "wr_returned_date_sk",
-        commonJoins: ["date_dim", "web_page", "item", "customer", "reason"],
-      },
-      {
-        name: "catalog_returns",
-        label: "Hoàn hàng Catalog",
-        description: "Giao dịch hoàn trả đơn mua qua catalog",
-        category: "returns",
-        primaryKey: ["cr_item_sk", "cr_order_number"],
-        dateKey: "cr_returned_date_sk",
-        commonJoins: ["date_dim", "catalog_page", "item", "customer", "reason"],
-      },
+    name: "catalog_returns",
+    displayName: "Catalog Returns (Đổi trả đơn Catalog)",
+    category: "returns",
+    categoryLabel: "Kênh Đổi trả",
+    rowCountEstimate: 144000,
+    description: "Các yêu cầu đổi trả đơn hàng gửi qua đường bưu điện hoặc tổng đài.",
+    primaryKey: ["cr_item_sk", "cr_order_number"],
+    sampleQuestions: [
+      "Chi phí hoàn trả của kênh Catalog trong năm 2003?",
+    ],
+    columns: [
+      { name: "cr_returned_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Ngày trả hàng" },
+      { name: "cr_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa mặt hàng" },
+      { name: "cr_order_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã đơn catalog đổi trả" },
+      { name: "cr_return_amount", type: "DECIMAL(7,2)", nullable: true, description: "Tiền hoàn lại" },
     ],
   },
   {
-    id: "inventory",
-    name: "Kho & Tồn Kho (Inventory)",
-    iconName: "Warehouse",
-    description: "Số lượng tồn kho theo tuần và các trung tâm phân phối",
-    tables: [
-      {
-        name: "inventory",
-        label: "Tồn kho Hàng tuần",
-        description: "Ảnh chụp lượng tồn kho theo từng mặt hàng và kho",
-        category: "inventory",
-        primaryKey: ["inv_date_sk", "inv_item_sk", "inv_warehouse_sk"],
-        dateKey: "inv_date_sk",
-        commonJoins: ["date_dim", "item", "warehouse"],
-      },
-      {
-        name: "warehouse",
-        label: "Danh mục Kho hàng",
-        description: "Thông tin vị trí, kích thước kho phân phối",
-        category: "inventory",
-        primaryKey: ["w_warehouse_sk"],
-      },
+    name: "web_returns",
+    displayName: "Web Returns (Đổi trả đơn Web)",
+    category: "returns",
+    categoryLabel: "Kênh Đổi trả",
+    rowCountEstimate: 72000,
+    description: "Đơn hàng hoàn trả từ khách mua trên mạng Internet.",
+    primaryKey: ["wr_item_sk", "wr_order_number"],
+    sampleQuestions: [
+      "Sản phẩm nào trên website bị hoàn trả nhiều nhất năm 2002?",
+    ],
+    columns: [
+      { name: "wr_returned_date_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Ngày trả hàng" },
+      { name: "wr_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa sản phẩm" },
+      { name: "wr_order_number", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Mã đơn hàng web bị trả" },
+      { name: "wr_return_amt", type: "DECIMAL(7,2)", nullable: true, description: "Số tiền hoàn đơn web" },
+    ],
+  },
+
+  // 3. Fact Inventory (1)
+  {
+    name: "inventory",
+    displayName: "Inventory (Quản lý tồn kho)",
+    category: "inventory",
+    categoryLabel: "Tồn kho & Kho vận",
+    rowCountEstimate: 11745000,
+    description: "Ảnh chụp tồn kho hàng tuần theo từng sản phẩm tại mạng lưới kho hàng trung tâm.",
+    primaryKey: ["inv_date_sk", "inv_item_sk", "inv_warehouse_sk"],
+    sampleQuestions: [
+      "Tình trạng tồn kho của nhóm hàng trang phục tại kho số 1 trong tháng 12?",
+      "Những sản phẩm nào có số lượng tồn kho dưới mức an toàn?",
+    ],
+    columns: [
+      { name: "inv_date_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "date_dim.d_date_sk", description: "Ngày ghi nhận tồn kho" },
+      { name: "inv_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk", description: "Khóa sản phẩm" },
+      { name: "inv_warehouse_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, isForeignKey: true, references: "warehouse.w_warehouse_sk", description: "Khóa kho lưu trữ" },
+      { name: "inv_quantity_on_hand", type: "INTEGER", nullable: true, description: "Số lượng tồn kho thực tế" },
+    ],
+  },
+
+  // 4. Dimensions (17)
+  {
+    name: "date_dim",
+    displayName: "Date Dimension (Chiều Thời gian Ngày)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 73049,
+    description: "Bảng chiều thời gian chuẩn, dùng để lọc theo năm, quý, tháng, ngày lễ và ngày cuối tuần.",
+    primaryKey: ["d_date_sk"],
+    sampleQuestions: ["Thống kê số ngày cuối tuần và ngày lễ trong năm 2003?"],
+    columns: [
+      { name: "d_date_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa chính surrogate key ngày" },
+      { name: "d_date_id", type: "VARCHAR(16)", nullable: false, description: "Mã ngày nghiệp vụ (YYYY-MM-DD)" },
+      { name: "d_year", type: "INTEGER", nullable: true, description: "Năm (ví dụ: 2003)" },
+      { name: "d_moy", type: "INTEGER", nullable: true, description: "Tháng trong năm (1-12)" },
+      { name: "d_qoy", type: "INTEGER", nullable: true, description: "Quý trong năm (1-4)" },
+      { name: "d_weekend", type: "VARCHAR(1)", nullable: true, description: "Cờ ngày cuối tuần (Y/N)" },
+      { name: "d_holiday", type: "VARCHAR(1)", nullable: true, description: "Cờ ngày lễ (Y/N)" },
     ],
   },
   {
-    id: "customer",
-    name: "Khách Hàng & Nhân Sự",
-    iconName: "Users",
-    description: "Hồ sơ khách hàng, nhân khẩu học và địa chỉ liên lạc",
-    tables: [
-      {
-        name: "customer",
-        label: "Khách hàng",
-        description: "Thông tin cá nhân (chứa các cột PII được bảo vệ)",
-        category: "customer",
-        primaryKey: ["c_customer_sk"],
-        commonJoins: ["customer_address", "customer_demographics", "household_demographics"],
-      },
-      {
-        name: "customer_address",
-        label: "Địa chỉ Khách hàng",
-        description: "Bang, thành phố, hạt, mã bưu chính",
-        category: "customer",
-        primaryKey: ["ca_address_sk"],
-      },
-      {
-        name: "customer_demographics",
-        label: "Nhân khẩu học",
-        description: "Giới tính, tình trạng hôn nhân, trình độ học vấn",
-        category: "customer",
-        primaryKey: ["cd_demo_sk"],
-      },
-      {
-        name: "household_demographics",
-        label: "Nhân khẩu Hộ gia đình",
-        description: "Quy mô hộ, khoảng thu nhập, số lượng phương tiện",
-        category: "customer",
-        primaryKey: ["hd_demo_sk"],
-        commonJoins: ["income_band"],
-      },
+    name: "time_dim",
+    displayName: "Time Dimension (Chiều Giờ/Phút/Giây)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 86400,
+    description: "Chiều thời gian trong ngày phục vụ phân tích khung giờ cao điểm mua sắm.",
+    primaryKey: ["t_time_sk"],
+    sampleQuestions: ["Khung giờ nào trong ngày có lượng khách mua sắm đông nhất?"],
+    columns: [
+      { name: "t_time_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa chính thời gian" },
+      { name: "t_hour", type: "INTEGER", nullable: true, description: "Giờ trong ngày (0-23)" },
+      { name: "t_minute", type: "INTEGER", nullable: true, description: "Phút" },
     ],
   },
   {
-    id: "dimension",
-    name: "Chiều Bán Lẻ & Thời Gian",
-    iconName: "Calendar",
-    description: "Các bảng chiều (Dimensions) phục vụ cắt lát số liệu phân tích",
-    tables: [
-      {
-        name: "date_dim",
-        label: "Chiều Ngày tháng",
-        description: "Năm, quý, tháng, tuần, ngày trong tuần, ngày lễ",
-        category: "dimension",
-        primaryKey: ["d_date_sk"],
-      },
-      {
-        name: "time_dim",
-        label: "Chiều Giờ giấc",
-        description: "Giờ, phút, giây, ca bán hàng",
-        category: "dimension",
-        primaryKey: ["t_time_sk"],
-      },
-      {
-        name: "item",
-        label: "Sản phẩm / Mặt hàng",
-        description: "Mã SKU, danh mục (Category), nhóm hàng (Class), thương hiệu",
-        category: "dimension",
-        primaryKey: ["i_item_sk"],
-      },
-      {
-        name: "store",
-        label: "Cửa hàng bán lẻ",
-        description: "Thông tin cửa hàng, diện tích, người quản lý, địa lý",
-        category: "dimension",
-        primaryKey: ["s_store_sk"],
-      },
-      {
-        name: "promotion",
-        label: "Chương trình Khuyến mãi",
-        description: "Tên chiến dịch, hình thức giảm giá, thời gian hiệu lực",
-        category: "dimension",
-        primaryKey: ["p_promo_sk"],
-      },
-      {
-        name: "call_center",
-        label: "Trung tâm Cuộc gọi",
-        description: "Call center phụ trách bán hàng catalog",
-        category: "dimension",
-        primaryKey: ["cc_call_center_sk"],
-      },
-      {
-        name: "catalog_page",
-        label: "Trang Catalog",
-        description: "Số trang catalog, loại catalog",
-        category: "dimension",
-        primaryKey: ["cp_catalog_page_sk"],
-      },
-      {
-        name: "web_site",
-        label: "Trang Web Bán lẻ",
-        description: "Cổng thương mại điện tử, múi giờ",
-        category: "dimension",
-        primaryKey: ["web_site_sk"],
-      },
-      {
-        name: "web_page",
-        label: "Trang con Web",
-        description: "Trang sản phẩm, trang checkout",
-        category: "dimension",
-        primaryKey: ["wp_web_page_sk"],
-      },
-      {
-        name: "ship_mode",
-        label: "Phương thức Vận chuyển",
-        description: "Đơn vị vận chuyển, loại dịch vụ",
-        category: "dimension",
-        primaryKey: ["sm_ship_mode_sk"],
-      },
-      {
-        name: "reason",
-        label: "Lý do Trả hàng",
-        description: "Mô tả lý do đổi trả hàng của khách",
-        category: "dimension",
-        primaryKey: ["r_reason_sk"],
-      },
-      {
-        name: "income_band",
-        label: "Khoảng Thu nhập",
-        description: "Mức thu nhập thấp nhất - cao nhất",
-        category: "dimension",
-        primaryKey: ["ib_income_band_sk"],
-      },
+    name: "item",
+    displayName: "Item (Danh mục Sản phẩm & SKU)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 18000,
+    description: "Thông tin chi tiết về sản phẩm, danh mục cha con, giá niêm yết, thương hiệu và nhà sản xuất.",
+    primaryKey: ["i_item_sk"],
+    sampleQuestions: ["Danh sách các phân loại mặt hàng (category) có nhiều SKU nhất?"],
+    columns: [
+      { name: "i_item_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa surrogate key sản phẩm" },
+      { name: "i_item_id", type: "VARCHAR(16)", nullable: false, description: "Mã SKU sản phẩm" },
+      { name: "i_item_desc", type: "VARCHAR(200)", nullable: true, description: "Tên và mô tả sản phẩm" },
+      { name: "i_current_price", type: "DECIMAL(7,2)", nullable: true, description: "Giá bán hiện tại" },
+      { name: "i_category", type: "VARCHAR(50)", nullable: true, description: "Ngành hàng lớn (Apparel, Books, Home...)" },
+      { name: "i_class", type: "VARCHAR(50)", nullable: true, description: "Phân nhóm sản phẩm" },
+      { name: "i_brand", type: "VARCHAR(50)", nullable: true, description: "Thương hiệu sản phẩm" },
+    ],
+  },
+  {
+    name: "customer",
+    displayName: "Customer (Khách hàng)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 100000,
+    description: "Hồ sơ nhân khẩu học khách hàng, mã bưu chính và địa chỉ hiện tại.",
+    primaryKey: ["c_customer_sk"],
+    sampleQuestions: ["Phân bố khách hàng theo tỉnh thành và độ tuổi?"],
+    columns: [
+      { name: "c_customer_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa khách hàng" },
+      { name: "c_customer_id", type: "VARCHAR(16)", nullable: false, description: "Mã khách hàng tự nhiên" },
+      { name: "c_first_name", type: "VARCHAR(20)", nullable: true, description: "Tên khách hàng (PII)" },
+      { name: "c_last_name", type: "VARCHAR(30)", nullable: true, description: "Họ khách hàng (PII)" },
+      { name: "c_current_addr_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "customer_address.ca_address_sk", description: "Khóa địa chỉ hiện tại" },
+    ],
+  },
+  {
+    name: "customer_address",
+    displayName: "Customer Address (Địa chỉ Khách hàng)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 50000,
+    description: "Địa chỉ đường phố, thành phố, tiểu bang, quốc gia của khách hàng.",
+    primaryKey: ["ca_address_sk"],
+    sampleQuestions: ["Top 5 bang có lượng khách hàng tập trung đông nhất?"],
+    columns: [
+      { name: "ca_address_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa địa chỉ" },
+      { name: "ca_city", type: "VARCHAR(60)", nullable: true, description: "Thành phố" },
+      { name: "ca_state", type: "VARCHAR(2)", nullable: true, description: "Bang/Tỉnh" },
+      { name: "ca_zip", type: "VARCHAR(10)", nullable: true, description: "Mã bưu điện ZIP" },
+      { name: "ca_country", type: "VARCHAR(20)", nullable: true, description: "Quốc gia" },
+    ],
+  },
+  {
+    name: "customer_demographics",
+    displayName: "Customer Demographics (Nhân khẩu học Khách)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 1920800,
+    description: "Thông tin giới tính, tình trạng hôn nhân, trình độ học vấn và phân nhóm thu nhập.",
+    primaryKey: ["cd_demo_sk"],
+    sampleQuestions: ["Tỷ lệ doanh thu mua hàng theo phân nhóm học vấn của khách hàng?"],
+    columns: [
+      { name: "cd_demo_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa nhân khẩu học" },
+      { name: "cd_gender", type: "VARCHAR(1)", nullable: true, description: "Giới tính (M/F)" },
+      { name: "cd_marital_status", type: "VARCHAR(1)", nullable: true, description: "Tình trạng hôn nhân (M/S/D/W)" },
+      { name: "cd_education_status", type: "VARCHAR(20)", nullable: true, description: "Trình độ học vấn" },
+    ],
+  },
+  {
+    name: "household_demographics",
+    displayName: "Household Demographics (Hộ gia đình)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 7200,
+    description: "Quy mô hộ gia đình, số xe sở hữu và nhóm thu nhập gia đình.",
+    primaryKey: ["hd_demo_sk"],
+    sampleQuestions: ["Mức chi tiêu trung bình theo số lượng xe của hộ gia đình?"],
+    columns: [
+      { name: "hd_demo_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa hộ gia đình" },
+      { name: "hd_income_band_sk", type: "BIGINT", nullable: true, isForeignKey: true, references: "income_band.ib_income_band_sk", description: "Khóa khoảng thu nhập" },
+      { name: "hd_buy_potential", type: "VARCHAR(15)", nullable: true, description: "Tiềm năng mua sắm" },
+      { name: "hd_vehicle_count", type: "INTEGER", nullable: true, description: "Số lượng ô tô" },
+    ],
+  },
+  {
+    name: "income_band",
+    displayName: "Income Band (Khoảng Thu nhập)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 20,
+    description: "Phân loại các khoảng thu nhập hàng năm (tối thiểu - tối đa).",
+    primaryKey: ["ib_income_band_sk"],
+    sampleQuestions: ["Danh sách các dải thu nhập được thiết lập trong hệ thống?"],
+    columns: [
+      { name: "ib_income_band_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa dải thu nhập" },
+      { name: "ib_lower_bound", type: "INTEGER", nullable: true, description: "Mức thu nhập cận dưới (USD)" },
+      { name: "ib_upper_bound", type: "INTEGER", nullable: true, description: "Mức thu nhập cận trên (USD)" },
+    ],
+  },
+  {
+    name: "store",
+    displayName: "Store (Cửa hàng Thực tế)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 12,
+    description: "Thông tin vị trí, diện tích sàn, số lượng nhân viên và người quản lý của cửa hàng.",
+    primaryKey: ["s_store_sk"],
+    sampleQuestions: ["Xếp hạng cửa hàng theo diện tích mặt sàn và doanh thu năm 2003?"],
+    columns: [
+      { name: "s_store_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa cửa hàng" },
+      { name: "s_store_id", type: "VARCHAR(16)", nullable: false, description: "Mã cửa hàng" },
+      { name: "s_store_name", type: "VARCHAR(50)", nullable: true, description: "Tên chi nhánh cửa hàng" },
+      { name: "s_number_employees", type: "INTEGER", nullable: true, description: "Số lượng nhân viên" },
+      { name: "s_floor_space", type: "INTEGER", nullable: true, description: "Diện tích sàn (sq ft)" },
+      { name: "s_city", type: "VARCHAR(60)", nullable: true, description: "Thành phố" },
+    ],
+  },
+  {
+    name: "call_center",
+    displayName: "Call Center (Trung tâm Cuộc gọi)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 6,
+    description: "Trung tâm chăm sóc khách hàng và tiếp nhận đơn hàng catalog.",
+    primaryKey: ["cc_call_center_sk"],
+    sampleQuestions: ["Trung tâm Call Center nào có tỷ lệ xử lý đơn hàng cao nhất?"],
+    columns: [
+      { name: "cc_call_center_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa trung tâm cuộc gọi" },
+      { name: "cc_call_center_id", type: "VARCHAR(16)", nullable: false, description: "Mã trung tâm" },
+      { name: "cc_name", type: "VARCHAR(50)", nullable: true, description: "Tên Call Center" },
+      { name: "cc_employees", type: "INTEGER", nullable: true, description: "Số lượng điện thoại viên" },
+    ],
+  },
+  {
+    name: "catalog_page",
+    displayName: "Catalog Page (Trang Danh mục In)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 12000,
+    description: "Thông tin các số ấn phẩm catalog và số trang tương ứng.",
+    primaryKey: ["cp_catalog_page_sk"],
+    sampleQuestions: ["Trang nào trong catalog phát hành tháng 6 có số lượng bán nhiều nhất?"],
+    columns: [
+      { name: "cp_catalog_page_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa trang catalog" },
+      { name: "cp_catalog_page_id", type: "VARCHAR(16)", nullable: false, description: "Mã trang" },
+      { name: "cp_page_number", type: "INTEGER", nullable: true, description: "Số thứ tự trang" },
+    ],
+  },
+  {
+    name: "web_site",
+    displayName: "Web Site (Cổng Thương mại Điện tử)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 30,
+    description: "Các tên miền và phân trang web bán hàng trực tuyến.",
+    primaryKey: ["web_site_sk"],
+    sampleQuestions: ["Website nào có số lượt đặt hàng trực tuyến lớn nhất năm 2002?"],
+    columns: [
+      { name: "web_site_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa trang web" },
+      { name: "web_site_id", type: "VARCHAR(16)", nullable: false, description: "Mã website" },
+      { name: "web_name", type: "VARCHAR(50)", nullable: true, description: "Tên thương hiệu website" },
+    ],
+  },
+  {
+    name: "web_page",
+    displayName: "Web Page (Trang Đích Web)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 60,
+    description: "Trang chi tiết sản phẩm hoặc landing page trên nền tảng thương mại điện tử.",
+    primaryKey: ["wp_web_page_sk"],
+    sampleQuestions: ["Những trang web landing page nào tạo ra tỷ lệ hoàn trả thấp nhất?"],
+    columns: [
+      { name: "wp_web_page_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa trang web" },
+      { name: "wp_web_page_id", type: "VARCHAR(16)", nullable: false, description: "Mã trang URL" },
+      { name: "wp_type", type: "VARCHAR(50)", nullable: true, description: "Loại trang (order, review, welcome)" },
+    ],
+  },
+  {
+    name: "warehouse",
+    displayName: "Warehouse (Kho Hàng Trung tâm)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 5,
+    description: "Kho lưu trữ vật lý cung cấp hàng hóa cho cả 3 kênh bán hàng.",
+    primaryKey: ["w_warehouse_sk"],
+    sampleQuestions: ["Sức chứa và tổng lượng hàng đang trữ tại từng kho hàng?"],
+    columns: [
+      { name: "w_warehouse_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa kho hàng" },
+      { name: "w_warehouse_id", type: "VARCHAR(16)", nullable: false, description: "Mã kho" },
+      { name: "w_warehouse_name", type: "VARCHAR(20)", nullable: true, description: "Tên kho vận" },
+      { name: "w_warehouse_sq_ft", type: "INTEGER", nullable: true, description: "Diện tích kho (sq ft)" },
+    ],
+  },
+  {
+    name: "ship_mode",
+    displayName: "Ship Mode (Phương thức Giao Hàng)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 20,
+    description: "Các đối tác và hình thức vận chuyển (Express, Ground, Air).",
+    primaryKey: ["sm_ship_mode_sk"],
+    sampleQuestions: ["Phương thức vận chuyển nào được khách hàng ưu chuộng nhất?"],
+    columns: [
+      { name: "sm_ship_mode_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa phương thức vận chuyển" },
+      { name: "sm_ship_mode_id", type: "VARCHAR(16)", nullable: false, description: "Mã phương thức" },
+      { name: "sm_type", type: "VARCHAR(30)", nullable: true, description: "Loại hình vận chuyển" },
+      { name: "sm_carrier", type: "VARCHAR(20)", nullable: true, description: "Hãng vận chuyển (UPS, FedEx...)" },
+    ],
+  },
+  {
+    name: "promotion",
+    displayName: "Promotion (Chương trình Khuyến mãi)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 300,
+    description: "Các chiến dịch giảm giá, phiếu mua hàng và quà tặng đi kèm.",
+    primaryKey: ["p_promo_sk"],
+    sampleQuestions: ["Chiến dịch khuyến mãi nào đem lại doanh thu cao nhất năm 2003?"],
+    columns: [
+      { name: "p_promo_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa khuyến mãi" },
+      { name: "p_promo_id", type: "VARCHAR(16)", nullable: false, description: "Mã chương trình" },
+      { name: "p_promo_name", type: "VARCHAR(50)", nullable: true, description: "Tên chiến dịch khuyến mãi" },
+      { name: "p_discount_active", type: "VARCHAR(1)", nullable: true, description: "Cờ kích hoạt chiết khấu (Y/N)" },
+    ],
+  },
+  {
+    name: "reason",
+    displayName: "Reason (Lý do Đổi trả Hàng)",
+    category: "dimensions",
+    categoryLabel: "Bảng Chiều Dimension",
+    rowCountEstimate: 35,
+    description: "Bảng danh mục lý do khách hàng đổi trả sản phẩm.",
+    primaryKey: ["r_reason_sk"],
+    sampleQuestions: ["Top 3 lý do đổi trả hàng phổ biến nhất trong toàn hệ thống?"],
+    columns: [
+      { name: "r_reason_sk", type: "BIGINT", nullable: false, isPrimaryKey: true, description: "Khóa lý do" },
+      { name: "r_reason_id", type: "VARCHAR(16)", nullable: false, description: "Mã lý do" },
+      { name: "r_reason_desc", type: "VARCHAR(100)", nullable: true, description: "Mô tả lý do đổi trả" },
     ],
   },
 ];
 
-export const TOTAL_TPCDS_TABLES_COUNT = 24;
-
-export interface TPCDSColumnMeta {
-  name: string;
-  type: string;
-  description: string;
-  isPrimaryKey?: boolean;
-  isForeignKey?: boolean;
-  references?: string;
-  isPii?: boolean;
+export function getTableByName(name: string): TableMetadata | undefined {
+  return TPCDS_TABLES.find((t) => t.name.toLowerCase() === name.toLowerCase());
 }
 
-// Bảng từ điển cột chi tiết cho các bảng TPC-DS phổ biến
-const TABLE_COLUMNS_MAP: Record<string, TPCDSColumnMeta[]> = {
-  store_sales: [
-    { name: "ss_item_sk", type: "INTEGER", description: "Mã định danh mặt hàng (SKU)", isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk" },
-    { name: "ss_ticket_number", type: "BIGINT", description: "Số vé hóa đơn bán lẻ", isPrimaryKey: true },
-    { name: "ss_sold_date_sk", type: "INTEGER", description: "Khóa ngày bán hàng", isForeignKey: true, references: "date_dim.d_date_sk" },
-    { name: "ss_customer_sk", type: "INTEGER", description: "Khóa khách hàng", isForeignKey: true, references: "customer.c_customer_sk" },
-    { name: "ss_store_sk", type: "INTEGER", description: "Khóa cửa hàng", isForeignKey: true, references: "store.s_store_sk" },
-    { name: "ss_quantity", type: "INTEGER", description: "Số lượng mặt hàng bán ra" },
-    { name: "ss_sales_price", type: "DECIMAL(7,2)", description: "Đơn giá bán thực tế" },
-    { name: "ss_net_paid", type: "DECIMAL(7,2)", description: "Doanh thu thuần đã trừ giảm giá" },
-    { name: "ss_net_profit", type: "DECIMAL(7,2)", description: "Lợi nhuận ròng sau chi phí" },
-  ],
-  web_sales: [
-    { name: "ws_item_sk", type: "INTEGER", description: "Mã mặt hàng trực tuyến", isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk" },
-    { name: "ws_order_number", type: "BIGINT", description: "Số đơn hàng trực tuyến", isPrimaryKey: true },
-    { name: "ws_sold_date_sk", type: "INTEGER", description: "Khóa ngày bán web", isForeignKey: true, references: "date_dim.d_date_sk" },
-    { name: "ws_bill_customer_sk", type: "INTEGER", description: "Khách hàng thanh toán", isForeignKey: true, references: "customer.c_customer_sk" },
-    { name: "ws_web_page_sk", type: "INTEGER", description: "Khóa trang web", isForeignKey: true, references: "web_page.wp_web_page_sk" },
-    { name: "ws_net_paid", type: "DECIMAL(7,2)", description: "Doanh thu thuần kênh Web" },
-    { name: "ws_net_profit", type: "DECIMAL(7,2)", description: "Lợi nhuận ròng kênh Web" },
-  ],
-  catalog_sales: [
-    { name: "cs_item_sk", type: "INTEGER", description: "Mã mặt hàng catalog", isPrimaryKey: true, isForeignKey: true, references: "item.i_item_sk" },
-    { name: "cs_order_number", type: "BIGINT", description: "Số đơn hàng catalog", isPrimaryKey: true },
-    { name: "cs_sold_date_sk", type: "INTEGER", description: "Khóa ngày bán catalog", isForeignKey: true, references: "date_dim.d_date_sk" },
-    { name: "cs_bill_customer_sk", type: "INTEGER", description: "Khách hàng đặt hàng", isForeignKey: true, references: "customer.c_customer_sk" },
-    { name: "cs_net_paid", type: "DECIMAL(7,2)", description: "Doanh thu thuần kênh Catalog" },
-    { name: "cs_net_profit", type: "DECIMAL(7,2)", description: "Lợi nhuận ròng kênh Catalog" },
-  ],
-  customer: [
-    { name: "c_customer_sk", type: "INTEGER", description: "Khóa chính khách hàng", isPrimaryKey: true },
-    { name: "c_customer_id", type: "CHAR(16)", description: "Mã định danh khách hàng tự nhiên" },
-    { name: "c_first_name", type: "VARCHAR(20)", description: "Tên khách hàng", isPii: true },
-    { name: "c_last_name", type: "VARCHAR(30)", description: "Họ và tên đệm khách hàng", isPii: true },
-    { name: "c_email_address", type: "VARCHAR(50)", description: "Địa chỉ thư điện tử cá nhân", isPii: true },
-    { name: "c_birth_year", type: "INTEGER", description: "Năm sinh" },
-    { name: "c_current_addr_sk", type: "INTEGER", description: "Khóa địa chỉ", isForeignKey: true, references: "customer_address.ca_address_sk" },
-  ],
-  customer_address: [
-    { name: "ca_address_sk", type: "INTEGER", description: "Khóa chính địa chỉ", isPrimaryKey: true },
-    { name: "ca_street_number", type: "CHAR(10)", description: "Số nhà", isPii: true },
-    { name: "ca_street_name", type: "VARCHAR(60)", description: "Tên đường phố", isPii: true },
-    { name: "ca_city", type: "VARCHAR(60)", description: "Thành phố" },
-    { name: "ca_state", type: "CHAR(2)", description: "Mã tiểu bang" },
-    { name: "ca_zip", type: "CHAR(10)", description: "Mã bưu chính" },
-  ],
-  date_dim: [
-    { name: "d_date_sk", type: "INTEGER", description: "Khóa chính ngày tháng", isPrimaryKey: true },
-    { name: "d_date_id", type: "CHAR(16)", description: "Chuỗi ngày định dạng YYYY-MM-DD" },
-    { name: "d_date", type: "DATE", description: "Giá trị ngày thực tế" },
-    { name: "d_year", type: "INTEGER", description: "Năm tài chính / dương lịch (VD: 1998 - 2002)" },
-    { name: "d_moy", type: "INTEGER", description: "Tháng trong năm (1 - 12)" },
-    { name: "d_qoy", type: "INTEGER", description: "Quý trong năm (1 - 4)" },
-    { name: "d_weekend", type: "CHAR(1)", description: "Cờ ngày cuối tuần (Y/N)" },
-  ],
-  item: [
-    { name: "i_item_sk", type: "INTEGER", description: "Khóa chính sản phẩm", isPrimaryKey: true },
-    { name: "i_item_id", type: "CHAR(16)", description: "Mã SKU sản phẩm" },
-    { name: "i_item_desc", type: "VARCHAR(200)", description: "Mô tả chi tiết sản phẩm" },
-    { name: "i_current_price", type: "DECIMAL(7,2)", description: "Giá niêm yết hiện tại" },
-    { name: "i_category", type: "VARCHAR(50)", description: "Danh mục ngành hàng (Electronics, Books...)" },
-    { name: "i_class", type: "VARCHAR(50)", description: "Nhóm phân loại sản phẩm" },
-    { name: "i_brand", type: "VARCHAR(50)", description: "Thương hiệu sản xuất" },
-  ],
-  store: [
-    { name: "s_store_sk", type: "INTEGER", description: "Khóa chính cửa hàng", isPrimaryKey: true },
-    { name: "s_store_id", type: "CHAR(16)", description: "Mã cửa hàng" },
-    { name: "s_store_name", type: "VARCHAR(50)", description: "Tên chi nhánh cửa hàng" },
-    { name: "s_number_employees", type: "INTEGER", description: "Số lượng nhân viên" },
-    { name: "s_city", type: "VARCHAR(60)", description: "Thành phố đặt cửa hàng" },
-    { name: "s_state", type: "CHAR(2)", description: "Tiểu bang" },
-  ],
-};
+export function getTablesByCategory(category: TableCategory): TableMetadata[] {
+  return TPCDS_TABLES.filter((t) => t.category === category);
+}
 
-/**
- * Lấy toàn bộ thông tin chi tiết của một bảng TPC-DS kèm danh sách cột
- */
-export function getTableDetails(tableName: string): (TPCDSTableMeta & { columns: TPCDSColumnMeta[] }) | null {
-  for (const domain of TPCDS_DOMAINS) {
-    const found = domain.tables.find((t) => t.name.toLowerCase() === tableName.toLowerCase());
-    if (found) {
-      const columns = TABLE_COLUMNS_MAP[found.name] || [
-        {
-          name: `${found.name.slice(0, 3)}_sk`,
-          type: "INTEGER",
-          description: `Khóa chính bảng ${found.name}`,
-          isPrimaryKey: true,
-        },
-      ];
-      return {
-        ...found,
-        columns,
-      };
-    }
-  }
-  return null;
+export function searchTables(query: string): TableMetadata[] {
+  if (!query.trim()) return TPCDS_TABLES;
+  const q = query.toLowerCase();
+  return TPCDS_TABLES.filter(
+    (t) =>
+      t.name.toLowerCase().includes(q) ||
+      t.displayName.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      t.columns.some((c) => c.name.toLowerCase().includes(q))
+  );
 }
