@@ -168,9 +168,6 @@ def retrieve_schema_context(
         # region -> nation
         if "region" in found_tables and "nation" not in found_tables:
             found_tables.append("nation")
-        # supplier -> region -> nation
-        if "supplier" in found_tables and "region" in found_tables and "nation" not in found_tables:
-            found_tables.append("nation")
         # customer + lineitem -> orders
         if (
             "customer" in found_tables
@@ -178,13 +175,13 @@ def retrieve_schema_context(
             and "orders" not in found_tables
         ):
             found_tables.append("orders")
-        # customer + region -> nation
+        # customer + part -> orders + lineitem
         if (
             "customer" in found_tables
-            and "region" in found_tables
-            and "nation" not in found_tables
+            and "part" in found_tables
+            and "orders" not in found_tables
         ):
-            found_tables.append("nation")
+            found_tables.extend(["orders", "lineitem"])
         # part + supplier -> partsupp (hoặc lineitem)
         if (
             "part" in found_tables

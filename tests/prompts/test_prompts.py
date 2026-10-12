@@ -24,6 +24,9 @@ def test_error_diagnostic_prompt_structure():
     assert isinstance(ERROR_DIAGNOSTIC_PROMPT, ChatPromptTemplate)
     assert ERROR_DIAGNOSTIC_PROMPT is REEXPORTED_PROMPT
     assert "chuyên gia chẩn đoán lỗi SQL" in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
+    assert "TPC-H" in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
+    assert "date_dim" not in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
+    assert "store_sales" not in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
     assert "DiagnosticResult" in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
     assert "error_category" in ERROR_DIAGNOSTIC_SYSTEM_PROMPT
     assert "{sql}" in ERROR_DIAGNOSTIC_HUMAN_PROMPT

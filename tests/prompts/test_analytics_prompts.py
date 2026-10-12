@@ -49,6 +49,9 @@ def test_evidence_analyzer_prompt_structure_and_formatting():
     assert isinstance(EVIDENCE_ANALYZER_PROMPT, ChatPromptTemplate)
     assert len(EVIDENCE_ANALYZER_PROMPT.messages) == 2
     assert "has_enough_evidence" in EVIDENCE_ANALYZER_SYSTEM_PROMPT
+    assert "TPC-H" in EVIDENCE_ANALYZER_SYSTEM_PROMPT
+    assert "store_sales" not in EVIDENCE_ANALYZER_SYSTEM_PROMPT
+    assert "date_dim" not in EVIDENCE_ANALYZER_SYSTEM_PROMPT
     assert "{remaining_budget}" in EVIDENCE_ANALYZER_HUMAN_PROMPT
 
     messages = EVIDENCE_ANALYZER_PROMPT.format_messages(
