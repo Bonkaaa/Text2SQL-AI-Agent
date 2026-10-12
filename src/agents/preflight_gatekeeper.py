@@ -44,27 +44,25 @@ TIER2_REFUSAL_MESSAGES: Final[dict[SafetyCategory, str]] = {
         "Hệ thống chỉ hỗ trợ truy vấn đọc dữ liệu phân tích (SELECT)."
     ),
     SafetyCategory.UNSUPPORTED_OUT_OF_DOMAIN: (
-        "Hệ thống chỉ hỗ trợ giải đáp và phân tích dữ liệu kinh doanh & chuỗi cung ứng (chuẩn TPC-H) "
-        "cùng bán lẻ đa kênh (chuẩn TPC-DS). Vui lòng đặt câu hỏi liên quan đến doanh thu (Store, Web, Catalog), "
-        "sản phẩm, khách hàng, nhà cung cấp hoặc tồn kho."
+        "Hệ thống chỉ hỗ trợ giải đáp và phân tích dữ liệu kinh doanh & chuỗi cung ứng (chuẩn TPC-H). "
+        "Vui lòng đặt câu hỏi liên quan đến đơn hàng, khách hàng, nhà cung cấp, linh kiện, tồn kho "
+        "hoặc phương thức vận chuyển."
     ),
 }
 
 # ==============================================================================
-# 1. POOL GỢI Ý PHƯƠNG ÁN LÀM RÕ (TPC-DS & TPC-H SUGGESTIONS POOL)
+# 1. POOL GỢI Ý PHƯƠNG ÁN LÀM RÕ (TPC-H SUGGESTIONS POOL)
 # ==============================================================================
 
 DEFAULT_CLARIFICATION_OPTIONS_POOL: Final[list[str]] = [
-    "Xem tổng doanh thu theo từng năm (1998 - 2002)",
-    "Tổng doanh số theo 3 kênh bán hàng (Store, Web, Catalog) năm 2001",
-    "Top 5 danh mục sản phẩm (Categories) có doanh thu cao nhất năm 2001",
-    "Doanh thu bán lẻ tại cửa hàng (Store Sales) theo từng bang",
-    "Top 10 mặt hàng bán chạy nhất qua kênh Website (Web Sales)",
-    "Tỷ lệ trả hàng (Returns) theo từng lý do hoàn trả",
-    "Doanh thu và lợi nhuận ròng (Net Profit) theo từng quý năm 2002",
-    "Số lượng khách hàng theo từng phân khúc nhân khẩu học",
-    "Hiệu quả các chiến dịch khuyến mãi (Promotion) năm 2001",
-    "Top 5 khách hàng có tổng chi tiêu cao nhất",
+    "Xem tổng doanh thu theo từng năm (1992 - 1998)",
+    "Tổng doanh thu thuần theo từng phân khúc thị trường (c_mktsegment)",
+    "Top 5 linh kiện có doanh thu cao nhất theo nhà sản xuất",
+    "Tỷ lệ đơn hàng giao trễ theo từng phương thức vận chuyển (l_shipmode)",
+    "Top 10 khách hàng có tổng giá trị đơn hàng lớn nhất",
+    "Giá trị tồn kho theo từng nhà cung cấp tại khu vực Châu Á",
+    "Tỷ lệ hoàn hàng (l_returnflag = 'R') theo từng quý",
+    "Số lượng đơn hàng phân bổ theo mức độ ưu tiên (o_orderpriority)",
 ]
 
 

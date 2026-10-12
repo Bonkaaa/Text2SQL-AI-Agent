@@ -1,6 +1,6 @@
 """Bộ 4 Strategic Metadata Tools cho SQL Generator và Direct Chat Node (Component 2.3.1).
 
-Cung cấp các công cụ tra cứu siêu dữ liệu tất định và ngữ nghĩa nghiệp vụ:
+Cung cấp các công cụ tra cứu siêu dữ liệu tất định và ngữ nghĩa nghiệp vụ chuẩn TPC-H (8 bảng):
 1. search_tables_and_columns: Tra cứu DDL và cấu trúc bảng theo từ khóa
 2. get_column_samples_and_values: Lấy danh mục giá trị thực tế của các cột phân loại
 3. find_join_path: Tìm đường nối khóa ngoại ngắn nhất và bảng cầu nối qua thuật toán BFS
@@ -19,15 +19,12 @@ from src.agents.schema_retriever import (
 )
 from src.utils.categorical_search import find_matching_categorical_values
 from src.utils.schema_context import (
-    TPCDS_JOIN_RELATIONSHIPS,
-    TPCDS_SEMANTIC_METRICS,
-    TPCDS_TABLE_NAMES,
     TPCH_JOIN_RELATIONSHIPS,
     TPCH_SEMANTIC_METRICS,
     TPCH_TABLE_NAMES,
 )
 
-# Từ điển giá trị danh mục phân loại chuẩn trong TPC-H Benchmark (legacy)
+# Từ điển giá trị danh mục phân loại chuẩn trong TPC-H Benchmark (8 bảng)
 TPCH_CATEGORICAL_CATALOG: dict[str, dict[str, list[str]]] = {
     "customer": {
         "c_mktsegment": [
@@ -88,145 +85,7 @@ TPCH_CATEGORICAL_CATALOG: dict[str, dict[str, list[str]]] = {
     },
 }
 
-# Từ điển giá trị danh mục phân loại chuẩn TPC-DS (24 bảng)
-TPCDS_CATEGORICAL_CATALOG: dict[str, dict[str, list[str]]] = {
-    "item": {
-        "i_category": [
-            "Books",
-            "Children",
-            "Electronics",
-            "Home",
-            "Jewelry",
-            "Men",
-            "Music",
-            "Shoes",
-            "Sports",
-            "Women",
-        ],
-    },
-    "customer_demographics": {
-        "cd_gender": ["M", "F"],
-        "cd_marital_status": ["M", "S", "D", "W", "U"],
-        "cd_education_status": [
-            "Advanced Degree",
-            "College",
-            "2 yr Degree",
-            "4 yr Degree",
-            "Primary",
-            "Secondary",
-            "Unknown",
-        ],
-    },
-    "ship_mode": {
-        "sm_type": [
-            "EXPRESS",
-            "OVERNIGHT",
-            "REGULAR",
-            "NEXT DAY",
-            "AIR",
-            "LIBRARY",
-            "STANDARD",
-        ],
-    },
-    "customer_address": {
-        "ca_state": [
-            "AL",
-            "AK",
-            "AZ",
-            "AR",
-            "CA",
-            "CO",
-            "CT",
-            "DE",
-            "FL",
-            "GA",
-            "HI",
-            "ID",
-            "IL",
-            "IN",
-            "IA",
-            "KS",
-            "KY",
-            "LA",
-            "ME",
-            "MD",
-            "MA",
-            "MI",
-            "MN",
-            "MS",
-            "MO",
-            "MT",
-            "NE",
-            "NV",
-            "NH",
-            "NJ",
-            "NM",
-            "NY",
-            "NC",
-            "ND",
-            "OH",
-            "OK",
-            "OR",
-            "PA",
-            "RI",
-            "SC",
-            "SD",
-            "TN",
-            "TX",
-            "UT",
-            "VT",
-            "VA",
-            "WA",
-            "WV",
-            "WI",
-            "WY",
-        ],
-        "ca_country": ["United States"],
-    },
-    "customer": {
-        "c_preferred_cust_flag": ["Y", "N"],
-    },
-    "store": {
-        "s_state": [
-            "AL",
-            "AZ",
-            "AR",
-            "CA",
-            "CO",
-            "FL",
-            "GA",
-            "IL",
-            "IN",
-            "KS",
-            "KY",
-            "LA",
-            "MD",
-            "MI",
-            "MO",
-            "NC",
-            "NM",
-            "NY",
-            "OH",
-            "PA",
-            "SC",
-            "TN",
-            "TX",
-            "VA",
-            "WA",
-            "WV",
-            "WI",
-        ],
-    },
-}
-
-CATEGORICAL_CATALOG: dict[str, dict[str, list[str]]] = {}
-for _tbl, _cols in TPCH_CATEGORICAL_CATALOG.items():
-    CATEGORICAL_CATALOG[_tbl] = dict(_cols)
-for _tbl, _cols in TPCDS_CATEGORICAL_CATALOG.items():
-    if _tbl in CATEGORICAL_CATALOG:
-        CATEGORICAL_CATALOG[_tbl] = {**CATEGORICAL_CATALOG[_tbl], **_cols}
-    else:
-        CATEGORICAL_CATALOG[_tbl] = dict(_cols)
+CATEGORICAL_CATALOG: dict[str, dict[str, list[str]]] = TPCH_CATEGORICAL_CATALOG
 
 
 # ==============================================================================
@@ -235,10 +94,10 @@ for _tbl, _cols in TPCDS_CATEGORICAL_CATALOG.items():
 
 
 def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]]:
-    """Tra cứu DDL và cấu trúc các bảng, cột trong cơ sở dữ liệu liên quan đến từ khóa.
+    """Tra cứu DDL và cấu trúc các bảng, cột trong cơ sở dữ liệu TPC-H liên quan đến từ khóa.
 
     Args:
-        query: Tên bảng, tên cột hoặc từ khóa nghiệp vụ cần tra cứu (ví dụ: 'store_sales', 'doanh thu quầy').
+        query: Tên bảng, tên cột hoặc từ khóa nghiệp vụ cần tra cứu (ví dụ: 'lineitem', 'doanh thu đơn hàng').
         top_k: Số lượng bảng tối đa trả về (mặc định 5).
 
     Returns:
@@ -255,15 +114,15 @@ def search_tables_and_columns(query: str, top_k: int = 5) -> list[dict[str, Any]
 def get_column_samples_and_values(
     table: str, column: str, query: str = ""
 ) -> dict[str, Any]:
-    """Tra cứu các giá trị danh mục thực tế (distinct categorical values) có trong cơ sở dữ liệu.
+    """Tra cứu các giá trị danh mục thực tế (distinct categorical values) có trong cơ sở dữ liệu TPC-H.
 
-    Sử dụng tool này khi cần viết mệnh đề WHERE lọc theo ngành hàng, giới tính, trạng thái, khu vực,
+    Sử dụng tool này khi cần viết mệnh đề WHERE lọc theo phân khúc, trạng thái, khu vực,
     phương thức vận chuyển để tránh tuyệt đối việc đoán mò giá trị literal.
 
     Args:
-        table: Tên bảng cần tra cứu (ví dụ: 'item', 'customer_demographics', 'ship_mode', 'customer_address').
-        column: Tên cột cần tra cứu (ví dụ: 'i_category', 'cd_gender', 'sm_type', 'ca_state').
-        query: Từ khóa giá trị tùy chọn để lọc nhanh (ví dụ: 'electronics', 'women', 'california').
+        table: Tên bảng cần tra cứu (ví dụ: 'customer', 'orders', 'lineitem', 'region').
+        column: Tên cột cần tra cứu (ví dụ: 'c_mktsegment', 'o_orderstatus', 'l_shipmode', 'r_name').
+        query: Từ khóa giá trị tùy chọn để lọc nhanh (ví dụ: 'automobile', 'air', 'asia').
 
     Returns:
         Dictionary chứa trạng thái, tên bảng, tên cột và danh sách giá trị thực tế.
@@ -271,7 +130,7 @@ def get_column_samples_and_values(
     tbl = table.lower().strip()
     col = column.lower().strip()
 
-    # 1. Kiểm tra trong catalog danh mục có sẵn (TPC-DS & TPC-H)
+    # 1. Kiểm tra trong catalog danh mục có sẵn của TPC-H
     table_catalog = CATEGORICAL_CATALOG.get(tbl, {})
     if col in table_catalog:
         values = list(table_catalog[col])
@@ -280,7 +139,6 @@ def get_column_samples_and_values(
             # Lọc các giá trị khớp chuỗi hoặc từ khóa
             filtered = [v for v in values if q_clean in v.lower()]
             if not filtered:
-                # Tìm kiếm tương đối qua vector / fuzzy search
                 fuzzy_matches = find_matching_categorical_values(query, top_k=5)
                 filtered = [
                     m.matched_value
@@ -329,14 +187,14 @@ def get_column_samples_and_values(
 
 
 def find_join_path(table_a: str, table_b: str) -> dict[str, Any]:
-    """Tìm lộ trình JOIN ngắn nhất và điều kiện khóa ngoại chính xác giữa hai bảng trong cơ sở dữ liệu.
+    """Tìm lộ trình JOIN ngắn nhất và điều kiện khóa ngoại chính xác giữa hai bảng trong TPC-H.
 
     Sử dụng tool này khi cần truy vấn kết hợp nhiều bảng mà chưa rõ các khóa ngoại
-    hoặc cần xác định bảng cầu nối (Bridge Tables) trung gian trong mô hình Snowflake.
+    hoặc cần xác định bảng cầu nối (Bridge Tables) trung gian trong chuỗi cung ứng TPC-H.
 
     Args:
-        table_a: Tên bảng nguồn (ví dụ: 'store_sales' hoặc 'customer').
-        table_b: Tên bảng đích (ví dụ: 'customer_address' hoặc 'date_dim').
+        table_a: Tên bảng nguồn (ví dụ: 'customer' hoặc 'lineitem').
+        table_b: Tên bảng đích (ví dụ: 'region' hoặc 'part').
 
     Returns:
         Dictionary chứa danh sách chuỗi bảng, các mệnh đề JOIN và các bảng trung gian cần thiết.
@@ -344,7 +202,7 @@ def find_join_path(table_a: str, table_b: str) -> dict[str, Any]:
     tbl_a = table_a.lower().strip()
     tbl_b = table_b.lower().strip()
 
-    valid_tables = set(TPCDS_TABLE_NAMES) | set(TPCH_TABLE_NAMES)
+    valid_tables = set(TPCH_TABLE_NAMES)
     if tbl_a not in valid_tables or tbl_b not in valid_tables:
         return {
             "found": False,
@@ -360,9 +218,9 @@ def find_join_path(table_a: str, table_b: str) -> dict[str, Any]:
             "description": f"Hai bảng trùng nhau ({tbl_a}), không cần phép JOIN.",
         }
 
-    # Xây dựng đồ thị vô hướng từ cả TPCDS_JOIN_RELATIONSHIPS và TPCH_JOIN_RELATIONSHIPS
+    # Xây dựng đồ thị vô hướng từ TPCH_JOIN_RELATIONSHIPS
     graph: dict[str, list[tuple[str, str]]] = {tbl: [] for tbl in valid_tables}
-    for rel in list(TPCDS_JOIN_RELATIONSHIPS) + list(TPCH_JOIN_RELATIONSHIPS):
+    for rel in TPCH_JOIN_RELATIONSHIPS:
         if rel.from_table in graph and rel.to_table in graph:
             graph[rel.from_table].append((rel.to_table, rel.condition))
             graph[rel.to_table].append((rel.from_table, rel.condition))
@@ -401,14 +259,14 @@ def find_join_path(table_a: str, table_b: str) -> dict[str, Any]:
 
 
 def search_business_definition(query: str) -> dict[str, Any]:
-    """Tra cứu định nghĩa chỉ số nghiệp vụ chuẩn hóa (dbt Semantic Metrics) và công thức SQL.
+    """Tra cứu định nghĩa chỉ số nghiệp vụ chuẩn hóa (dbt Semantic Metrics) và công thức SQL TPC-H.
 
     Sử dụng tool này khi câu hỏi đề cập đến các chỉ số kinh doanh như doanh thu thuần,
-    doanh thu gộp, lợi nhuận, tỷ lệ hoàn hàng, tỷ lệ giao hàng trễ... để lấy công thức chuẩn
-    thay vì tự phỏng đoán công thức toán học.
+    doanh thu gộp, giá trị tồn kho, lợi nhuận gộp, tỷ lệ hoàn hàng, tỷ lệ giao hàng trễ...
+    để lấy công thức chuẩn thay vì tự phỏng đoán công thức toán học.
 
     Args:
-        query: Tên chỉ số hoặc khái niệm kinh doanh (ví dụ: 'doanh thu thuần', 'lợi nhuận', 'hoàn hàng').
+        query: Tên chỉ số hoặc khái niệm kinh doanh (ví dụ: 'doanh thu thuần', 'tồn kho', 'trễ hạn').
 
     Returns:
         Dictionary chứa ID chỉ số, tên tiếng Việt, công thức SQL chuẩn, bảng yêu cầu và mô tả.
@@ -432,7 +290,7 @@ def search_business_definition(query: str) -> dict[str, Any]:
     best_metric = None
     best_score = 0
 
-    all_metrics = {**TPCH_SEMANTIC_METRICS, **TPCDS_SEMANTIC_METRICS}
+    all_metrics = TPCH_SEMANTIC_METRICS
 
     # Chấm điểm độ tương đồng từ khóa
     for metric_id, metric in all_metrics.items():
@@ -444,7 +302,6 @@ def search_business_definition(query: str) -> dict[str, Any]:
         elif name_lower in q_norm or q_norm in name_lower:
             score += 15
 
-        # Khớp các từ đơn có ý nghĩa trong tên chỉ số hoặc metric_id
         name_tokens = set(name_lower.split()) | set(metric_id.split("_"))
         for word in q_norm.split():
             if len(word) >= 3 and word not in stop_words and word in name_tokens:
@@ -454,7 +311,6 @@ def search_business_definition(query: str) -> dict[str, Any]:
             best_score = score
             best_metric = metric
 
-    # Chỉ công nhận tìm thấy khi score vượt ngưỡng tin cậy (>= 10)
     if best_metric is not None and best_score >= 10:
         return {
             "found": True,

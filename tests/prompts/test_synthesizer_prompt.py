@@ -18,6 +18,8 @@ def test_synthesizer_prompt_structure():
     # Kiểm tra nội dung System Prompt
     system_text = SYNTHESIZER_SYSTEM_PROMPT.lower()
     assert "chuyên gia" in system_text
+    assert "tpc-h" in system_text
+    assert "store_sales" not in system_text
     assert "trực quan hóa" in system_text or "biểu đồ" in system_text
     assert "recharts" in system_text
     assert "bar" in system_text

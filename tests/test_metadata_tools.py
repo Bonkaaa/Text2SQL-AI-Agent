@@ -133,59 +133,59 @@ def test_search_business_definition_not_found():
     assert "available_metrics" in res
 
 
-def test_find_join_path_tpcds_direct_store_sales_to_date_dim():
-    """Kiểm tra tìm đường nối trực tiếp TPC-DS giữa store_sales và date_dim."""
-    res = find_join_path(table_a="store_sales", table_b="date_dim")
+def test_find_join_path_tpch_direct_lineitem_to_supplier():
+    """Kiểm tra tìm đường nối trực tiếp TPC-H giữa lineitem và supplier."""
+    res = find_join_path(table_a="lineitem", table_b="supplier")
     assert res["found"] is True
-    assert res["tables_chain"] == ["store_sales", "date_dim"]
+    assert res["tables_chain"] == ["lineitem", "supplier"]
     assert len(res["join_conditions"]) == 1
-    assert (
-        "store_sales.ss_sold_date_sk = date_dim.d_date_sk" in res["join_conditions"][0]
-    )
+    assert "lineitem.l_suppkey = supplier.s_suppkey" in res["join_conditions"][0]
     assert res["bridge_tables_needed"] == []
 
 
-def test_find_join_path_tpcds_direct_store_sales_to_customer_address():
-    """Kiểm tra tìm đường nối trực tiếp TPC-DS giữa store_sales và customer_address."""
-    res = find_join_path(table_a="store_sales", table_b="customer_address")
+def test_find_join_path_tpch_direct_partsupp_to_part():
+    """Kiểm tra tìm đường nối trực tiếp TPC-H giữa partsupp và part."""
+    res = find_join_path(table_a="partsupp", table_b="part")
     assert res["found"] is True
-    assert res["tables_chain"] == ["store_sales", "customer_address"]
+    assert res["tables_chain"] == ["partsupp", "part"]
     assert len(res["join_conditions"]) == 1
-    assert (
-        "store_sales.ss_addr_sk = customer_address.ca_address_sk"
-        in res["join_conditions"][0]
-    )
+    assert "partsupp.ps_partkey = part.p_partkey" in res["join_conditions"][0]
 
 
-def test_find_join_path_tpcds_multi_hop_store_sales_to_income_band():
-    """Kiểm tra tìm đường nối đa chặng TPC-DS: store_sales -> household_demographics -> income_band."""
-    res = find_join_path(table_a="store_sales", table_b="income_band")
+def test_find_join_path_tpch_multi_hop_supplier_to_region():
+    """Kiểm tra tìm đường nối đa chặng TPC-H: supplier -> nation -> region."""
+    res = find_join_path(table_a="supplier", table_b="region")
     assert res["found"] is True
-    assert res["tables_chain"] == [
-        "store_sales",
-        "household_demographics",
-        "income_band",
-    ]
+    assert res["tables_chain"] == ["supplier", "nation", "region"]
     assert len(res["join_conditions"]) == 2
-    assert res["bridge_tables_needed"] == ["household_demographics"]
+    assert res["bridge_tables_needed"] == ["nation"]
     conditions_str = " ".join(res["join_conditions"])
-    assert "ss_hdemo_sk = household_demographics.hd_demo_sk" in conditions_str
-    assert "hd_income_band_sk = income_band.ib_income_band_sk" in conditions_str
+    assert "s_nationkey = nation.n_nationkey" in conditions_str
+    assert "n_regionkey = region.r_regionkey" in conditions_str
 
 
-def test_search_business_definition_tpcds_store_sales_revenue():
-    """Kiểm tra tra cứu chỉ số dbt TPC-DS store_net_sales."""
-    res = search_business_definition(query="doanh thu cửa hàng store sales")
+def test_search_business_definition_tpch_inventory_value():
+    """Kiểm tra tra cứu chỉ số dbt TPC-H inventory_value."""
+    res = search_business_definition(query="giá trị tồn kho")
     assert res["found"] is True
-    assert res["metric_id"] == "store_net_sales"
-    assert "SUM(ss_net_paid)" in res["formula"]
-    assert "store_sales" in res["required_tables"]
+    assert res["metric_id"] == "inventory_value"
+    assert "SUM(ps_availqty * ps_supplycost)" in res["formula"]
+    assert "partsupp" in res["required_tables"]
 
 
-def test_get_column_samples_and_values_tpcds_item_category():
-    """Kiểm tra lấy giá trị danh mục TPC-DS cho cột i_category trong bảng item."""
-    res = get_column_samples_and_values(table="item", column="i_category")
+def test_search_business_definition_tpch_late_delivery_rate():
+    """Kiểm tra tra cứu chỉ số dbt TPC-H late_delivery_rate."""
+    res = search_business_definition(query="tỷ lệ trễ hạn giao hàng")
+    assert res["found"] is True
+    assert res["metric_id"] == "late_delivery_rate"
+    assert "l_receiptdate > l_commitdate" in res["formula"]
+    assert "lineitem" in res["required_tables"]
+
+
+def test_get_column_samples_and_values_tpch_shipmode():
+    """Kiểm tra lấy giá trị danh mục TPC-H cho cột l_shipmode trong bảng lineitem."""
+    res = get_column_samples_and_values(table="lineitem", column="l_shipmode")
     assert res["status"] == "SUCCESS"
-    assert "Books" in res["values"]
-    assert "Electronics" in res["values"]
-    assert "Home" in res["values"]
+    assert "AIR" in res["values"]
+    assert "SHIP" in res["values"]
+    assert "TRUCK" in res["values"]

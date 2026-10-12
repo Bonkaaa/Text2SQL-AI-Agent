@@ -58,14 +58,14 @@ class TestSchemaRetrieverTools:
         found_tables = [r["table"] for r in results]
         assert "customer" in found_tables or "orders" in found_tables
 
-    def test_search_tables_and_columns_item_store(self) -> None:
-        """Tìm kiếm bảng liên quan đến sản phẩm và cửa hàng."""
-        results = search_tables_and_columns("giá bán sản phẩm tại cửa hàng")
+    def test_search_tables_and_columns_part_supplier(self) -> None:
+        """Tìm kiếm bảng liên quan đến linh kiện và nhà cung cấp."""
+        results = search_tables_and_columns("giá linh kiện từ nhà cung cấp")
         found_tables = [r["table"] for r in results]
         assert (
-            "item" in found_tables
-            or "store" in found_tables
-            or "store_sales" in found_tables
+            "part" in found_tables
+            or "supplier" in found_tables
+            or "partsupp" in found_tables
         )
 
     def test_search_tables_and_columns_top_k_limit(self) -> None:
@@ -74,16 +74,16 @@ class TestSchemaRetrieverTools:
         assert len(results) <= 3
 
     def test_search_categorical_values_matching(self) -> None:
-        """Tìm kiếm giá trị phân loại danh mục trong câu hỏi TPC-DS."""
+        """Tìm kiếm giá trị phân loại danh mục trong câu hỏi TPC-H."""
         results = search_categorical_values(
-            "khách hàng mua đồ gia dụng tại bang california"
+            "khách hàng phân khúc ô tô tại châu á"
         )
         assert isinstance(results, list)
         assert len(results) >= 2
 
         matched_values = {r["column"]: r["value"] for r in results}
-        assert matched_values.get("i_category") == "Home"
-        assert matched_values.get("ca_state") == "CA"
+        assert matched_values.get("c_mktsegment") == "AUTOMOBILE"
+        assert matched_values.get("r_name") == "ASIA"
 
     def test_search_categorical_values_no_match(self) -> None:
         """Không tìm thấy danh mục nếu câu hỏi không chứa từ khóa phân loại."""
@@ -95,47 +95,43 @@ class TestSchemaRetrieverTools:
 class TestRetrieveSchemaContext:
     """Kiểm tra hàm tổng hợp ngữ cảnh schema context."""
 
-    def test_retrieve_schema_context_tpcds_omnichannel(self) -> None:
-        """Tổng hợp đầy đủ schema cho câu hỏi nghiệp vụ bán lẻ TPC-DS kèm date_dim."""
-        question = "Thống kê doanh số bán lẻ đồ gia dụng của khách hàng nam giới tại bang California năm 2001"
+    def test_retrieve_schema_context_tpch_supply_chain(self) -> None:
+        """Tổng hợp đầy đủ schema cho câu hỏi nghiệp vụ chuỗi cung ứng TPC-H."""
+        question = "Thống kê doanh thu phân khúc ô tô tại khu vực Châu Á năm 1995"
         result = retrieve_schema_context(question)
 
         assert isinstance(result, SchemaContextResult)
         # Bắt buộc phát hiện được các bảng Fact và Dimension cốt lõi
-        assert "store_sales" in result.selected_tables
-        assert "date_dim" in result.selected_tables  # Nhờ Time Heuristic
-        assert "item" in result.selected_tables
+        assert "orders" in result.selected_tables or "lineitem" in result.selected_tables
         assert "customer" in result.selected_tables
-        assert (
-            "customer_address" in result.selected_tables
-        )  # Nhờ Snowflake Bridge Integrity
+        assert "nation" in result.selected_tables  # Bridge table nối region
+        assert "region" in result.selected_tables
 
         # Bắt buộc phát hiện được categorical values
-        assert result.categorical_filters.get("i_category") == "Home"
-        assert result.categorical_filters.get("cd_gender") == "M"
-        assert result.categorical_filters.get("ca_state") == "CA"
+        assert result.categorical_filters.get("c_mktsegment") == "AUTOMOBILE"
+        assert result.categorical_filters.get("r_name") == "ASIA"
 
         # Bắt buộc có join conditions giữa các bảng liên quan
         assert len(result.join_conditions) > 0
 
-        # Bắt buộc có công thức doanh thu bán lẻ
+        # Bắt buộc có công thức doanh thu thuần
         assert any(
-            "ss_net_paid" in f or "ss_ext_sales_price" in f
+            "l_extendedprice" in f
             for f in result.metric_formulas
         )
 
         # Context markdown đầy đủ DDL và categorical context
         assert "### NGỮ CẢNH LƯỢC ĐỒ CƠ SỞ DỮ LIỆU" in result.context_markdown
-        assert "Home" in result.context_markdown
+        assert "AUTOMOBILE" in result.context_markdown
 
     def test_retrieve_schema_context_explicit_tables(self) -> None:
         """Tổng hợp ngữ cảnh khi người dùng hoặc agent chỉ định trước bảng."""
         result = retrieve_schema_context(
-            question="Xem thông tin sản phẩm",
-            selected_tables=["item", "store_sales"],
+            question="Xem thông tin linh kiện",
+            selected_tables=["part", "partsupp"],
         )
-        assert "item" in result.selected_tables
-        assert "store_sales" in result.selected_tables
+        assert "part" in result.selected_tables
+        assert "partsupp" in result.selected_tables
         assert "customer" not in result.selected_tables
 
 

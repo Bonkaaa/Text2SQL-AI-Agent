@@ -28,6 +28,8 @@ def test_analytics_planner_prompt_structure_and_formatting():
     assert isinstance(ANALYTICS_PLANNER_PROMPT, ChatPromptTemplate)
     assert len(ANALYTICS_PLANNER_PROMPT.messages) == 2
     assert "TPC-H" in ANALYTICS_PLANNER_SYSTEM_PROMPT
+    assert "store_sales" not in ANALYTICS_PLANNER_SYSTEM_PROMPT
+    assert "date_dim" not in ANALYTICS_PLANNER_SYSTEM_PROMPT
     assert "{max_tasks}" in ANALYTICS_PLANNER_HUMAN_PROMPT
 
     messages = ANALYTICS_PLANNER_PROMPT.format_messages(
@@ -67,6 +69,8 @@ def test_analytics_presentation_prompt_structure_and_formatting():
     assert isinstance(ANALYTICS_PRESENTATION_PROMPT, ChatPromptTemplate)
     assert len(ANALYTICS_PRESENTATION_PROMPT.messages) == 2
     assert "Business Intelligence" in ANALYTICS_PRESENTATION_SYSTEM_PROMPT
+    assert "TPC-H" in ANALYTICS_PRESENTATION_SYSTEM_PROMPT
+    assert "store_sales" not in ANALYTICS_PRESENTATION_SYSTEM_PROMPT
     assert "{findings_summary}" in ANALYTICS_PRESENTATION_HUMAN_PROMPT
 
     messages = ANALYTICS_PRESENTATION_PROMPT.format_messages(

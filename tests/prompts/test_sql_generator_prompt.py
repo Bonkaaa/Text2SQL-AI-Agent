@@ -104,6 +104,14 @@ def test_sql_generator_prompt_structure():
     assert set(SQL_GENERATOR_PROMPT.input_variables) == expected_vars
     assert len(SQL_GENERATOR_PROMPT.messages) == 2
 
+    # Kiểm tra 3 Quy tắc vàng TPC-H
+    assert "QUY TẮC VÀNG BẮT BUỘC TRÊN TPC-H" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "date_dim" not in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "store_sales" not in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "ss_sold_date_sk" not in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "l_extendedprice * (1 - l_discount)" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert "o_orderdate" in SQL_GENERATOR_SYSTEM_PROMPT or "l_shipdate" in SQL_GENERATOR_SYSTEM_PROMPT
+
 
 def test_sql_generator_prompt_format_messages():
     """Kiểm tra format message cho lần sinh SQL đầu tiên."""

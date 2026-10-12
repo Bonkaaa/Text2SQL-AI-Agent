@@ -6,7 +6,7 @@ Kiến trúc lai (Hybrid Architecture) kết hợp:
    - Hoạch định kế hoạch động với TodoListMiddleware (công cụ write_todos).
    - Domain Knowledge thông qua Skills:
      * skills/analytics-orchestrator: Chuẩn hóa SOP điều phối, phân luồng Pure Orchestrator.
-     * skills/tpcds-analytics: Từ điển dữ liệu TPC-DS 24 bảng, dbt metrics, categorical mappings, Snowflake schema.
+     * skills/tpch-analytics: Từ điển dữ liệu TPC-H 8 bảng, dbt metrics, categorical mappings, Supply Chain schema.
    - Operating Memory: Quy chuẩn vận hành từ AGENTS.md.
    - Phân quyền & RBAC: context_schema=UserContext.
    - Cách ly phiên: Virtual Filesystem (StateBackend) và SessionTracer ghi vết.
@@ -25,6 +25,7 @@ Kiến trúc lai (Hybrid Architecture) kết hợp:
 import asyncio
 import logging
 import re
+import sqlite3
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
@@ -42,22 +43,34 @@ from langchain.agents.middleware import (
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph.state import CompiledStateGraph
 
-# Singleton Checkpointer dùng chung cho toàn bộ Agent Supervisor để duy trì ngữ cảnh phiên
-_shared_supervisor_checkpointer: MemorySaver = MemorySaver()
+# Singleton Persistent Checkpointer lưu trữ trạng thái phiên làm việc bền vững trên đĩa
+_shared_supervisor_checkpointer: BaseCheckpointSaver | None = None
 
 
 def get_default_checkpointer() -> BaseCheckpointSaver:
-    """Singleton getter cung cấp Checkpointer chung cho toàn bộ Agent Supervisor."""
+    """Singleton getter cung cấp Persistent SqliteSaver cho toàn bộ Agent Supervisor."""
+    global _shared_supervisor_checkpointer
+    if _shared_supervisor_checkpointer is None:
+        settings = get_settings()
+        db_path = Path(settings.checkpoints_db_path).resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+        saver = SqliteSaver(conn)
+        saver.setup()
+        _shared_supervisor_checkpointer = saver
     return _shared_supervisor_checkpointer
 
 
 def reset_default_checkpointer() -> None:
     """Reset dữ liệu checkpointer phục vụ cho unit testing."""
     global _shared_supervisor_checkpointer
-    _shared_supervisor_checkpointer = MemorySaver()
+    _shared_supervisor_checkpointer = None
 
 
 from src.agents.analytics import get_analytics_subagent
@@ -86,7 +99,7 @@ logger = logging.getLogger(__name__)
 # Danh sách kỹ năng nghiệp vụ mặc định nạp cho Deep Agent Supervisor (Pure Orchestrator)
 DEFAULT_SUPERVISOR_SKILLS: Final[list[str]] = [
     "skills/analytics-orchestrator",
-    "skills/tpcds-analytics",
+    "skills/tpch-analytics",
 ]
 
 # Danh sách tài liệu bộ nhớ vận hành hệ thống
@@ -845,8 +858,6 @@ async def arun_supervisor(
             }
 
     # 2. Invoke Agent bất đồng bộ qua ainvoke
-    active_checkpointer = checkpointer or get_default_checkpointer()
-    active_agent = agent or create_text2sql_supervisor(checkpointer=active_checkpointer)
     config = {"configurable": {"thread_id": active_thread_id}}
     input_state = {
         "messages": [HumanMessage(content=question)],
@@ -855,11 +866,30 @@ async def arun_supervisor(
     }
 
     try:
-        output_state = await active_agent.ainvoke(
-            input_state,
-            config=config,
-            context=active_user_context,
-        )
+        if agent is not None:
+            output_state = await agent.ainvoke(
+                input_state,
+                config=config,
+                context=active_user_context,
+            )
+        elif checkpointer is not None and not isinstance(checkpointer, SqliteSaver):
+            active_agent = create_text2sql_supervisor(checkpointer=checkpointer)
+            output_state = await active_agent.ainvoke(
+                input_state,
+                config=config,
+                context=active_user_context,
+            )
+        else:
+            settings = get_settings()
+            db_path = Path(settings.checkpoints_db_path).resolve()
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            async with AsyncSqliteSaver.from_conn_string(str(db_path)) as async_saver:
+                active_agent = create_text2sql_supervisor(checkpointer=async_saver)
+                output_state = await active_agent.ainvoke(
+                    input_state,
+                    config=config,
+                    context=active_user_context,
+                )
 
         messages = output_state.get("messages", [])
         final_answer = extract_message_text(messages[-1].content) if messages else ""

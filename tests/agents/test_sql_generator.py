@@ -157,7 +157,7 @@ def test_create_sql_generator_agent_structure():
     fake_llm = ToolAwareFakeChatModel(responses=[""])
     agent = create_sql_generator_agent(
         model=fake_llm,
-        skills=["skills/duckdb-sql", "skills/tpcds-analytics"],
+        skills=["skills/duckdb-sql", "skills/tpch-analytics"],
     )
 
     assert isinstance(agent, CompiledStateGraph)
