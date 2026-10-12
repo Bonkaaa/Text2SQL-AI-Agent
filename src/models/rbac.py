@@ -10,35 +10,25 @@ class UserRole(str, Enum):
     ADMIN = "Admin"
 
 
-from src.utils.schema_context import TPCDS_TABLE_NAMES, TPCH_TABLE_NAMES
+from src.utils.schema_context import TPCH_TABLE_NAMES
 
-# Ma trận bảng được phép truy cập theo Role (hỗ trợ cả TPC-DS 24 bảng và TPC-H 8 bảng)
-_ALL_ANALYST_TABLES = set(TPCDS_TABLE_NAMES) | set(TPCH_TABLE_NAMES)
+# Ma trận bảng được phép truy cập theo Role (chuẩn TPC-H 8 bảng)
+_ALL_ANALYST_TABLES = set(TPCH_TABLE_NAMES)
 
 DEFAULT_ALLOWED_TABLES: dict[UserRole, set[str]] = {
     UserRole.ANALYST: _ALL_ANALYST_TABLES,
     UserRole.ADMIN: _ALL_ANALYST_TABLES | {"audit_log"},
 }
 
-# Ma trận các cột nhạy cảm bị CẤM (PII / Tài chính cá nhân / Thu nhập)
+# Ma trận các cột nhạy cảm bị CẤM (PII / Tài chính cá nhân TPC-H)
 DEFAULT_DENIED_COLUMNS: dict[UserRole, set[str]] = {
     UserRole.ANALYST: {
-        # TPC-H PII & Financial columns (giữ nguyên để tương thích)
-        "c_phone",  # PII: Số điện thoại khách hàng
+        "c_phone",    # PII: Số điện thoại khách hàng
+        "c_address",  # PII: Địa chỉ khách hàng
         "c_acctbal",  # Tài chính: Số dư tài khoản khách hàng
-        "s_phone",  # PII: Số điện thoại nhà cung cấp
+        "s_phone",    # PII: Số điện thoại nhà cung cấp
+        "s_address",  # PII: Địa chỉ nhà cung cấp
         "s_acctbal",  # Tài chính: Số dư tài khoản nhà cung cấp
-        # TPC-DS PII & Sensitive demographics/income columns
-        "c_email_address",  # PII: Email cá nhân khách hàng
-        "c_birth_day",  # PII: Ngày sinh khách hàng
-        "c_birth_month",  # PII: Tháng sinh khách hàng
-        "c_birth_year",  # PII: Năm sinh khách hàng
-        "c_login",  # PII: Tên đăng nhập
-        "ca_street_number",  # PII: Số nhà
-        "ca_street_name",  # PII: Tên đường chi tiết
-        "ca_suite_number",  # PII: Số phòng/căn hộ
-        "ib_lower_bound",  # Thu nhập: Cận dưới khoảng thu nhập
-        "ib_upper_bound",  # Thu nhập: Cận trên khoảng thu nhập
     },
     UserRole.ADMIN: set(),  # Admin toàn quyền
 }

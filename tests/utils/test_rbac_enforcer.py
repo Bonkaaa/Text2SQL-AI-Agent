@@ -22,12 +22,12 @@ def test_analyst_access_allowed_tables_and_columns():
 
 
 def test_analyst_blocked_when_accessing_forbidden_columns():
-    """Kiểm tra role Analyst bị chặn khi truy cập các cột PII hoặc tài chính cá nhân."""
+    """Kiểm tra role Analyst bị chặn khi truy cập các cột PII hoặc tài chính cá nhân TPC-H."""
     context = UserContext(
         user_id="analyst_1", session_id="sess_1", role=UserRole.ANALYST
     )
     tables = ["customer"]
-    columns = ["c_name", "c_phone", "c_acctbal"]  # c_phone và c_acctbal bị cấm
+    columns = ["c_name", "c_phone", "c_acctbal", "c_address"]  # c_phone, c_acctbal, c_address bị cấm
 
     result = enforce_rbac_policy(
         tables_used=tables, columns_used=columns, user_context=context
@@ -37,6 +37,7 @@ def test_analyst_blocked_when_accessing_forbidden_columns():
     assert result.error_type == "UNAUTHORIZED_COLUMN"
     assert "c_phone" in result.violating_columns
     assert "c_acctbal" in result.violating_columns
+    assert "c_address" in result.violating_columns
     assert "c_phone" in result.error_message
 
 
@@ -81,7 +82,7 @@ def test_admin_full_access():
         user_id="admin_1", session_id="sess_admin", role=UserRole.ADMIN
     )
     tables = ["audit_log", "customer", "supplier"]
-    columns = ["c_phone", "c_acctbal", "s_phone", "s_acctbal", "query_id"]
+    columns = ["c_phone", "c_acctbal", "s_phone", "s_acctbal", "s_address", "query_id"]
 
     result = enforce_rbac_policy(
         tables_used=tables, columns_used=columns, user_context=admin_context
@@ -98,7 +99,6 @@ def test_analyst_blocked_on_wildcard_select_star_sensitive_table():
     context = UserContext(
         user_id="analyst_1", session_id="sess_1", role=UserRole.ANALYST
     )
-    # Giả lập SELECT * FROM customer: columns_used rỗng nếu chưa expand, nhưng has_star=True
     tables = ["customer"]
     columns: list[str] = []
 
@@ -113,10 +113,11 @@ def test_analyst_blocked_on_wildcard_select_star_sensitive_table():
     assert result.error_type == "UNAUTHORIZED_COLUMN"
     assert "c_phone" in result.violating_columns
     assert "c_acctbal" in result.violating_columns
+    assert "c_address" in result.violating_columns
 
 
 def test_analyst_blocked_on_wildcard_unexpandable_table():
-    """Kiểm tra role Analyst bị từ chối Fail-Closed khi dùng wildcard trên bảng không thuộc TPC-H/TPC-DS."""
+    """Kiểm tra role Analyst bị từ chối Fail-Closed khi dùng wildcard trên bảng không thuộc TPC-H."""
     context = UserContext(
         user_id="analyst_1", session_id="sess_1", role=UserRole.ANALYST
     )
@@ -132,13 +133,34 @@ def test_analyst_blocked_on_wildcard_unexpandable_table():
     assert "Fail-Closed" in result.error_message
 
 
-def test_tpcds_analyst_access_allowed_tables_and_columns():
-    """Kiểm tra role Analyst được phép truy vấn 24 bảng TPC-DS và cột nghiệp vụ."""
+def test_tpch_analyst_access_all_8_tables():
+    """Kiểm tra role Analyst được phép truy vấn cả 8 bảng TPC-H với các cột thông thường."""
     context = UserContext(
-        user_id="analyst_tpcds", session_id="sess_tpcds", role=UserRole.ANALYST
+        user_id="analyst_tpch", session_id="sess_tpch", role=UserRole.ANALYST
     )
-    tables = ["store_sales", "date_dim", "item", "store"]
-    columns = ["ss_net_paid", "d_year", "i_category", "s_store_name"]
+    tables = [
+        "customer",
+        "orders",
+        "lineitem",
+        "part",
+        "partsupp",
+        "supplier",
+        "nation",
+        "region",
+    ]
+    columns = [
+        "c_name",
+        "c_mktsegment",
+        "o_orderdate",
+        "o_totalprice",
+        "l_quantity",
+        "l_extendedprice",
+        "p_name",
+        "ps_availqty",
+        "s_name",
+        "n_name",
+        "r_name",
+    ]
 
     result = enforce_rbac_policy(
         tables_used=tables, columns_used=columns, user_context=context
@@ -150,19 +172,13 @@ def test_tpcds_analyst_access_allowed_tables_and_columns():
     assert len(result.violating_columns) == 0
 
 
-def test_tpcds_analyst_blocked_on_pii_and_income_columns():
-    """Kiểm tra role Analyst bị chặn khi truy cập PII (email, birth year, street) và thu nhập."""
+def test_tpch_analyst_blocked_on_supplier_pii_and_finance():
+    """Kiểm tra role Analyst bị chặn khi truy cập PII và tài chính của supplier."""
     context = UserContext(
-        user_id="analyst_tpcds", session_id="sess_tpcds", role=UserRole.ANALYST
+        user_id="analyst_tpch", session_id="sess_tpch", role=UserRole.ANALYST
     )
-    tables = ["customer", "customer_address", "income_band"]
-    columns = [
-        "c_customer_sk",
-        "c_email_address",
-        "c_birth_year",
-        "ca_street_name",
-        "ib_lower_bound",
-    ]
+    tables = ["supplier"]
+    columns = ["s_name", "s_phone", "s_address", "s_acctbal"]
 
     result = enforce_rbac_policy(
         tables_used=tables, columns_used=columns, user_context=context
@@ -170,18 +186,17 @@ def test_tpcds_analyst_blocked_on_pii_and_income_columns():
 
     assert result.is_allowed is False
     assert result.error_type == "UNAUTHORIZED_COLUMN"
-    assert "c_email_address" in result.violating_columns
-    assert "c_birth_year" in result.violating_columns
-    assert "ca_street_name" in result.violating_columns
-    assert "ib_lower_bound" in result.violating_columns
+    assert "s_phone" in result.violating_columns
+    assert "s_address" in result.violating_columns
+    assert "s_acctbal" in result.violating_columns
 
 
-def test_tpcds_analyst_blocked_on_wildcard_customer_address():
-    """Kiểm tra role Analyst bị chặn khi dùng SELECT * trên customer_address (chứa ca_street_name)."""
+def test_tpch_analyst_blocked_on_wildcard_supplier():
+    """Kiểm tra role Analyst bị chặn khi dùng SELECT * trên supplier (chứa s_phone, s_address, s_acctbal)."""
     context = UserContext(
-        user_id="analyst_tpcds", session_id="sess_tpcds", role=UserRole.ANALYST
+        user_id="analyst_tpch", session_id="sess_tpch", role=UserRole.ANALYST
     )
-    tables = ["customer_address"]
+    tables = ["supplier"]
     columns: list[str] = []
 
     result = enforce_rbac_policy(
@@ -193,5 +208,6 @@ def test_tpcds_analyst_blocked_on_wildcard_customer_address():
 
     assert result.is_allowed is False
     assert result.error_type == "UNAUTHORIZED_COLUMN"
-    assert "ca_street_name" in result.violating_columns
-    assert "ca_street_number" in result.violating_columns
+    assert "s_phone" in result.violating_columns
+    assert "s_address" in result.violating_columns
+    assert "s_acctbal" in result.violating_columns

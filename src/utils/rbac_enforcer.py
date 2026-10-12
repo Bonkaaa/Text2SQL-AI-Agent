@@ -63,18 +63,9 @@ def enforce_rbac_policy(
 
     # Nếu query sử dụng wildcard (*), mở rộng kiểm tra tất cả các cột của bảng tương ứng
     if has_star and denied_columns:
-        from src.utils.schema_context import TPCDS_TABLE_COLUMNS, TPCH_TABLE_COLUMNS
+        from src.utils.schema_context import TPCH_TABLE_COLUMNS
 
-        all_table_columns: dict[str, list[str]] = {}
-        for tbl_name, cols in TPCH_TABLE_COLUMNS.items():
-            all_table_columns[tbl_name] = list(cols)
-        for tbl_name, cols in TPCDS_TABLE_COLUMNS.items():
-            if tbl_name in all_table_columns:
-                all_table_columns[tbl_name] = list(
-                    dict.fromkeys(all_table_columns[tbl_name] + cols)
-                )
-            else:
-                all_table_columns[tbl_name] = list(cols)
+        all_table_columns = TPCH_TABLE_COLUMNS
 
         for tbl in tables_used:
             tbl_lower = tbl.lower()

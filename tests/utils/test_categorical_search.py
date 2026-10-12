@@ -1,11 +1,13 @@
-"""Unit tests cho Component 2.2: Categorical Value Search (Entity / Value Linking) trên TPC-DS.
+"""Unit tests cho Component 2.2: Categorical Value Search trên TPC-H (8 bảng).
 
 Kiểm tra:
-- Khả năng ánh xạ từ khóa tiếng Việt / tiếng Anh về đúng giá trị phân loại trong TPC-DS.
-- Khớp ngành hàng sản phẩm (item.i_category: Electronics, Home, Women, Men, Sports, Books...).
-- Khớp nhân khẩu học (cd_gender: M/F, cd_marital_status: S/M/D/W).
-- Khớp hình thức giao vận (sm_type: EXPRESS, NEXT DAY, OVERNIGHT...).
-- Khớp tiểu bang địa chỉ (ca_state: CA, TX, NY, FL...).
+- Khả năng ánh xạ từ khóa tiếng Việt / tiếng Anh về đúng giá trị phân loại trong TPC-H.
+- Khớp phân khúc thị trường (customer.c_mktsegment: AUTOMOBILE, BUILDING, FURNITURE, HOUSEHOLD, MACHINERY).
+- Khớp phương thức giao vận (lineitem.l_shipmode: AIR, SHIP, TRUCK, RAIL, MAIL, FOB, REG AIR).
+- Khớp trạng thái đơn hàng (orders.o_orderstatus: O, F, P) và mức độ ưu tiên (orders.o_orderpriority).
+- Khớp khu vực địa lý (region.r_name: ASIA, EUROPE, AFRICA, AMERICA, MIDDLE EAST).
+- Khớp quốc gia (nation.n_name: VIETNAM, JAPAN, CHINA, UNITED STATES, GERMANY...).
+- Khớp cờ hoàn trả (lineitem.l_returnflag: R, A, N).
 - Định dạng context đầu ra để nạp vào prompt cho Schema Retriever / SQL Generator.
 """
 
@@ -15,152 +17,124 @@ from src.utils.categorical_search import (
     format_categorical_context,
     get_all_categorical_entries,
 )
+from src.utils.table_keywords import TABLE_KEYWORD_MAP, get_table_keywords
 
 
 def test_get_all_categorical_entries():
-    """Kiểm tra kho từ điển giá trị phân loại có đầy đủ các cột TPC-DS cốt lõi."""
+    """Kiểm tra kho từ điển giá trị phân loại có đầy đủ các cột TPC-H cốt lõi."""
     entries = get_all_categorical_entries()
     assert len(entries) > 0
 
     columns_indexed = {e.column for e in entries}
-    assert "i_category" in columns_indexed
-    assert "cd_gender" in columns_indexed
-    assert "cd_marital_status" in columns_indexed
-    assert "sm_type" in columns_indexed
-    assert "ca_state" in columns_indexed
+    assert "c_mktsegment" in columns_indexed
+    assert "l_shipmode" in columns_indexed
+    assert "o_orderstatus" in columns_indexed
+    assert "o_orderpriority" in columns_indexed
+    assert "r_name" in columns_indexed
+    assert "n_name" in columns_indexed
+    assert "l_returnflag" in columns_indexed
 
 
-def test_match_item_categories_vietnamese():
-    """Kiểm tra khớp ngành hàng sản phẩm với từ khóa tiếng Việt."""
-    # 1. "ngành hàng điện tử" -> i_category = 'Electronics'
-    matches_elec = find_matching_categorical_values(
-        "Thống kê doanh số ngành hàng điện tử"
-    )
-    assert len(matches_elec) > 0
-    top_elec = matches_elec[0]
-    assert isinstance(top_elec, CategoricalMatch)
-    assert top_elec.column == "i_category"
-    assert top_elec.matched_value == "Electronics"
+def test_match_mktsegment_vietnamese():
+    """Kiểm tra khớp phân khúc thị trường khách hàng với từ khóa tiếng Việt."""
+    # 1. "ngành ô tô" -> c_mktsegment = 'AUTOMOBILE'
+    matches_auto = find_matching_categorical_values("Khách hàng thuộc phân khúc ngành ô tô")
+    assert len(matches_auto) > 0
+    top_auto = matches_auto[0]
+    assert isinstance(top_auto, CategoricalMatch)
+    assert top_auto.column == "c_mktsegment"
+    assert top_auto.matched_value == "AUTOMOBILE"
 
-    # 2. "thời trang nữ" -> i_category = 'Women'
-    matches_women = find_matching_categorical_values("Báo cáo bán hàng thời trang nữ")
+    # 2. "xây dựng" -> c_mktsegment = 'BUILDING'
+    matches_build = find_matching_categorical_values("Doanh thu từ phân khúc xây dựng")
     assert any(
-        m.column == "i_category" and m.matched_value == "Women" for m in matches_women
+        m.column == "c_mktsegment" and m.matched_value == "BUILDING" for m in matches_build
     )
 
-    # 3. "đồ gia dụng" -> i_category = 'Home'
-    matches_home = find_matching_categorical_values(
-        "Sản phẩm đồ gia dụng bán chạy nhất"
-    )
+    # 3. "nội thất" -> c_mktsegment = 'FURNITURE'
+    matches_furn = find_matching_categorical_values("Đơn hàng của khách ngành nội thất")
     assert any(
-        m.column == "i_category" and m.matched_value == "Home" for m in matches_home
-    )
-
-    # 4. "dụng cụ thể thao" -> i_category = 'Sports'
-    matches_sports = find_matching_categorical_values("Doanh thu từ dụng cụ thể thao")
-    assert any(
-        m.column == "i_category" and m.matched_value == "Sports" for m in matches_sports
+        m.column == "c_mktsegment" and m.matched_value == "FURNITURE" for m in matches_furn
     )
 
 
-def test_match_demographics():
-    """Kiểm tra khớp nhân khẩu học giới tính và tình trạng hôn nhân."""
-    # 1. "nam giới" -> cd_gender = 'M'
-    matches_male = find_matching_categorical_values(
-        "Khách hàng nam giới chi tiêu bao nhiêu"
-    )
-    assert any(m.column == "cd_gender" and m.matched_value == "M" for m in matches_male)
+def test_match_shipmode_and_returns():
+    """Kiểm tra khớp phương thức giao hàng và cờ hoàn trả."""
+    # 1. "đường hàng không" -> l_shipmode = 'AIR'
+    matches_air = find_matching_categorical_values("Các mặt hàng vận chuyển đường hàng không")
+    assert any(m.column == "l_shipmode" and m.matched_value == "AIR" for m in matches_air)
 
-    # 2. "phụ nữ" -> cd_gender = 'F'
-    matches_female = find_matching_categorical_values(
-        "Số lượng người mua phụ nữ tại cửa hàng"
-    )
-    assert any(
-        m.column == "cd_gender" and m.matched_value == "F" for m in matches_female
-    )
+    # 2. "tàu biển" / "đường biển" -> l_shipmode = 'SHIP'
+    matches_ship = find_matching_categorical_values("Đơn hàng vận chuyển bằng tàu biển")
+    assert any(m.column == "l_shipmode" and m.matched_value == "SHIP" for m in matches_ship)
 
-    # 3. "độc thân" -> cd_marital_status = 'S'
-    matches_single = find_matching_categorical_values("Phân khúc khách hàng độc thân")
-    assert any(
-        m.column == "cd_marital_status" and m.matched_value == "S"
-        for m in matches_single
-    )
-
-    # 4. "đã kết hôn" -> cd_marital_status = 'M'
-    matches_married = find_matching_categorical_values(
-        "Khách hàng đã kết hôn mua gì nhiều"
-    )
-    assert any(
-        m.column == "cd_marital_status" and m.matched_value == "M"
-        for m in matches_married
-    )
+    # 3. "hoàn trả" -> l_returnflag = 'R'
+    matches_ret = find_matching_categorical_values("Tỷ lệ các mặt hàng bị hoàn trả")
+    assert any(m.column == "l_returnflag" and m.matched_value == "R" for m in matches_ret)
 
 
-def test_match_shipmode_and_states():
-    """Kiểm tra khớp phương thức vận chuyển và tiểu bang địa chỉ."""
-    # 1. "giao hàng hỏa tốc" -> sm_type = 'EXPRESS'
-    matches_express = find_matching_categorical_values("Đơn hàng giao hàng hỏa tốc")
-    assert any(
-        m.column == "sm_type" and m.matched_value == "EXPRESS" for m in matches_express
-    )
+def test_match_geography():
+    """Kiểm tra khớp khu vực kinh tế (region) và quốc gia (nation)."""
+    # 1. "châu á" -> r_name = 'ASIA'
+    matches_asia = find_matching_categorical_values("Top 5 khách hàng khu vực Châu Á")
+    assert any(m.column == "r_name" and m.matched_value == "ASIA" for m in matches_asia)
 
-    # 2. "giao qua đêm" -> sm_type = 'OVERNIGHT'
-    matches_overnight = find_matching_categorical_values(
-        "Chi phí vận chuyển giao qua đêm"
-    )
-    assert any(
-        m.column == "sm_type" and m.matched_value == "OVERNIGHT"
-        for m in matches_overnight
-    )
+    # 2. "châu âu" -> r_name = 'EUROPE'
+    matches_eu = find_matching_categorical_values("Doanh số các nhà cung cấp ở Châu Âu")
+    assert any(m.column == "r_name" and m.matched_value == "EUROPE" for m in matches_eu)
 
-    # 3. "bang california" -> ca_state = 'CA'
-    matches_ca = find_matching_categorical_values("Khách hàng ở bang california")
-    assert any(m.column == "ca_state" and m.matched_value == "CA" for m in matches_ca)
-
-    # 4. "tiểu bang texas" -> ca_state = 'TX'
-    matches_tx = find_matching_categorical_values("Doanh số tại tiểu bang texas")
-    assert any(m.column == "ca_state" and m.matched_value == "TX" for m in matches_tx)
+    # 3. "nhật bản" -> n_name = 'JAPAN'
+    matches_jp = find_matching_categorical_values("Khách hàng tại quốc gia Nhật Bản")
+    assert any(m.column == "n_name" and m.matched_value == "JAPAN" for m in matches_jp)
 
 
 def test_no_false_positive_on_generic_text():
-    """Kiểm tra câu hỏi không chứa thực thể phân loại thì không bị hallucinate kết quả sai lệch."""
-    matches = find_matching_categorical_values(
-        "Tính tổng số lượng hóa đơn phát sinh trong ngày hôm nay"
-    )
-    for m in matches:
-        assert m.similarity_score >= 60.0
+    """Kiểm tra câu hỏi chung không ánh xạ nhầm giá trị phân loại."""
+    matches = find_matching_categorical_values("Cho tôi xem danh sách 10 khách hàng đầu tiên")
+    assert len(matches) == 0
 
 
 def test_format_categorical_context():
-    """Kiểm tra format kết quả matching thành Markdown context cho prompt."""
-    matches = [
+    """Kiểm tra hàm format_categorical_context tạo Markdown chính xác."""
+    sample_matches = [
         CategoricalMatch(
-            table="item",
-            column="i_category",
-            matched_value="Electronics",
-            query_keyword="điện tử",
+            table="customer",
+            column="c_mktsegment",
+            matched_value="AUTOMOBILE",
+            query_keyword="ngành ô tô",
             similarity_score=100.0,
             exact_match=True,
-        ),
-        CategoricalMatch(
-            table="customer_address",
-            column="ca_state",
-            matched_value="CA",
-            query_keyword="california",
-            similarity_score=100.0,
-            exact_match=True,
-        ),
+        )
     ]
-
-    formatted_str = format_categorical_context(matches)
-    assert isinstance(formatted_str, str)
-    assert "GIÁ TRỊ PHÂN LOẠI" in formatted_str
-    assert "i_category = 'Electronics'" in formatted_str
-    assert "ca_state = 'CA'" in formatted_str
-    assert "điện tử" in formatted_str
+    context = format_categorical_context(sample_matches)
+    assert "c_mktsegment" in context
+    assert "AUTOMOBILE" in context
+    assert "ngành ô tô" in context
 
 
 def test_format_empty_categorical_context():
-    """Kiểm tra format khi không tìm thấy match nào."""
-    formatted_str = format_categorical_context([])
-    assert formatted_str == ""
+    """Kiểm tra danh sách rỗng trả về chuỗi rỗng."""
+    assert format_categorical_context([]) == ""
+
+
+def test_tpch_table_keywords_mapping():
+    """Kiểm tra từ điển từ khóa tiếng Việt của đúng 8 bảng TPC-H."""
+    keywords = get_table_keywords()
+    assert len(keywords) == 8
+    assert "customer" in keywords
+    assert "khách hàng" in keywords["customer"]
+    assert "orders" in keywords
+    assert "đơn hàng" in keywords["orders"]
+    assert "lineitem" in keywords
+    assert "mặt hàng" in keywords["lineitem"] or "chi tiết" in keywords["lineitem"]
+    assert "supplier" in keywords
+    assert "nhà cung cấp" in keywords["supplier"]
+    assert "part" in keywords
+    assert "linh kiện" in keywords["part"]
+    assert "partsupp" in keywords
+    assert "tồn kho" in keywords["partsupp"] or "cung ứng" in keywords["partsupp"]
+    assert "nation" in keywords
+    assert "quốc gia" in keywords["nation"]
+    assert "region" in keywords
+    assert "khu vực" in keywords["region"] or "châu lục" in keywords["region"]
+    assert TABLE_KEYWORD_MAP == keywords

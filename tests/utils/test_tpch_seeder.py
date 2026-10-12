@@ -66,3 +66,15 @@ def test_verify_tpch_tables_missing():
     empty_conn = duckdb.connect(":memory:")
     assert verify_tpch_tables(empty_conn) is False
     empty_conn.close()
+
+
+def test_tpch_config_defaults():
+    """Kiểm tra cấu hình mặc định trong config trỏ tới TPC-H DuckDB."""
+    from src.config import Settings
+
+    settings = Settings()
+    assert "tpch.duckdb" in settings.duckdb_path
+    assert "lineitem" in settings.heavy_tables_set
+    assert "orders" in settings.heavy_tables_set
+    assert "o_orderdate" in settings.time_columns_set
+

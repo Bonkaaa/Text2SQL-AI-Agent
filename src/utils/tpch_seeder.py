@@ -38,7 +38,7 @@ def get_table_row_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
 
 def seed_tpch_data(
     db_path: str = ":memory:",
-    scale_factor: float = 0.01,
+    scale_factor: float = 0.1,
 ) -> duckdb.DuckDBPyConnection:
     """Khởi tạo database DuckDB và sinh dữ liệu chuẩn TPC-H bằng extension có sẵn.
 

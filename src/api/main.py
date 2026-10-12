@@ -18,10 +18,18 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.routes import audit_router, query_router
+from src.api.routes import (
+    audit_router,
+    auth_router,
+    conversations_router,
+    dashboard_router,
+    query_router,
+    saved_queries_router,
+)
 from src.config import get_settings
+from src.database import init_db
 from src.models.api_schemas import HealthResponse
-from src.utils.tpcds_seeder import seed_tpcds_data
+from src.utils.tpch_seeder import seed_tpch_data
 
 logger = logging.getLogger(__name__)
 
@@ -35,21 +43,28 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     """Quản lý vòng đời khởi động và tắt ứng dụng FastAPI.
 
-    - Khởi động: Kiểm tra / nạp dữ liệu mẫu TPC-DS (24 bảng) vào DuckDB nếu chưa có.
+    - Khởi động: Kiểm tra / nạp dữ liệu mẫu TPC-H (8 bảng) vào DuckDB nếu chưa có.
     - Dọn dẹp: Đóng các kết nối khi ứng dụng dừng hoạt động.
     """
     settings = get_settings()
     logger.info("Đang khởi động FastAPI Gateway (%s)...", settings.app_env)
 
     try:
-        # Nạp dữ liệu DuckDB TPC-DS scale factor 0.01 phục vụ truy vấn
-        seed_tpcds_data(db_path=settings.duckdb_path, scale_factor=0.01)
+        # Nạp dữ liệu DuckDB TPC-H scale factor 0.01 phục vụ truy vấn
+        seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.01)
         logger.info(
-            "Khởi tạo kết nối DuckDB TPC-DS (24 bảng) thành công tại '%s'.",
+            "Khởi tạo kết nối DuckDB TPC-H (8 bảng) thành công tại '%s'.",
             settings.duckdb_path,
         )
     except (OSError, RuntimeError, duckdb.DatabaseError) as exc:
         logger.warning("Cảnh báo khi khởi tạo DuckDB trong lifespan: %s", exc)
+
+    try:
+        # Khởi tạo Application Database và nạp 3 tài khoản Persona mẫu
+        await init_db()
+        logger.info("Khởi tạo Application Database (SQLAlchemy 2.0 Async) thành công.")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cảnh báo khi khởi tạo Application Database: %s", exc)
 
     yield
 
@@ -109,8 +124,12 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # ==============================================================================
 
 # Đăng ký các routers với tiền tố api_prefix (mặc định: /api/v1)
+app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(conversations_router, prefix=settings.api_prefix)
 app.include_router(query_router, prefix=settings.api_prefix)
 app.include_router(audit_router, prefix=settings.api_prefix)
+app.include_router(saved_queries_router, prefix=settings.api_prefix)
+app.include_router(dashboard_router, prefix=settings.api_prefix)
 
 
 @app.get(

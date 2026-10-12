@@ -37,6 +37,18 @@ class Settings(BaseSettings):
         default=None,
         description="Mã khóa API bí mật bảo vệ quyền ADMIN server-side (X-Admin-Token)",
     )
+    # --- JWT Authentication ---
+    jwt_secret_key: str = Field(
+        default="dev_super_secret_jwt_key_2026_change_in_prod",
+        description="Mã khóa bí mật ký JWT Token",
+    )
+    jwt_algorithm: str = Field(
+        default="HS256", description="Thuật toán mã hóa JWT"
+    )
+    jwt_access_token_expire_minutes: int = Field(
+        default=1440,
+        description="Thời hạn sống của JWT Access Token tính theo phút (1440p = 24h)",
+    )
 
     # --- LLM Providers & Tiering Strategy ---
     llm_provider: Literal["openai", "gemini", "deepseek", "mistral"] = Field(
@@ -133,9 +145,17 @@ class Settings(BaseSettings):
     )
 
     # --- Database & Warehouse ---
+    database_url: str = Field(
+        default="sqlite+aiosqlite:///./data/app.db",
+        description="Đường dẫn Database URL cho Application DB (SQLite dev, PostgreSQL prod)",
+    )
+    checkpoints_db_path: str = Field(
+        default="./data/checkpoints.sqlite",
+        description="Đường dẫn file SQLite lưu trữ LangGraph checkpoints bền vững",
+    )
     duckdb_path: str = Field(
-        default="./data/tpcds.duckdb",
-        description="Đường dẫn file DuckDB local (chuẩn TPC-DS 24 bảng)",
+        default="./data/tpch.duckdb",
+        description="Đường dẫn file DuckDB local (chuẩn TPC-H 8 bảng)",
     )
     pending_approvals_db_path: str = Field(
         default="./data/pending_approvals.sqlite",
@@ -224,11 +244,11 @@ class Settings(BaseSettings):
         description="Số lượng dòng quét ước tính tối đa cho phép chạy tự động mà không cần duyệt HITL",
     )
     hitl_heavy_tables: str = Field(
-        default="store_sales,catalog_sales,web_sales,inventory,lineitem,orders",
+        default="lineitem,orders,partsupp",
         description="Danh sách các bảng kích thước lớn (Heavy Tables) phân tách bằng dấu phẩy, cấu hình linh hoạt theo từng DB",
     )
     hitl_time_columns: str = Field(
-        default="sold_date_sk,d_date,date_sk,shipdate,orderdate,date,created_at,timestamp",
+        default="o_orderdate,l_shipdate,l_commitdate,l_receiptdate",
         description="Danh sách các cột phân vùng / mốc thời gian dùng để kiểm tra tính đầy đủ của bộ lọc WHERE",
     )
 
