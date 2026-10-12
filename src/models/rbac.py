@@ -8,6 +8,7 @@ class UserRole(str, Enum):
 
     ANALYST = "Analyst"
     ADMIN = "Admin"
+    BUSINESS_USER = "BusinessUser"
 
 
 from src.utils.schema_context import TPCH_TABLE_NAMES
@@ -17,19 +18,23 @@ _ALL_ANALYST_TABLES = set(TPCH_TABLE_NAMES)
 
 DEFAULT_ALLOWED_TABLES: dict[UserRole, set[str]] = {
     UserRole.ANALYST: _ALL_ANALYST_TABLES,
+    UserRole.BUSINESS_USER: _ALL_ANALYST_TABLES,
     UserRole.ADMIN: _ALL_ANALYST_TABLES | {"audit_log"},
 }
 
 # Ma trận các cột nhạy cảm bị CẤM (PII / Tài chính cá nhân TPC-H)
+_ANALYST_DENIED_COLUMNS: set[str] = {
+    "c_phone",    # PII: Số điện thoại khách hàng
+    "c_address",  # PII: Địa chỉ khách hàng
+    "c_acctbal",  # Tài chính: Số dư tài khoản khách hàng
+    "s_phone",    # PII: Số điện thoại nhà cung cấp
+    "s_address",  # PII: Địa chỉ nhà cung cấp
+    "s_acctbal",  # Tài chính: Số dư tài khoản nhà cung cấp
+}
+
 DEFAULT_DENIED_COLUMNS: dict[UserRole, set[str]] = {
-    UserRole.ANALYST: {
-        "c_phone",    # PII: Số điện thoại khách hàng
-        "c_address",  # PII: Địa chỉ khách hàng
-        "c_acctbal",  # Tài chính: Số dư tài khoản khách hàng
-        "s_phone",    # PII: Số điện thoại nhà cung cấp
-        "s_address",  # PII: Địa chỉ nhà cung cấp
-        "s_acctbal",  # Tài chính: Số dư tài khoản nhà cung cấp
-    },
+    UserRole.ANALYST: _ANALYST_DENIED_COLUMNS,
+    UserRole.BUSINESS_USER: _ANALYST_DENIED_COLUMNS,
     UserRole.ADMIN: set(),  # Admin toàn quyền
 }
 

@@ -41,7 +41,7 @@ def get_duckdb_connector() -> Generator[DuckDBConnector]:
     if _shared_duckdb_connector is None:
         settings = get_settings()
         # Khởi tạo kết nối DuckDB
-        conn = seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.01)
+        conn = seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.1)
         _shared_duckdb_connector = DuckDBConnector(connection=conn)
 
     yield _shared_duckdb_connector

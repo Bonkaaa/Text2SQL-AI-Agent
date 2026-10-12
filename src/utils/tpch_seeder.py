@@ -39,12 +39,14 @@ def get_table_row_counts(conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
 def seed_tpch_data(
     db_path: str = ":memory:",
     scale_factor: float = 0.1,
+    force: bool = False,
 ) -> duckdb.DuckDBPyConnection:
     """Khởi tạo database DuckDB và sinh dữ liệu chuẩn TPC-H bằng extension có sẵn.
 
     Args:
         db_path: Đường dẫn file DuckDB hoặc ':memory:' để chạy trên RAM.
         scale_factor: Tỷ lệ quy mô dữ liệu (0.01 cho unit test, 0.1 cho dev/demo).
+        force: Nếu True, ép buộc chạy lại CALL dbgen ngay cả khi DB đã có dữ liệu.
 
     Returns:
         duckdb.DuckDBPyConnection: Kết nối tới database đã sinh dữ liệu.
@@ -63,6 +65,12 @@ def seed_tpch_data(
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = duckdb.connect(db_path)
+
+    # Idempotency check: Tránh duplicate dữ liệu nếu file DB đã có bảng và dữ liệu
+    if db_path != ":memory:" and not force and verify_tpch_tables(conn):
+        counts = get_table_row_counts(conn)
+        if counts.get("customer", 0) > 0:
+            return conn
 
     # Cài đặt và tải extension TPC-H tích hợp sẵn của DuckDB
     conn.execute("INSTALL tpch;")

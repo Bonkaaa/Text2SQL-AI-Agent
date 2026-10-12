@@ -50,8 +50,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     logger.info("Đang khởi động FastAPI Gateway (%s)...", settings.app_env)
 
     try:
-        # Nạp dữ liệu DuckDB TPC-H scale factor 0.01 phục vụ truy vấn
-        seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.01)
+        # Nạp dữ liệu DuckDB TPC-H scale factor 0.1 phục vụ truy vấn
+        conn = seed_tpch_data(db_path=settings.duckdb_path, scale_factor=0.1)
+        conn.close()
         logger.info(
             "Khởi tạo kết nối DuckDB TPC-H (8 bảng) thành công tại '%s'.",
             settings.duckdb_path,

@@ -350,11 +350,18 @@ TPCH_SEMANTIC_METRICS: Final[dict[str, SemanticMetric]] = {
     "late_delivery_rate": SemanticMetric(
         metric_id="late_delivery_rate",
         vietnamese_name="Tỷ lệ trễ hạn giao hàng",
-        formula="COUNT(CASE WHEN l_receiptdate > l_commitdate THEN 1 END) * 100.0 / COUNT(*)",
+        formula="COUNT(CASE WHEN l_receiptdate > l_commitdate THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)",
         description="Tỷ lệ phần trăm đơn hàng giao cho khách sau ngày cam kết",
         required_tables=["lineitem"],
     ),
 }
+
+# Shims tương thích ngược tạm thời cho các module/agents đang chờ chuyển đổi ở Phase 2
+TPCDS_TABLE_NAMES: Final[list[str]] = TPCH_TABLE_NAMES
+TPCDS_TABLE_SCHEMAS: Final[dict[str, str]] = TPCH_TABLE_SCHEMAS
+TPCDS_TABLE_COLUMNS: Final[dict[str, list[str]]] = TPCH_TABLE_COLUMNS
+TPCDS_JOIN_RELATIONSHIPS: Final[list[JoinRelationship]] = TPCH_JOIN_RELATIONSHIPS
+TPCDS_SEMANTIC_METRICS: Final[dict[str, SemanticMetric]] = TPCH_SEMANTIC_METRICS
 
 
 # ==============================================================================
@@ -440,6 +447,11 @@ def render_schema_context(selected_tables: list[str] | None = None) -> str:
 
 
 __all__ = [
+    "TPCDS_JOIN_RELATIONSHIPS",
+    "TPCDS_SEMANTIC_METRICS",
+    "TPCDS_TABLE_COLUMNS",
+    "TPCDS_TABLE_NAMES",
+    "TPCDS_TABLE_SCHEMAS",
     "TPCH_JOIN_RELATIONSHIPS",
     "TPCH_SEMANTIC_METRICS",
     "TPCH_TABLE_COLUMNS",

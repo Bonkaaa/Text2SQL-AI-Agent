@@ -78,3 +78,20 @@ def test_tpch_config_defaults():
     assert "orders" in settings.heavy_tables_set
     assert "o_orderdate" in settings.time_columns_set
 
+
+def test_seed_persistent_idempotent(tmp_path: Path):
+    """Kiểm tra gọi seed nhiều lần trên file không làm nhân bản số dòng."""
+    db_file = tmp_path / "idempotent_tpch.duckdb"
+    conn1 = seed_tpch_data(db_path=str(db_file), scale_factor=0.01)
+    counts1 = get_table_row_counts(conn1)
+    conn1.close()
+
+    # Gọi seed lần 2 trên cùng file
+    conn2 = seed_tpch_data(db_path=str(db_file), scale_factor=0.01)
+    counts2 = get_table_row_counts(conn2)
+    conn2.close()
+
+    assert counts1["customer"] == counts2["customer"]
+    assert counts1["orders"] == counts2["orders"]
+
+
