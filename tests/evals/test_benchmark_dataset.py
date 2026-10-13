@@ -68,7 +68,9 @@ def test_tables_are_strictly_tpch():
 def test_all_ground_truth_sqls_executable():
     data = load_dataset()
     db_path = settings.duckdb_path
-    assert Path(db_path).exists(), f"DuckDB warehouse not found at {db_path}"
+    if not Path(db_path).exists():
+        from src.utils.tpch_seeder import seed_tpch_data
+        seed_tpch_data(db_path=db_path, scale_factor=0.01)
     con = duckdb.connect(db_path, read_only=True)
     failures = []
     try:

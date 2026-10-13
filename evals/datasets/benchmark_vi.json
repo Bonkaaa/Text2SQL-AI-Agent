@@ -406,7 +406,7 @@
     "tables": [
       "part"
     ],
-    "ground_truth_sql": "SELECT p_name, p_retailprice FROM part ORDER BY p_retailprice DESC LIMIT 5;"
+    "ground_truth_sql": "SELECT p_name, p_retailprice FROM part ORDER BY p_retailprice DESC, p_name ASC LIMIT 5;"
   },
   {
     "id": "q40",

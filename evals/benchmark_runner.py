@@ -20,6 +20,7 @@ import sys
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -76,10 +77,11 @@ def normalize_value(val: Any) -> Any:
         return None
     if isinstance(val, (date, datetime)):
         return val.isoformat()
-    if isinstance(val, float):
-        if math.isnan(val):
+    if isinstance(val, (float, Decimal)):
+        f_val = float(val)
+        if math.isnan(f_val):
             return "NaN"
-        return round(val, 2)
+        return round(f_val, 2)
     if isinstance(val, (int, str, bool)):
         return val
     return str(val)

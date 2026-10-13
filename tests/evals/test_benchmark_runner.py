@@ -1,6 +1,7 @@
 """Unit tests for Spider-like Benchmark Runner (evals/benchmark_runner.py)."""
 
 import json
+from datetime import UTC
 from pathlib import Path
 
 import duckdb
@@ -27,11 +28,26 @@ def test_runner_uses_default_tpch_db_path():
 
 
 def test_normalize_value():
+    from datetime import date, datetime
+    from decimal import Decimal
+
     assert normalize_value(None) is None
     assert normalize_value(3.14159) == 3.14
+    assert normalize_value(Decimal("100.50")) == 100.5
+    assert normalize_value(Decimal("100.5")) == 100.5
+    assert normalize_value(date(2023, 1, 1)) == "2023-01-01"
+    assert normalize_value(datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)) == "2023-01-01T12:00:00+00:00"
     assert normalize_value(42) == 42
     assert normalize_value("test") == "test"
     assert normalize_value(float("nan")) == "NaN"
+
+
+def test_compare_query_results_decimal_and_float_equivalence():
+    from decimal import Decimal
+
+    res1 = [(Decimal("100.50"), "A")]
+    res2 = [(100.5, "A")]
+    assert compare_query_results(res1, res2) is True
 
 
 def test_compare_query_results_identical():
