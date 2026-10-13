@@ -59,8 +59,8 @@ flowchart TD
 | :--- | :--- | :---: | :--- | :--- |
 | **Giai đoạn 1** | Tầng Dữ liệu & Tri thức Ngữ nghĩa | 5 tasks | `config.py`, `tpch_seeder.py`, `schema_context.py`, `table_keywords.py`, `categorical_search.py`, `rbac.py` | `pytest tests/utils/ -v` |
 | **Giai đoạn 2** | Tác tử AI, Prompts & Control Pipeline | 5 tasks | `sql_generator_prompt.py`, `schema_retriever_prompt.py`, `preflight_prompt.py`, `analytics_planner_prompt.py`, `synthesizer_prompt.py`, `metadata_tools.py` | `pytest tests/agents/ tests/prompts/ -v` |
-| **Giai đoạn 3** | Bộ Đánh giá Evals & Benchmark 50 Câu | 3 tasks | `benchmark_vi.json`, `benchmark_runner.py` | `python -m evals.benchmark_runner` |
-| **Giai đoạn 4** | Giao diện Frontend & Trải nghiệm UI | 5 tasks | `tpchCatalog.ts`, `PromptPresets.tsx`, `data-sources/page.tsx`, `DataSourceCard.tsx`, `vi.ts`, `en.ts` | `npm --prefix src/frontend run test` |
+| **Giai đoạn 3** | Bộ Đánh giá Evals & Benchmark 50 Câu | 3 tasks (100% Hoàn tất - 100% VSR/EX) | `benchmark_vi.json`, `benchmark_runner.py` | `python -m evals.benchmark_runner` |
+| **Giai đoạn 4** | Giao diện Frontend & Trải nghiệm UI | 5 tasks (100% Hoàn tất - 94/94 Tests Green) | `tpchCatalog.ts`, `data-sources/page.tsx`, `DataSourceCard.tsx`, `SchemaExplorer.tsx`, `vi.ts`, `en.ts` | `npm --prefix src/frontend run test` |
 | **Giai đoạn 5** | Tài liệu Đồ án, Quy chuẩn & Nghiệm thu | 5 tasks | `AGENTS.md`, `DATABASE_SCHEMA.md`, `README.md`, `PRD.md`, `TOM_TAT_DO_AN.md` | `ruff check .` & Full Pytest |
 
 ---
@@ -393,9 +393,11 @@ flowchart TD
   ```powershell
   npm --prefix src/frontend run test
   ```
-- **Tiêu chí hoàn thành (Milestone 4 Gate)**:
-  - 100% unit & integration tests của frontend pass xanh.
-  - Màn hình Data Sources và Chat Workspace hoạt động đồng bộ với 8 bảng TPC-H.
+- **Tiêu chí hoàn thành (Milestone 4 Gate - ĐÃ HOÀN TẤT)**:
+  - 100% unit & integration tests của frontend pass xanh (26/26 test suites, 94/94 tests).
+  - TypeScript compilation `0` lỗi (`tsc --noEmit`), ESLint `0` warnings/errors (`next lint`).
+  - Màn hình Data Sources và Chat Workspace hoạt động đồng bộ với 8 bảng TPC-H (Commits `4ba5a2b`, `c345eab`).
+  - Code Review độc lập xác nhận đạt chuẩn **Ready to merge**.
 
 ---
 
