@@ -24,10 +24,10 @@ DEFAULT_ALLOWED_TABLES: dict[UserRole, set[str]] = {
 
 # Ma trận các cột nhạy cảm bị CẤM (PII / Tài chính cá nhân TPC-H)
 _ANALYST_DENIED_COLUMNS: set[str] = {
-    "c_phone",    # PII: Số điện thoại khách hàng
+    "c_phone",  # PII: Số điện thoại khách hàng
     "c_address",  # PII: Địa chỉ khách hàng
     "c_acctbal",  # Tài chính: Số dư tài khoản khách hàng
-    "s_phone",    # PII: Số điện thoại nhà cung cấp
+    "s_phone",  # PII: Số điện thoại nhà cung cấp
     "s_address",  # PII: Địa chỉ nhà cung cấp
     "s_acctbal",  # Tài chính: Số dư tài khoản nhà cung cấp
 }

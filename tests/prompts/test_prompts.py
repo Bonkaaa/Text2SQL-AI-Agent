@@ -82,7 +82,10 @@ def test_schema_retriever_prompt_structure():
     assert "TPC-H" in SCHEMA_RETRIEVER_SYSTEM_PROMPT
     assert "date_dim" not in SCHEMA_RETRIEVER_SYSTEM_PROMPT
     assert "store_sales" not in SCHEMA_RETRIEVER_SYSTEM_PROMPT
-    assert "c_mktsegment" in SCHEMA_RETRIEVER_SYSTEM_PROMPT or "l_shipmode" in SCHEMA_RETRIEVER_SYSTEM_PROMPT
+    assert (
+        "c_mktsegment" in SCHEMA_RETRIEVER_SYSTEM_PROMPT
+        or "l_shipmode" in SCHEMA_RETRIEVER_SYSTEM_PROMPT
+    )
 
 
 def test_schema_retriever_prompt_format_messages():

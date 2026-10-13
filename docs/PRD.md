@@ -1,57 +1,56 @@
 # PRD.md — Product Requirements Document
 
 > **Dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp  
-> **Bộ dữ liệu chuẩn**: **TPC-DS Benchmark (Omnichannel Retail & Enterprise Data Warehouse - 24 Tables)**  
+> **Bộ dữ liệu chuẩn**: **TPC-H Benchmark (Supply Chain, B2B/B2C & Distribution Data Warehouse - 8 Tables)**  
 > **Phiên bản**: 4.0  
 > **Trạng thái**: Production Architecture Standard  
-> **Ngày cập nhật**: 2026-10-01  
-> **Tài liệu kiến trúc**: [ARCHITECTURE.md](file:///d:/Text2SQL-AI-Agent/docs/ARCHITECTURE.md), [agent-architecture-v4.md](file:///d:/Text2SQL-AI-Agent/docs/agent-architecture-v4.md)  
-> **Đặc tả luồng dữ liệu**: [DATA_FLOW.md](file:///d:/Text2SQL-AI-Agent/docs/DATA_FLOW.md)  
+> **Ngày cập nhật**: 2026-10-13  
+> **Tài liệu kiến trúc**: [ARCHITECTURE.md](file:///d:/Text2SQL-AI-Agent/docs/ARCHITECTURE.md), [agent-architecture-v2.md](file:///d:/Text2SQL-AI-Agent/docs/agent-architecture-v2.md)  
+> **Kế hoạch chuyển đổi**: [docs/migrate_to_tpch/IMPLEMENTATION_PLAN.md](file:///d:/Text2SQL-AI-Agent/docs/migrate_to_tpch/IMPLEMENTATION_PLAN.md)  
 > **Từ điển cơ sở dữ liệu**: [DATABASE_SCHEMA.md](file:///d:/Text2SQL-AI-Agent/docs/DATABASE_SCHEMA.md)  
 
 ---
 
 ## 1. PROJECT BRIEF (BẢN TÓM TẮT DỰ ÁN)
 
-- **Tên sản phẩm**: **Enterprise Agentic Self-Service Analytics Engine (TPC-DS Edition)**
+- **Tên sản phẩm**: **Enterprise Agentic Self-Service Analytics Engine (TPC-H Edition)**
 - **Vấn đề cốt lõi (Pain Point)**:
-  - Tại các doanh nghiệp thương mại và bán lẻ đa kênh (Omnichannel Retail), nhân viên nghiệp vụ (Kinh doanh, Tiếp thị, Quản lý kho, Điều hành chuỗi cung ứng) liên tục đối mặt với các câu hỏi phân tích kinh doanh đa biến: *Tại sao doanh thu quý 3 sụt giảm? Kênh bán lẻ tại quầy (Store) hay trực tuyến (Web) bị ảnh hưởng nhiều nhất? Ngành hàng nào có tỷ lệ trả hàng vượt mức trung bình? Tồn kho có đáp ứng được nhu cầu các chương trình khuyến mãi không?*
+  - Tại các doanh nghiệp thương mại và chuỗi cung ứng (Supply Chain & Commercial Distribution), nhân viên nghiệp vụ (Kinh doanh, Điều phối cung ứng, Quản lý kho, Quản lý quan hệ khách hàng) liên tục đối mặt với các câu hỏi phân tích kinh doanh đa biến: *Khách hàng nào có tổng doanh số mua hàng lớn nhất tại Châu Á năm 1995? Phương thức giao hàng nào có tỷ lệ đổi trả cao nhất? Nhà cung cấp nào còn tồn kho linh kiện quan trọng nhưng chưa giao hàng? Biên lợi nhuận theo từng nhóm sản phẩm biến động ra sao?*
   - Hiện tại, mọi yêu cầu phân tích đều phải gửi ticket sang đội ngũ Data Analyst (DA). Thời gian phản hồi kéo dài từ **2 đến 5 ngày**, gây nghẽn nghiêm trọng cho các quyết định chiến lược và điều phối vận hành.
-  - Các công cụ Text-to-SQL truyền thống trên thị trường chỉ hỗ trợ mô hình thô sơ: **"1 câu text $\to$ 1 câu SQL đơn lẻ $\to$ 1 bảng kết quả"**. Mô hình này hoàn toàn bất lực trước kho dữ liệu chuẩn công nghiệp (Snowflake Schema gồm 24 bảng, 429 cột và quan hệ bắc cầu qua bảng ngày tháng `date_dim`) và các câu hỏi đòi hỏi điều tra nhiều góc nhìn.
+  - Các công cụ Text-to-SQL truyền thống trên thị trường chỉ hỗ trợ mô hình thô sơ: **"1 câu text $\to$ 1 câu SQL đơn lẻ $\to$ 1 bảng kết quả"**. Mô hình này bất lực trước kho dữ liệu quan hệ chuẩn công nghiệp và các câu hỏi đòi hỏi điều tra nhiều góc nhìn.
   - Nguy cơ an ninh (SQL Injection, biến đổi dữ liệu trái phép, rò rỉ dữ liệu cá nhân PII) và tình trạng lỗi giao diện phổ biến khi dùng Regular Expression để trích xuất JSON/SQL từ câu trả lời tự do của LLM.
 - **Giải pháp (Solution)**:
-  - Xây dựng một **Agentic Self-Service Analytics Engine (Kiến trúc v4.0)** cho phép người dùng hỏi đáp bằng **tiếng Việt tự nhiên** trên kho dữ liệu phân tích chuẩn TPC-DS.
+  - Xây dựng một **Agentic Self-Service Analytics Engine (Kiến trúc v4.0)** cho phép người dùng hỏi đáp bằng **tiếng Việt tự nhiên** trên kho dữ liệu phân tích chuẩn TPC-H 8 bảng (`orders`, `lineitem`, `part`, `partsupp`, `customer`, `supplier`, `nation`, `region`).
   - Mô phỏng chính xác phương pháp luận làm việc của một **Senior Data Analyst**:
-    1. *Kiểm soát sơ bộ & Làm rõ*: Nhận diện ý định, hỏi lại khi câu hỏi thiếu mốc thời gian hoặc kênh bán ([`PreflightGatekeeper`](file:///d:/Text2SQL-AI-Agent/src/agents/preflight_gatekeeper.py)).
-    2. *Lập kế hoạch phân tích (`AnalysisPlan`)*: Đặt mục tiêu và phân rã thành tối đa 3 nhiệm vụ truy vấn tuần tự ($N \le 3$) để kiểm chứng các giả thuyết kinh doanh ([`AnalysisPlanner`](file:///d:/Text2SQL-AI-Agent/src/agents/analytics/planner.py)).
-    3. *Thực thi & Thu thập bằng chứng*: Dò đường nối BFS, sinh SQL tập trung, đưa qua hàng rào an ninh tất định 100% bằng code thuần ([`LangGraph Control Pipeline`](file:///d:/Text2SQL-AI-Agent/src/agents/control_pipeline/builder.py)), tích lũy số liệu vào `EvidenceStore`.
-    4. *Phân tích chuyên sâu (`EvidenceAnalyzer`)*: Tính toán các chỉ số tăng trưởng ($\Delta\%$), tỷ trọng đóng góp, phát hiện ngoại lệ và kiểm chứng giả thuyết.
-    5. *Trình diễn chuẩn chỉ (`ResponseSynthesizer`)*: Chọn cấu hình trực quan Recharts linh hoạt và rót dữ liệu tất định (Deterministic Data Hydration), xuất bản gói kết quả định kiểu mạnh (`ResponsePackage` / `ArtifactBundle`).
+    1. *Kiểm soát sơ bộ & Làm rõ*: Nhận diện ý định, hỏi lại khi câu hỏi thiếu mốc thời gian hoặc phạm vi phân tích ([`PreflightGatekeeper`](file:///d:/Text2SQL-AI-Agent/src/agents/preflight_gatekeeper.py)).
+    2. *Lập kế hoạch phân tích (`AnalysisPlan`)*: Đặt mục tiêu và phân rã thành các nhiệm vụ truy vấn tập trung để kiểm chứng các giả thuyết kinh doanh.
+    3. *Thực thi & Thu thập bằng chứng*: Dò đường nối BFS quan hệ TPC-H, sinh SQL chuẩn DuckDB, đưa qua hàng rào an ninh tất định 100% bằng code thuần ([`LangGraph Control Pipeline`](file:///d:/Text2SQL-AI-Agent/src/agents/control_pipeline.py)), tích lũy số liệu vào `EvidenceStore`.
+    4. *Phân tích chuyên sâu*: Tính toán các chỉ số tăng trưởng, phân bổ tỷ trọng, so sánh đối chuẩn theo các công thức dbt chuẩn hóa.
+    5. *Trình diễn chuẩn chỉ (`ResponseSynthesizer`)*: Chọn cấu hình trực quan Recharts linh hoạt và rót dữ liệu tất định, xuất bản gói kết quả định kiểu mạnh.
 - **Đối tượng sử dụng (Target Users)**:
-  1. *Business Users / Sales & Inventory Analysts (Role: `Analyst`)*: Cần số liệu và insight phân tích nhanh chóng mà không cần kỹ năng viết SQL chuyên sâu.
-  2. *Data Team / Warehouse Administrators (Role: `Admin`)*: Cần giảm tải yêu cầu ad-hoc, muốn kiểm soát an toàn tuyệt đối (Zero DML/DDL, RBAC bảo vệ PII) và định lượng chi phí quét dữ liệu kho cloud.
+  1. *Business Users / Supply Chain Analysts (Role: `Analyst`)*: Cần số liệu và insight phân tích nhanh chóng mà không cần kỹ năng viết SQL chuyên sâu.
+  2. *Data Team / Warehouse Administrators (Role: `Admin`)*: Cần giảm tải yêu cầu ad-hoc, muốn kiểm soát an toàn tuyệt đối (Zero DML/DDL, RBAC bảo vệ PII) và định lượng chi phí quét dữ liệu kho DuckDB.
 
 ---
 
 ## 2. MỤC TIÊU & CHỈ SỐ THÀNH CÔNG (GOALS & TARGET METRICS)
 
 ### 2.1. Mục tiêu sản phẩm (Product Goals)
-- Rút ngắn thời gian từ lúc phát sinh bài toán nghiệp vụ đến khi có báo cáo phân tích kèm biểu đồ từ **vài ngày xuống dưới 30 giây**.
-- Trao quyền tự phục vụ (Self-service) cho các bài toán phân tích ad-hoc từ đơn giản đến phức tạp trên 24 bảng TPC-DS.
+- Rút ngắn thời gian từ lúc phát sinh bài toán nghiệp vụ đến khi có báo cáo phân tích kèm biểu đồ từ **vài ngày xuống dưới 10 giây**.
+- Trao quyền tự phục vụ (Self-service) cho các bài toán phân tích ad-hoc từ đơn giản đến phức tạp trên 8 bảng TPC-H.
 - Đảm bảo **an toàn dữ liệu tuyệt đối (Zero Trust on LLM for Security)**: Chặn đứng 100% các thao tác thay đổi dữ liệu hoặc truy cập trái phép trường nhạy cảm PII.
 - Loại bỏ hoàn toàn lỗi hiển thị giao diện thông qua giao thức truyền thông định kiểu mạnh (Zero Regex Scraping).
 
 ### 2.2. Chỉ số thành công đo lường được (Target Metrics)
 
-| Chỉ số | Định nghĩa / Cách đo | Mục tiêu v4.0 (TPC-DS) |
+| Chỉ số | Định nghĩa / Cách đo | Mục tiêu v4.0 (TPC-H) |
 |---|---|:---:|
-| **Valid SQL Rate (VSR)** | Tỷ lệ câu SQL sinh ra đúng cú pháp và chạy thành công trên Warehouse | $\ge \mathbf{92\%}$ |
-| **Execution Accuracy (EX)** | Tỷ lệ kết quả truy vấn sinh ra trùng khớp với Ground-truth trên bộ dữ liệu TPC-DS | $\ge \mathbf{78\%}$ |
+| **Valid SQL Rate (VSR)** | Tỷ lệ câu SQL sinh ra đúng cú pháp và chạy thành công trên Warehouse | $\ge \mathbf{95\%}$ |
+| **Execution Accuracy (EX)** | Tỷ lệ kết quả truy vấn sinh ra trùng khớp với Ground-truth trên bộ dữ liệu TPC-H | $\ge \mathbf{82\%}$ |
 | **Governance Compliance** | Tỷ lệ chặn đứng 100% các câu lệnh biến đổi dữ liệu (DML/DDL) và vi phạm RBAC | $\mathbf{100\%}$ |
-| **Self-Correction Success Rate** | Tỷ lệ truy vấn lỗi được sửa thành công nhờ `DiagnosticAgent` ($\le 3$ lần retry) | $\ge \mathbf{65\%}$ |
-| **Multi-Query Plan Completion** | Tỷ lệ các kế hoạch phân tích nhiều bước hoàn thành trọn vẹn và tổng hợp thành công | $\ge \mathbf{85\%}$ |
-| **Presentation Integrity** | Tỷ lệ output chuẩn hóa Pydantic `ResponsePackage` thành công, không dùng regex fallback | $\mathbf{100\%}$ |
-| **Average End-to-End Latency** | Tổng thời gian hoàn thành (bao gồm lập kế hoạch, truy vấn và phân tích) | $<\mathbf{30\text{ giây}}$ |
+| **Self-Correction Success Rate** | Tỷ lệ truy vấn lỗi được sửa thành công ($\le 3$ lần retry) | $\ge \mathbf{70\%}$ |
+| **Presentation Integrity** | Tỷ lệ output chuẩn hóa định kiểu mạnh thành công, không dùng regex fallback | $\mathbf{100\%}$ |
+| **Average End-to-End Latency** | Tổng thời gian hoàn thành (bao gồm truy xuất, truy vấn và tổng hợp insight) | $<\mathbf{10\text{ giây}}$ |
 
 ---
 

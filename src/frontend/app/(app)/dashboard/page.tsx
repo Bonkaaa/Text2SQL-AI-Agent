@@ -22,26 +22,26 @@ import { useLanguage } from "@/context/LanguageContext";
 
 const POPULAR_RECOMMENDED_QUERIES = [
   {
-    title: "Top 10 Sản Phẩm Doanh Thu Cao Nhất 2003",
-    question: "Which 10 products generated the most revenue in 2003?",
-    category: "Store Sales",
+    title: "Top 10 Khách Hàng Chi Tiêu Cao Nhất Năm 1995",
+    question: "Which 10 customers spent the most money on orders in 1995?",
+    category: "Customer Orders",
     runs: 42,
   },
   {
-    title: "So Sánh Doanh Số Kênh Cửa Hàng vs Kênh Web 2002",
-    question: "Compare monthly sales between store channel and web channel in 2002.",
-    category: "Omnichannel",
+    title: "Doanh Thu Theo Từng Phân Khúc Thị Trường 1995",
+    question: "Compare revenue across market segments in 1995.",
+    category: "Market Segment",
     runs: 31,
   },
   {
-    title: "Phân Tích Tỷ Lệ Đổi Trả Theo Nhóm Học Vấn",
-    question: "Which customer income demographics show the highest item return rate?",
-    category: "Customer & Returns",
+    title: "Phân Tích Tỷ Lệ Đổi Trả Theo Phương Thức Vận Chuyển",
+    question: "Which ship modes have the highest return rate?",
+    category: "Supply Chain",
     runs: 28,
   },
   {
-    title: "Tồn Kho Mặt Hàng Apparel Tại Kho Số 1",
-    question: "Tồn kho các mặt hàng thuộc nhóm Apparel tại kho số 1",
+    title: "Tồn Kho Linh Kiện Có Số Lượng Thấp",
+    question: "Tồn kho các mặt hàng linh kiện có số lượng dưới 100",
     category: "Inventory",
     runs: 19,
   },

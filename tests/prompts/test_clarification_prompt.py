@@ -23,7 +23,10 @@ def test_clarification_prompt_structure():
     assert "needs_clarification" in CLARIFICATION_SYSTEM_PROMPT
     assert "TPC-H" in CLARIFICATION_SYSTEM_PROMPT
     assert "store_sales" not in CLARIFICATION_SYSTEM_PROMPT
-    assert "c_mktsegment" in CLARIFICATION_SYSTEM_PROMPT or "chuỗi cung ứng" in CLARIFICATION_SYSTEM_PROMPT.lower()
+    assert (
+        "c_mktsegment" in CLARIFICATION_SYSTEM_PROMPT
+        or "chuỗi cung ứng" in CLARIFICATION_SYSTEM_PROMPT.lower()
+    )
 
     # Kiểm tra biến đầu vào của Human Prompt
     assert "{question}" in CLARIFICATION_HUMAN_PROMPT

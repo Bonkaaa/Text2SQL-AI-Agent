@@ -87,7 +87,7 @@ describe("Full Application Smoke Integration (TDD Suite 5)", () => {
 
     expect(screen.getByRole("heading", { name: /Saved queries/i })).toBeInTheDocument();
     expect(
-      screen.getByText(/Top 10 Sản Phẩm Doanh Thu Cao Nhất 2003/i)
+      screen.getByText(/Top 10 Khách Hàng Chi Tiêu Cao Nhất Năm 1995/i)
     ).toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe("Full Application Smoke Integration (TDD Suite 5)", () => {
 
     expect(screen.getByText(/Query history/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Which 10 products generated the most revenue in 2003?/i)
+      screen.getByText(/Which 10 customers spent the most money on orders in 1995\?/i)
     ).toBeInTheDocument();
   });
 

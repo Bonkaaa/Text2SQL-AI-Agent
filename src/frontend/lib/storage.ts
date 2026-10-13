@@ -25,41 +25,40 @@ const QUERY_HISTORY_KEY = "querypilot_query_history";
 export const PRESET_SAVED_QUERIES: SavedQueryItem[] = [
   {
     id: "sq_1",
-    title: "Top 10 Sản Phẩm Doanh Thu Cao Nhất 2003",
-    question: "Which 10 products generated the most revenue in 2003?",
-    sql: `SELECT i.i_item_id, i.i_item_desc, SUM(ss.ss_net_paid) AS total_revenue
-FROM store_sales ss
-JOIN item i ON ss.ss_item_sk = i.i_item_sk
-JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk
-WHERE d.d_year = 2003
+    title: "Top 10 Khách Hàng Chi Tiêu Cao Nhất Năm 1995",
+    question: "Which 10 customers spent the most money on orders in 1995?",
+    sql: `SELECT c.c_custkey, c.c_name, SUM(l.l_extendedprice * (1 - l.l_discount)) AS total_spent
+FROM customer c
+JOIN orders o ON c.c_custkey = o.o_custkey
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE EXTRACT(year FROM o.o_orderdate) = 1995
 GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10;`,
-    tag: "Doanh thu",
+    tag: "Khách hàng",
     createdAt: "2026-10-08 09:30",
     owner: "Alex Chen",
   },
   {
     id: "sq_2",
-    title: "So Sánh Doanh Số Kênh Cửa Hàng vs Kênh Web 2002",
-    question: "Compare monthly sales between store channel and web channel in 2002.",
-    sql: `SELECT d.d_moy AS month, SUM(ss.ss_net_paid) AS store_revenue, SUM(ws.ws_net_paid) AS web_revenue
-FROM date_dim d
-LEFT JOIN store_sales ss ON ss.ss_sold_date_sk = d.d_date_sk
-LEFT JOIN web_sales ws ON ws.ws_sold_date_sk = d.d_date_sk
-WHERE d.d_year = 2002 GROUP BY 1 ORDER BY 1;`,
-    tag: "Đa kênh",
+    title: "Doanh Thu Theo Từng Phân Khúc Thị Trường 1995",
+    question: "Compare revenue across market segments in 1995.",
+    sql: `SELECT c.c_mktsegment, SUM(l.l_extendedprice * (1 - l.l_discount)) AS segment_revenue
+FROM customer c
+JOIN orders o ON c.c_custkey = o.o_custkey
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE EXTRACT(year FROM o.o_orderdate) = 1995
+GROUP BY 1 ORDER BY 2 DESC;`,
+    tag: "Phân khúc",
     createdAt: "2026-10-08 14:15",
     owner: "Alex Chen",
   },
   {
     id: "sq_3",
-    title: "Phân Tích Tỷ Lệ Đổi Trả Theo Nhóm Học Vấn",
-    question: "Which customer income demographics show the highest item return rate?",
-    sql: `SELECT cd.cd_education_status, COUNT(sr.sr_item_sk) AS return_count, SUM(sr.sr_return_amt) AS total_refunded
-FROM store_returns sr
-JOIN customer c ON sr.sr_customer_sk = c.c_customer_sk
-JOIN customer_demographics cd ON c.c_current_cdemo_sk = cd.cd_demo_sk
-GROUP BY 1 ORDER BY 3 DESC;`,
-    tag: "Đổi trả",
+    title: "Phân Tích Tỷ Lệ Đổi Trả Theo Phương Thức Vận Chuyển",
+    question: "Which ship modes have the highest return rate?",
+    sql: `SELECT l.l_shipmode, COUNT(*) AS total_items, SUM(CASE WHEN l.l_returnflag = 'R' THEN 1 ELSE 0 END) AS returned_items
+FROM lineitem l
+GROUP BY 1 ORDER BY 2 DESC;`,
+    tag: "Đổi Trả",
     createdAt: "2026-10-09 11:20",
     owner: "Sarah Data Lead",
   },
@@ -68,8 +67,8 @@ GROUP BY 1 ORDER BY 3 DESC;`,
 export const PRESET_HISTORY_ITEMS: HistoryItem[] = [
   {
     id: "hist_1",
-    question: "Which 10 products generated the most revenue in 2003?",
-    sql: "SELECT i_item_id, SUM(ss_net_paid) AS total_revenue FROM store_sales GROUP BY 1 LIMIT 10;",
+    question: "Which 10 customers spent the most money on orders in 1995?",
+    sql: "SELECT c.c_custkey, c.c_name, SUM(l.l_extendedprice * (1 - l.l_discount)) AS total_spent FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN lineitem l ON o.o_orderkey = l.l_orderkey WHERE EXTRACT(year FROM o.o_orderdate) = 1995 GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10;",
     status: "SUCCESS",
     rowCount: 10,
     executionTimeMs: 186,
@@ -78,10 +77,10 @@ export const PRESET_HISTORY_ITEMS: HistoryItem[] = [
   },
   {
     id: "hist_2",
-    question: "Compare monthly sales between store channel and web channel in 2002.",
-    sql: "SELECT d_moy, SUM(ss_net_paid), SUM(ws_net_paid) FROM date_dim ...",
+    question: "Compare revenue across market segments in 1995.",
+    sql: "SELECT c.c_mktsegment, SUM(l.l_extendedprice * (1 - l.l_discount)) AS segment_revenue FROM customer c JOIN orders o ON c.c_custkey = o.o_custkey JOIN lineitem l ON o.o_orderkey = l.l_orderkey WHERE EXTRACT(year FROM o.o_orderdate) = 1995 GROUP BY 1 ORDER BY 2 DESC;",
     status: "SUCCESS",
-    rowCount: 12,
+    rowCount: 5,
     executionTimeMs: 342,
     timestamp: "2026-10-09 13:45",
     userRole: "Analyst",
@@ -98,8 +97,8 @@ export const PRESET_HISTORY_ITEMS: HistoryItem[] = [
   },
   {
     id: "hist_4",
-    question: "Tồn kho các mặt hàng thuộc nhóm Apparel tại kho số 1",
-    sql: "SELECT i_item_id, inv_quantity_on_hand FROM inventory WHERE inv_warehouse_sk = 1 LIMIT 20;",
+    question: "Tồn kho các mặt hàng linh kiện có số lượng dưới 100",
+    sql: "SELECT p_partkey, ps_suppkey, ps_availqty FROM partsupp WHERE ps_availqty < 100 LIMIT 20;",
     status: "SUCCESS",
     rowCount: 20,
     executionTimeMs: 154,

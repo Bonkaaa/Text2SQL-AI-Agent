@@ -427,9 +427,15 @@ def render_schema_context(selected_tables: list[str] | None = None) -> str:
     ]
 
     lines.append("#### 2. QUAN HỆ JOIN CHUẨN GIỮA CÁC BẢNG:")
-    joins_to_show = relevant_joins if relevant_joins else [
-        j for j in TPCH_JOIN_RELATIONSHIPS if j.from_table in table_set or j.to_table in table_set
-    ]
+    joins_to_show = (
+        relevant_joins
+        if relevant_joins
+        else [
+            j
+            for j in TPCH_JOIN_RELATIONSHIPS
+            if j.from_table in table_set or j.to_table in table_set
+        ]
+    )
     for j in joins_to_show:
         lines.append(
             f"- **{j.from_table} JOIN {j.to_table}**: `{j.condition}` ({j.description})"
@@ -437,7 +443,9 @@ def render_schema_context(selected_tables: list[str] | None = None) -> str:
     lines.append("")
 
     # 3. Chỉ số nghiệp vụ chuẩn (dbt Semantic Metrics)
-    lines.append("#### 3. CÔNG THỨC CHUẨN NGHIỆP VỤ CHUỖI CUNG ỨNG (dbt SEMANTIC METRICS):")
+    lines.append(
+        "#### 3. CÔNG THỨC CHUẨN NGHIỆP VỤ CHUỖI CUNG ỨNG (dbt SEMANTIC METRICS):"
+    )
     for metric in TPCH_SEMANTIC_METRICS.values():
         lines.append(
             f"- **{metric.vietnamese_name}** (`{metric.metric_id}`): `{metric.formula}` — {metric.description}"

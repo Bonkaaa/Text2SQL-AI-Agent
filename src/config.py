@@ -42,9 +42,7 @@ class Settings(BaseSettings):
         default="dev_super_secret_jwt_key_2026_change_in_prod",
         description="Mã khóa bí mật ký JWT Token",
     )
-    jwt_algorithm: str = Field(
-        default="HS256", description="Thuật toán mã hóa JWT"
-    )
+    jwt_algorithm: str = Field(default="HS256", description="Thuật toán mã hóa JWT")
     jwt_access_token_expire_minutes: int = Field(
         default=1440,
         description="Thời hạn sống của JWT Access Token tính theo phút (1440p = 24h)",

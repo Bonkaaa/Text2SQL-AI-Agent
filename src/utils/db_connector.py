@@ -83,9 +83,18 @@ class DuckDBConnector(BaseWarehouseConnector):
         self,
         db_path: str | None = None,
         connection: duckdb.DuckDBPyConnection | None = None,
+        read_only: bool = True,
     ) -> None:
         self.db_path = db_path or get_settings().duckdb_path
-        self._conn = connection or duckdb.connect(self.db_path)
+        if connection:
+            self._conn = connection
+        elif self.db_path == ":memory:":
+            self._conn = duckdb.connect(self.db_path)
+        else:
+            try:
+                self._conn = duckdb.connect(self.db_path, read_only=read_only)
+            except duckdb.ConnectionException:
+                self._conn = duckdb.connect(self.db_path, read_only=not read_only)
 
     def estimate_query_cost(
         self,

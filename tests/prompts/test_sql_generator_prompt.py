@@ -110,7 +110,10 @@ def test_sql_generator_prompt_structure():
     assert "store_sales" not in SQL_GENERATOR_SYSTEM_PROMPT
     assert "ss_sold_date_sk" not in SQL_GENERATOR_SYSTEM_PROMPT
     assert "l_extendedprice * (1 - l_discount)" in SQL_GENERATOR_SYSTEM_PROMPT
-    assert "o_orderdate" in SQL_GENERATOR_SYSTEM_PROMPT or "l_shipdate" in SQL_GENERATOR_SYSTEM_PROMPT
+    assert (
+        "o_orderdate" in SQL_GENERATOR_SYSTEM_PROMPT
+        or "l_shipdate" in SQL_GENERATOR_SYSTEM_PROMPT
+    )
 
 
 def test_sql_generator_prompt_format_messages():

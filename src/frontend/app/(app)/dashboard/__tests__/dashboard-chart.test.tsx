@@ -38,7 +38,7 @@ describe("Dashboard Activity Chart & Popular Queries (TDD Suite 3)", () => {
 
     expect(screen.getByText(/Popular Queries/i)).toBeInTheDocument();
     expect(
-      screen.getByText("Top 10 Sản Phẩm Doanh Thu Cao Nhất 2003")
+      screen.getByText("Top 10 Khách Hàng Chi Tiêu Cao Nhất Năm 1995")
     ).toBeInTheDocument();
 
     const runButtons = screen.getAllByRole("button", { name: /Run in Workspace|Run/i });

@@ -27,7 +27,12 @@ def test_analyst_blocked_when_accessing_forbidden_columns():
         user_id="analyst_1", session_id="sess_1", role=UserRole.ANALYST
     )
     tables = ["customer"]
-    columns = ["c_name", "c_phone", "c_acctbal", "c_address"]  # c_phone, c_acctbal, c_address bị cấm
+    columns = [
+        "c_name",
+        "c_phone",
+        "c_acctbal",
+        "c_address",
+    ]  # c_phone, c_acctbal, c_address bị cấm
 
     result = enforce_rbac_policy(
         tables_used=tables, columns_used=columns, user_context=context

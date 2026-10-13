@@ -6,14 +6,15 @@
 
 ## 1. TỔNG QUAN DỰ ÁN & KIẾN TRÚC
 
-- **Tên dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp (Chuẩn TPC-DS Benchmark 24 bảng - Phân phối & Bán lẻ đa kênh Omnichannel: Store, Web, Catalog, Returns, Inventory).
+- **Tên dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp (Chuẩn TPC-H Benchmark 8 bảng - Phân phối B2B/B2C & Chuỗi cung ứng: Orders, Lineitem, Customer, Supplier, Part, Partsupp, Nation, Region).
 - **Tài liệu nghiệp vụ & kiến trúc gốc**:
   - Đề tài & yêu cầu chấm điểm: `DETAI.md`
-  - Kế hoạch chuyển đổi TPC-DS: `docs/TPCDS_MIGRATION_PLAN.md`
+  - Kế hoạch chuyển đổi TPC-H: `docs/migrate_to_tpch/IMPLEMENTATION_PLAN.md`
+  - Đặc tả kỹ thuật TPC-H: `docs/migrate_to_tpch/SPECIFICATION.md`
   - Thiết kế kiến trúc chi tiết v2.0: `docs/agent-architecture-v2.md`
   - Đặc tả yêu cầu sản phẩm: `docs/PRD.md`
   - Thiết kế kiến trúc hệ thống 3 tầng: `docs/ARCHITECTURE.md`
-  - Từ điển dữ liệu & Schema 24 bảng TPC-DS: `docs/DATABASE_SCHEMA.md`
+  - Từ điển dữ liệu & Schema 8 bảng TPC-H: `docs/DATABASE_SCHEMA.md`
 - **Mô hình cốt lõi (Hybrid Architecture)**:
   1. **Tầng suy luận (DeepAgents Harness)**: Supervisor điều phối + Question Clarification + Schema & Categorical Value Retriever + SQL Generator + Response Synthesizer.
   2. **Tầng kiểm soát tất định (LangGraph Control Pipeline)**: Đóng gói dưới dạng Subgraph kiểm duyệt cứng: AST Sanitizer (`sqlglot`), RBAC Policy, Cost Guard (Dry-run), HITL Approval (`interrupt`), Warehouse Executor (Timeout/Limit) và Audit Logger.
@@ -36,10 +37,14 @@ Các nguyên tắc an toàn này có độ ưu tiên cao nhất, Agent phải tu
    - Cơ chế tự sửa lỗi truy vấn (Self-correction) không được vượt quá 3 lần retry. Nếu thất bại sau 3 lần, bắt buộc kích hoạt graceful failure và log audit.
 5. **GIỮ NGUYÊN KIẾN TRÚC TẤT ĐỊNH**:
    - Không chuyển các bước kiểm duyệt an toàn (RBAC, Dry-run cost, Audit Log) sang cho LLM tự quyết. Các bước này bắt buộc nằm trong LangGraph deterministic nodes bằng code thuần.
-6. **3 QUY TẮC VÀNG CHO TRUY VẤN TPC-DS (TPC-DS GOLDEN RULES)**:
-   - **Quy tắc ngày tháng (Date Dimension Join)**: Các bảng Fact TPC-DS không chứa timestamp trực tiếp mà dùng surrogate key (`ss_sold_date_sk`, `ws_sold_date_sk`, `cs_sold_date_sk`, `sr_returned_date_sk`, `cr_returned_date_sk`, `wr_returned_date_sk`) liên kết tới `date_dim.d_date_sk`. Bắt buộc JOIN `date_dim` để lọc theo năm (`d_year`), tháng (`d_moy`), quý (`d_qoy`).
-   - **Quy tắc doanh thu thuần (Net Paid Metrics)**: Sử dụng các thước đo chuẩn TPC-DS (`ss_net_paid`, `cs_net_paid`, `ws_net_paid`) cho doanh thu thuần và (`ss_net_profit`, `cs_net_profit`, `ws_net_profit`) cho lợi nhuận, tránh nhầm lẫn với tổng giá niêm yết chưa trừ giảm giá.
-   - **Quy tắc bảo vệ PII & RBAC**: Các cột định danh cá nhân nhạy cảm (`c_first_name`, `c_last_name`, `c_email_address`, `ca_street_name`, `ca_street_number`) thuộc diện quản lý PII. Hệ thống kiểm soát quyền tự động áp dụng chính sách RBAC bảo vệ dữ liệu nhạy cảm đối với các vai trò không có thẩm quyền cao.
+6. **3 QUY TẮC VÀNG CHO TRUY VẤN TPC-H (TPC-H GOLDEN RULES)**:
+   - **Quy tắc ngày tháng (Natural DATE Columns)**: Các bảng TPC-H sử dụng cột ngày tự nhiên (`o_orderdate`, `l_shipdate`, `l_commitdate`, `l_receiptdate`) có kiểu `DATE`. Tuyệt đối **KHÔNG JOIN `date_dim`** (bảng này không tồn tại trong TPC-H). Để lọc theo năm/tháng/quý, sử dụng cú pháp chuẩn DuckDB: `EXTRACT(year FROM o_orderdate) = 1995` hoặc `o_orderdate BETWEEN '1995-01-01' AND '1995-12-31'`.
+   - **Quy tắc tính toán doanh thu thuần & tồn kho (Metrics & Formulas)**:
+     - Doanh thu thuần (Net Revenue): `SUM(l_extendedprice * (1 - l_discount))`
+     - Doanh thu sau thuế (Gross Revenue with Tax): `SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax))`
+     - Giá trị hàng tồn kho (Inventory Supply Value): `SUM(ps_availqty * ps_supplycost)`
+     - Chiết khấu (Discount Amount): `SUM(l_extendedprice * l_discount)`
+   - **Quy tắc bảo vệ PII & RBAC (Privacy & Column Masking)**: Các cột định danh cá nhân nhạy cảm (`c_phone`, `c_address`, `s_phone`, `c_acctbal`) thuộc diện quản lý PII. Hệ thống tự động áp dụng chính sách RBAC che mờ dữ liệu (ví dụ: `c_phone` masked thành `***-***-1234`, `c_acctbal` làm tròn hoặc ẩn) đối với người dùng không phải Admin.
 
 ---
 

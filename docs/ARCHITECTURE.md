@@ -1,20 +1,20 @@
 # ARCHITECTURE.md — System Architecture & Design Specification
 
 > **Dự án**: AI Agent Text-to-SQL Self-Service Analytics cho dữ liệu doanh nghiệp  
-> **Phiên bản**: 4.0 (Three-Tier Architecture + 6-Layer Hybrid Agentic Governance Engine)  
-> **Bộ dữ liệu chuẩn**: **TPC-DS Benchmark (Omnichannel Retail & Enterprise Data Warehouse - 24 Bảng)**  
+> **Phiên bản**: 4.0 (Three-Tier Architecture + Hybrid Agentic Governance Engine)  
+> **Bộ dữ liệu chuẩn**: **TPC-H Benchmark (Supply Chain & Distribution Enterprise Data Warehouse - 8 Bảng)**  
 > **Trọng tâm tài liệu**: Trả lời câu hỏi *"Hệ thống này được tổ chức như thế nào, các tầng thành phần giao tiếp ra sao, và dữ liệu chuyển hóa theo luồng nào?"*
 
 ---
 
 ## 1. TỔNG QUAN KIẾN TRÚC HỆ THỐNG (SYSTEM OVERVIEW)
 
-Hệ thống được thiết kế theo mô hình **Kiến trúc 3 tầng (Three-Tier Architecture)** kết hợp với **Mô hình Tác tử Lai 6 Lớp (6-Layer Hybrid Agentic Architecture)** nhằm phân định ranh giới tuyệt đối giữa:
+Hệ thống được thiết kế theo mô hình **Kiến trúc 3 tầng (Three-Tier Architecture)** kết hợp với **Mô hình Tác tử Lai (Hybrid Agentic Architecture)** nhằm phân định ranh giới tuyệt đối giữa:
 1. **Tương tác người dùng (Frontend Workstation)**: Trình diễn dữ liệu trực quan, điều hành phân tích, duyệt lệnh an toàn.
 2. **Cổng dịch vụ doanh nghiệp (Backend Gateway)**: Tiếp nhận yêu cầu, quản lý phiên làm việc đa luồng (`thread_id`), xác thực và điều phối.
-3. **Bộ não suy luận phân cấp (AI Reasoning Engine)**: Mô phỏng phương pháp luận của Senior Data Analyst — tiếp nhận bài toán, làm rõ mơ hồ, lập kế hoạch phân rã giả thuyết, thu thập bằng chứng tuần tự và tổng hợp báo cáo.
+3. **Bộ não suy luận phân cấp (AI Reasoning Engine)**: Mô phỏng phương pháp luận của Senior Data Analyst — tiếp nhận bài toán, làm rõ mơ hồ, lập kế hoạch phân rã giả thuyết, thu thập bằng chứng và tổng hợp báo cáo.
 4. **Hàng rào an ninh tất định (Deterministic Governance Pipeline)**: Dùng mã nguồn Python thuần túy (AST parser `sqlglot`, RBAC policy, Cost Guard, HITL `interrupt`, Timeout & Limit) để bảo đảm an toàn dữ liệu 100%, không trao quyền an ninh cho LLM.
-5. **Kho dữ liệu chuẩn công nghiệp (Enterprise Data Warehouse)**: Vận hành trên lược đồ Snowflake 24 bảng TPC-DS, kết hợp công cụ dò đường khóa ngoại BFS và liên kết bảng thời gian `date_dim`.
+5. **Kho dữ liệu chuẩn công nghiệp (Enterprise Data Warehouse)**: Vận hành trên lược đồ quan hệ 8 bảng TPC-H, kết hợp công cụ dò đường khóa ngoại BFS và các thước đo chuẩn dbt.
 
 ### Bốn nguyên tắc thiết kế cốt lõi:
 1. **Separation of Concerns (Tách biệt trách nhiệm)**: Frontend chỉ đảm nhiệm hiển thị & tương tác; Backend lo xác thực và quản lý phiên; Agent lo suy luận logic; Control Pipeline lo bảo mật; Warehouse lo lưu trữ và xử lý truy vấn OLAP.

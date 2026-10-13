@@ -21,10 +21,15 @@ def test_runner_uses_default_tpch_db_path():
     assert "tpch.duckdb" in settings.duckdb_path
     # Check default in benchmark_runner function signature
     import inspect
+
     sig = inspect.signature(run_benchmark)
     default_db = sig.parameters["db_path"].default
-    assert "tpcds" not in default_db.lower(), f"db_path default still points to TPC-DS: {default_db}"
-    assert "tpch" in default_db.lower(), f"db_path default should point to TPC-H: {default_db}"
+    assert "tpcds" not in default_db.lower(), (
+        f"db_path default still points to TPC-DS: {default_db}"
+    )
+    assert "tpch" in default_db.lower(), (
+        f"db_path default should point to TPC-H: {default_db}"
+    )
 
 
 def test_normalize_value():
@@ -36,7 +41,10 @@ def test_normalize_value():
     assert normalize_value(Decimal("100.50")) == 100.5
     assert normalize_value(Decimal("100.5")) == 100.5
     assert normalize_value(date(2023, 1, 1)) == "2023-01-01"
-    assert normalize_value(datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)) == "2023-01-01T12:00:00+00:00"
+    assert (
+        normalize_value(datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC))
+        == "2023-01-01T12:00:00+00:00"
+    )
     assert normalize_value(42) == 42
     assert normalize_value("test") == "test"
     assert normalize_value(float("nan")) == "NaN"

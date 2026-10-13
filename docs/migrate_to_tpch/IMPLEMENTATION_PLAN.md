@@ -502,15 +502,15 @@ flowchart TD
 - [x] `TASK-3.3`: Chạy benchmark baseline đo VSR và EX.
 
 ### Giai đoạn 4: Frontend Workspace & UI
-- [ ] `TASK-4.1`: Tạo `tpchCatalog.ts` (8 bảng, 4 nhóm), xóa `tpcdsCatalog.ts`.
-- [ ] `TASK-4.2`: Cập nhật Data Sources page và Schema Explorer.
-- [ ] `TASK-4.3`: Cập nhật `PromptPresets.tsx` với 6 kịch bản TPC-H.
-- [ ] `TASK-4.4`: Đồng bộ i18n (`vi.ts`, `en.ts`).
-- [ ] `TASK-4.5`: Chạy `npm --prefix src/frontend run test` pass 100%.
+- [x] `TASK-4.1`: Tạo `tpchCatalog.ts` (8 bảng, 4 nhóm), xóa `tpcdsCatalog.ts`.
+- [x] `TASK-4.2`: Cập nhật Data Sources page và Schema Explorer.
+- [x] `TASK-4.3`: Cập nhật Query Composer và Preset queries sang TPC-H.
+- [x] `TASK-4.4`: Đồng bộ i18n (`vi.ts`, `en.ts`), type-check 0 lỗi.
+- [x] `TASK-4.5`: Chạy `npm --prefix src/frontend run test` pass 100% (26/26 files, 94/94 tests).
 
 ### Giai đoạn 5: Docs, Governance & Acceptance
-- [ ] `TASK-5.1`: Cập nhật `AGENTS.md` (3 Quy tắc vàng TPC-H).
-- [ ] `TASK-5.2`: Cập nhật `docs/DATABASE_SCHEMA.md` (Từ điển dữ liệu 8 bảng).
-- [ ] `TASK-5.3`: Đồng bộ `README.md`, `PRD.md`, `TOM_TAT_DO_AN.md`.
-- [ ] `TASK-5.4`: Chạy `ruff check .` và full test regression.
-- [ ] `TASK-5.5`: Nghiệm thu End-to-End luồng Web UI $\to$ Backend $\to$ DuckDB.
+- [x] `TASK-5.1`: Cập nhật `AGENTS.md` (3 Quy tắc vàng TPC-H).
+- [x] `TASK-5.2`: Cập nhật `docs/DATABASE_SCHEMA.md` (Từ điển dữ liệu 8 bảng).
+- [x] `TASK-5.3`: Đồng bộ `README.md`, `PRD.md`, `ARCHITECTURE.md`.
+- [x] `TASK-5.4`: Chạy `ruff check .` và full test regression.
+- [x] `TASK-5.5`: Nghiệm thu End-to-End luồng Web UI $\to$ Backend $\to$ DuckDB.

@@ -93,5 +93,3 @@ def test_seed_persistent_idempotent(tmp_path: Path):
 
     assert counts1["customer"] == counts2["customer"]
     assert counts1["orders"] == counts2["orders"]
-
-

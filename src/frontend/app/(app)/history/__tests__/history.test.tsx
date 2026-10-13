@@ -25,7 +25,7 @@ describe("Query History & Audit Page (TDD Suite 4)", () => {
     );
 
     expect(screen.getByText(/Query history/i)).toBeInTheDocument();
-    expect(screen.getByText(/Which 10 products generated the most revenue in 2003?/i)).toBeInTheDocument();
+    expect(screen.getByText(/Which 10 customers spent the most money on orders in 1995\?/i)).toBeInTheDocument();
     expect(screen.getAllByText("SUCCESS").length).toBeGreaterThan(0);
     expect(screen.getByText("186ms")).toBeInTheDocument();
   });
@@ -42,7 +42,7 @@ describe("Query History & Audit Page (TDD Suite 4)", () => {
 
     expect(screen.getAllByText(/DROP TABLE customer;/i).length).toBeGreaterThan(0);
     expect(
-      screen.queryByText(/Which 10 products generated the most revenue in 2003?/i)
+      screen.queryByText(/Which 10 customers spent the most money on orders in 1995\?/i)
     ).not.toBeInTheDocument();
   });
 

@@ -25,7 +25,7 @@ describe("Saved Queries Page (TDD Suite 3)", () => {
     );
 
     expect(screen.getByText(/Saved queries/i)).toBeInTheDocument();
-    expect(screen.getByText(/Top 10 Sản Phẩm Doanh Thu Cao Nhất 2003/i)).toBeInTheDocument();
+    expect(screen.getByText(/Top 10 Khách Hàng Chi Tiêu Cao Nhất Năm 1995/i)).toBeInTheDocument();
   });
 
   it("should open query in workspace when Open is clicked", () => {
@@ -54,7 +54,7 @@ describe("Saved Queries Page (TDD Suite 3)", () => {
     fireEvent.change(searchInput, { target: { value: "Đổi Trả" } });
 
     expect(screen.getByText(/Phân Tích Tỷ Lệ Đổi Trả/i)).toBeInTheDocument();
-    expect(screen.queryByText(/So Sánh Doanh Số Kênh Cửa Hàng/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Doanh Thu Theo Từng Phân Khúc/i)).not.toBeInTheDocument();
   });
 
   it("should delete a saved query when delete is confirmed", () => {

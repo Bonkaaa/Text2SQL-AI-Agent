@@ -38,7 +38,9 @@ def test_get_all_categorical_entries():
 def test_match_mktsegment_vietnamese():
     """Kiểm tra khớp phân khúc thị trường khách hàng với từ khóa tiếng Việt."""
     # 1. "ngành ô tô" -> c_mktsegment = 'AUTOMOBILE'
-    matches_auto = find_matching_categorical_values("Khách hàng thuộc phân khúc ngành ô tô")
+    matches_auto = find_matching_categorical_values(
+        "Khách hàng thuộc phân khúc ngành ô tô"
+    )
     assert len(matches_auto) > 0
     top_auto = matches_auto[0]
     assert isinstance(top_auto, CategoricalMatch)
@@ -48,29 +50,39 @@ def test_match_mktsegment_vietnamese():
     # 2. "xây dựng" -> c_mktsegment = 'BUILDING'
     matches_build = find_matching_categorical_values("Doanh thu từ phân khúc xây dựng")
     assert any(
-        m.column == "c_mktsegment" and m.matched_value == "BUILDING" for m in matches_build
+        m.column == "c_mktsegment" and m.matched_value == "BUILDING"
+        for m in matches_build
     )
 
     # 3. "nội thất" -> c_mktsegment = 'FURNITURE'
     matches_furn = find_matching_categorical_values("Đơn hàng của khách ngành nội thất")
     assert any(
-        m.column == "c_mktsegment" and m.matched_value == "FURNITURE" for m in matches_furn
+        m.column == "c_mktsegment" and m.matched_value == "FURNITURE"
+        for m in matches_furn
     )
 
 
 def test_match_shipmode_and_returns():
     """Kiểm tra khớp phương thức giao hàng và cờ hoàn trả."""
     # 1. "đường hàng không" -> l_shipmode = 'AIR'
-    matches_air = find_matching_categorical_values("Các mặt hàng vận chuyển đường hàng không")
-    assert any(m.column == "l_shipmode" and m.matched_value == "AIR" for m in matches_air)
+    matches_air = find_matching_categorical_values(
+        "Các mặt hàng vận chuyển đường hàng không"
+    )
+    assert any(
+        m.column == "l_shipmode" and m.matched_value == "AIR" for m in matches_air
+    )
 
     # 2. "tàu biển" / "đường biển" -> l_shipmode = 'SHIP'
     matches_ship = find_matching_categorical_values("Đơn hàng vận chuyển bằng tàu biển")
-    assert any(m.column == "l_shipmode" and m.matched_value == "SHIP" for m in matches_ship)
+    assert any(
+        m.column == "l_shipmode" and m.matched_value == "SHIP" for m in matches_ship
+    )
 
     # 3. "hoàn trả" -> l_returnflag = 'R'
     matches_ret = find_matching_categorical_values("Tỷ lệ các mặt hàng bị hoàn trả")
-    assert any(m.column == "l_returnflag" and m.matched_value == "R" for m in matches_ret)
+    assert any(
+        m.column == "l_returnflag" and m.matched_value == "R" for m in matches_ret
+    )
 
 
 def test_match_geography():
@@ -90,7 +102,9 @@ def test_match_geography():
 
 def test_no_false_positive_on_generic_text():
     """Kiểm tra câu hỏi chung không ánh xạ nhầm giá trị phân loại."""
-    matches = find_matching_categorical_values("Cho tôi xem danh sách 10 khách hàng đầu tiên")
+    matches = find_matching_categorical_values(
+        "Cho tôi xem danh sách 10 khách hàng đầu tiên"
+    )
     assert len(matches) == 0
 
 

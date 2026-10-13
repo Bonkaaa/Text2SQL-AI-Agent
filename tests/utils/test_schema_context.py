@@ -97,14 +97,20 @@ def test_join_relationships():
     assert ("lineitem", "orders") in join_pairs or ("orders", "lineitem") in join_pairs
     # part/supplier nối partsupp
     assert ("partsupp", "part") in join_pairs or ("part", "partsupp") in join_pairs
-    assert ("partsupp", "supplier") in join_pairs or ("supplier", "partsupp") in join_pairs
+    assert ("partsupp", "supplier") in join_pairs or (
+        "supplier",
+        "partsupp",
+    ) in join_pairs
     # geography
     assert ("customer", "nation") in join_pairs or ("nation", "customer") in join_pairs
     assert ("nation", "region") in join_pairs or ("region", "nation") in join_pairs
 
     # Kiểm tra cấu trúc JoinRelationship dataclass
     sample_join = next(
-        j for j in joins if (j.from_table == "orders" and j.to_table == "customer") or (j.from_table == "customer" and j.to_table == "orders")
+        j
+        for j in joins
+        if (j.from_table == "orders" and j.to_table == "customer")
+        or (j.from_table == "customer" and j.to_table == "orders")
     )
     assert isinstance(sample_join, JoinRelationship)
     assert "custkey" in sample_join.condition

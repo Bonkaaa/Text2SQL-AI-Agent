@@ -75,9 +75,7 @@ class TestSchemaRetrieverTools:
 
     def test_search_categorical_values_matching(self) -> None:
         """Tìm kiếm giá trị phân loại danh mục trong câu hỏi TPC-H."""
-        results = search_categorical_values(
-            "khách hàng phân khúc ô tô tại châu á"
-        )
+        results = search_categorical_values("khách hàng phân khúc ô tô tại châu á")
         assert isinstance(results, list)
         assert len(results) >= 2
 
@@ -102,7 +100,9 @@ class TestRetrieveSchemaContext:
 
         assert isinstance(result, SchemaContextResult)
         # Bắt buộc phát hiện được các bảng Fact và Dimension cốt lõi
-        assert "orders" in result.selected_tables or "lineitem" in result.selected_tables
+        assert (
+            "orders" in result.selected_tables or "lineitem" in result.selected_tables
+        )
         assert "customer" in result.selected_tables
         assert "nation" in result.selected_tables  # Bridge table nối region
         assert "region" in result.selected_tables
@@ -115,10 +115,7 @@ class TestRetrieveSchemaContext:
         assert len(result.join_conditions) > 0
 
         # Bắt buộc có công thức doanh thu thuần
-        assert any(
-            "l_extendedprice" in f
-            for f in result.metric_formulas
-        )
+        assert any("l_extendedprice" in f for f in result.metric_formulas)
 
         # Context markdown đầy đủ DDL và categorical context
         assert "### NGỮ CẢNH LƯỢC ĐỒ CƠ SỞ DỮ LIỆU" in result.context_markdown
