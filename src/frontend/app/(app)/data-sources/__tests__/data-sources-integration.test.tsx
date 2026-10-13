@@ -16,7 +16,7 @@ describe("Data Sources Full Integration Flow (TDD Suite 5)", () => {
     mockPush.mockClear();
   });
 
-  it("should render full 24-table explorer, inspect columns, and trigger question navigation", () => {
+  it("should render full 8-table TPC-H explorer, inspect columns, and trigger question navigation", () => {
     render(
       <AuthProvider>
         <DataSourcesPage />
@@ -25,15 +25,15 @@ describe("Data Sources Full Integration Flow (TDD Suite 5)", () => {
 
     // 1. Verify Page Heading & DuckDB Connection Card
     expect(screen.getByText(/Data sources & Schema/i)).toBeInTheDocument();
-    expect(screen.getByText(/DuckDB TPC-DS Benchmark/i)).toBeInTheDocument();
+    expect(screen.getByText(/DuckDB TPC-H Benchmark/i)).toBeInTheDocument();
     expect(screen.getByText("Connected")).toBeInTheDocument();
 
     // 2. Verify Table Catalog in Explorer
-    expect(screen.getAllByText("store_sales").length).toBeGreaterThan(0);
-    expect(screen.getByText("web_sales")).toBeInTheDocument();
+    expect(screen.getAllByText("orders").length).toBeGreaterThan(0);
+    expect(screen.getByText("lineitem")).toBeInTheDocument();
 
     // 3. Inspect columns
-    expect(screen.getByText(/ss_net_paid/i)).toBeInTheDocument();
+    expect(screen.getByText(/o_totalprice/i)).toBeInTheDocument();
     expect(screen.getAllByText(/PK/i).length).toBeGreaterThan(0);
 
     // 4. Click Ask about table

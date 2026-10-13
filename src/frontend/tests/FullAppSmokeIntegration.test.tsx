@@ -65,7 +65,7 @@ describe("Full Application Smoke Integration (TDD Suite 5)", () => {
     expect(screen.getByTestId("activity-chart-container")).toBeInTheDocument();
   });
 
-  it("4. should render Data Sources (24 TPC-DS Tables) page without errors", () => {
+  it("4. should render Data Sources (8 TPC-H Tables) page without errors", () => {
     render(
       <AuthProvider>
         <DataSourcesPage />
@@ -75,7 +75,7 @@ describe("Full Application Smoke Integration (TDD Suite 5)", () => {
     expect(
       screen.getByRole("heading", { name: /Data sources & Schema/i })
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/store_sales/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/orders/i).length).toBeGreaterThan(0);
   });
 
   it("5. should render Saved Queries library page without errors", () => {

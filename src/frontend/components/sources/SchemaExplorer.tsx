@@ -27,26 +27,26 @@ export function SchemaExplorer({
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories: { id: FilterCategory; label: string; count: number }[] = [
-    { id: "all", label: t("sources.allTables"), count: tables.length },
+    { id: "all", label: t("sources.allTables", "All Tables"), count: tables.length },
     {
-      id: "sales",
-      label: t("sources.catSales"),
-      count: tables.filter((t) => t.category === "sales").length,
+      id: "transactions",
+      label: t("sources.catTransactions", "Transactions"),
+      count: tables.filter((t) => t.category === "transactions").length,
     },
     {
-      id: "returns",
-      label: t("sources.catReturns"),
-      count: tables.filter((t) => t.category === "returns").length,
+      id: "products_inventory",
+      label: t("sources.catProductsInventory", "Products & Inventory"),
+      count: tables.filter((t) => t.category === "products_inventory").length,
     },
     {
-      id: "inventory",
-      label: t("sources.catInventory"),
-      count: tables.filter((t) => t.category === "inventory").length,
+      id: "partners_customers",
+      label: t("sources.catPartnersCustomers", "Partners & Customers"),
+      count: tables.filter((t) => t.category === "partners_customers").length,
     },
     {
-      id: "dimensions",
-      label: t("sources.catDimensions"),
-      count: tables.filter((t) => t.category === "dimensions").length,
+      id: "geography",
+      label: t("sources.catGeography", "Geography"),
+      count: tables.filter((t) => t.category === "geography").length,
     },
   ];
 
@@ -130,7 +130,7 @@ export function SchemaExplorer({
         <div className="lg:col-span-4 bg-surface border border-line rounded-xl shadow-card overflow-hidden">
           <div className="p-3 border-b border-line bg-surface-2 flex items-center justify-between text-xs font-bold text-foreground">
             <span>
-              {t("sources.tablesHeader")} ({filteredTables.length})
+              {t("sources.tablesHeader", "TPC-H Tables")} ({filteredTables.length})
             </span>
             <span className="text-[10px] text-muted font-normal">
               {t("sources.clickToInspect")}

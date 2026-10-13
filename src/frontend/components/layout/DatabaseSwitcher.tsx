@@ -10,8 +10,8 @@ interface DatabaseSwitcherProps {
 }
 
 export function DatabaseSwitcher({
-  databaseName = "AdventureWorks",
-  engineInfo = "DuckDB TPC-DS (24 tables)",
+  databaseName = "TPC-H Analytics",
+  engineInfo = "DuckDB TPC-H (8 tables)",
   status = "connected",
 }: DatabaseSwitcherProps) {
   return (

@@ -1,4 +1,8 @@
-export type TableCategory = "sales" | "returns" | "inventory" | "dimensions";
+export type TableCategory =
+  | "transactions"
+  | "products_inventory"
+  | "partners_customers"
+  | "geography";
 
 export interface ColumnMetadata {
   name: string;

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { DataSourceCard } from "@/components/sources/DataSourceCard";
 import { SchemaExplorer } from "@/components/sources/SchemaExplorer";
-import { TPCDS_TABLES } from "@/data/tpcdsCatalog";
+import { TPCH_TABLES } from "@/data/tpchCatalog";
 import { TableMetadata } from "@/types/schema";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -13,7 +13,7 @@ export default function DataSourcesPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const [selectedTable, setSelectedTable] = useState<TableMetadata | null>(
-    TPCDS_TABLES[0]
+    TPCH_TABLES[0]
   );
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -56,11 +56,11 @@ export default function DataSourcesPage() {
       </div>
 
       {/* Connection Card Top */}
-      <DataSourceCard tableCount={TPCDS_TABLES.length} />
+      <DataSourceCard tableCount={TPCH_TABLES.length} />
 
       {/* Schema Explorer & Table Inspector */}
       <SchemaExplorer
-        tables={TPCDS_TABLES}
+        tables={TPCH_TABLES}
         selectedTable={selectedTable}
         onSelectTable={setSelectedTable}
         onAskQuestion={handleAskQuestion}

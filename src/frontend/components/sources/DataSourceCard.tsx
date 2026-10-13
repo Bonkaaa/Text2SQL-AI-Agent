@@ -10,7 +10,7 @@ interface DataSourceCardProps {
 }
 
 export function DataSourceCard({
-  tableCount = 24,
+  tableCount = 8,
 }: DataSourceCardProps) {
   const { t } = useLanguage();
 
@@ -25,7 +25,7 @@ export function DataSourceCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-foreground">
-                DuckDB TPC-DS Benchmark
+                DuckDB TPC-H Benchmark
               </h3>
               <span className="text-[10px] font-bold text-emerald bg-emerald-soft px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
@@ -57,7 +57,7 @@ export function DataSourceCard({
         <div className="p-2 rounded-lg bg-surface-2 border border-line">
           <span className="text-[10px] text-muted font-semibold block">{t("sources.salesChannels")}</span>
           <strong className="text-base font-extrabold text-foreground font-mono">
-            Store, Web, Catalog
+            Supply Chain & B2B/B2C
           </strong>
         </div>
         <div className="p-2 rounded-lg bg-surface-2 border border-line">
@@ -69,7 +69,7 @@ export function DataSourceCard({
         <div className="p-2 rounded-lg bg-surface-2 border border-line">
           <span className="text-[10px] text-muted font-semibold block">{t("sources.modeledRecords")}</span>
           <strong className="text-base font-extrabold text-foreground font-mono tabular-nums">
-            ~17.5M rows
+            ~8.7M rows
           </strong>
         </div>
       </div>
