@@ -98,7 +98,7 @@ export const PRESET_HISTORY_ITEMS: HistoryItem[] = [
   {
     id: "hist_4",
     question: "Tồn kho các mặt hàng linh kiện có số lượng dưới 100",
-    sql: "SELECT p_partkey, ps_suppkey, ps_availqty FROM partsupp WHERE ps_availqty < 100 LIMIT 20;",
+    sql: "SELECT ps_partkey, ps_suppkey, ps_availqty FROM partsupp WHERE ps_availqty < 100 LIMIT 20;",
     status: "SUCCESS",
     rowCount: 20,
     executionTimeMs: 154,

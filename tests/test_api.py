@@ -228,7 +228,7 @@ async def test_approve_query_success_with_pending_execution():
     )
     save_pending_approval(
         session_id="sess_hitl_exec",
-        sql="SELECT c_customer_sk FROM customer LIMIT 2",
+        sql="SELECT c_custkey FROM customer LIMIT 2",
         estimated_bytes=50000,
         user_context=user_context,
     )
@@ -410,7 +410,7 @@ async def test_approve_idempotent_duplicate_request():
     )
     saved = save_pending_approval(
         session_id="sess_idempotent_test",
-        sql="SELECT c_customer_sk FROM customer LIMIT 1",
+        sql="SELECT c_custkey FROM customer LIMIT 1",
         estimated_bytes=1000,
         user_context=user_context,
     )
