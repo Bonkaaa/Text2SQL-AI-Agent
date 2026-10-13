@@ -19,6 +19,7 @@ import math
 import sys
 import time
 from dataclasses import asdict, dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +29,13 @@ import duckdb
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.agents.supervisor import arun_supervisor
+from src.config import get_settings
 from src.models.rbac import UserContext, UserRole
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_DB_PATH: str = get_settings().duckdb_path
+DEFAULT_OUTPUT_REPORT_PATH: str = "evals/reports/benchmark_report.json"
 
 
 @dataclass
@@ -69,6 +74,8 @@ def normalize_value(val: Any) -> Any:
     """Chuẩn hóa giá trị để so sánh độc lập kiểu dữ liệu."""
     if val is None:
         return None
+    if isinstance(val, (date, datetime)):
+        return val.isoformat()
     if isinstance(val, float):
         if math.isnan(val):
             return "NaN"
@@ -198,7 +205,7 @@ async def run_benchmark(
     dataset_path: str,
     limit: int | None = None,
     output_path: str | None = None,
-    db_path: str = "data/tpcds.duckdb",
+    db_path: str = DEFAULT_DB_PATH,
     mock: bool = False,
 ) -> BenchmarkSummary:
     """Chạy toàn bộ quy trình benchmark trên tập dataset."""
@@ -300,14 +307,14 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=str,
-        default=None,
-        help="Đường dẫn tệp JSON để xuất báo cáo chi tiết",
+        default=DEFAULT_OUTPUT_REPORT_PATH,
+        help=f"Đường dẫn tệp JSON để xuất báo cáo chi tiết (mặc định: {DEFAULT_OUTPUT_REPORT_PATH})",
     )
     parser.add_argument(
         "--db-path",
         type=str,
-        default="data/tpcds.duckdb",
-        help="Đường dẫn file DuckDB database (mặc định: data/tpcds.duckdb)",
+        default=DEFAULT_DB_PATH,
+        help=f"Đường dẫn file DuckDB database (mặc định: {DEFAULT_DB_PATH})",
     )
     parser.add_argument(
         "--mock",
