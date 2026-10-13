@@ -62,13 +62,19 @@ export function SchemaExplorer({
         t.name.toLowerCase().includes(q) ||
         t.displayName.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
-        t.columns.some((c) => c.name.toLowerCase().includes(q))
+        t.columns.some(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            c.description.toLowerCase().includes(q)
+        )
       );
     });
   }, [tables, activeCategory, searchQuery]);
 
   const currentSelected =
-    selectedTable || filteredTables[0] || tables[0] || null;
+    selectedTable && filteredTables.some((t) => t.name === selectedTable.name)
+      ? selectedTable
+      : filteredTables[0] || null;
 
   return (
     <div className="space-y-4">
